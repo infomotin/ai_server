@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% block title %}OpenLocalAI - Chat{% endblock %}
+{% block header_title %}AI Chat{% endblock %}
+
+{% block content %}
+<div class="grid grid-cols-1 lg:grid-cols-4 gap-6" style="height: calc(100vh - 180px);">
+    <!-- Settings Panel -->
+    <div class="lg:col-span-1 hidden lg:block">
+        <div class="card h-full">
+            <h3 class="text-white font-semibold mb-4"><i class="fas fa-cog mr-2 text-gray-400"></i>Settings</h3>
+
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-300 mb-1.5">Model</label>
+                <select id="model-select" class="input-field">
+                    <option value="">Default</option>
+                    {% for model in models %}
+                    <option value="{{ model.id }}" {{ 'selected' if user_settings and user_settings.default_model == model.id }}>{{ model.id }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-300 mb-1.5">Skill</label>
+                <select id="skill-select" class="input-field">
+                    <option value="">No Skill</option>
+                    {% for skill in skills %}
+                    <option value="{{ skill.id }}">{{ skill.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-300 mb-1.5">Temperature: <span id="temp-val">0.7</span></label>
+                <input type="range" id="temperature" min="0" max="2" step="0.1" value="0.7" class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-blue-500">
+            </div>
+
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-300 mb-1.5">Max Tokens</label>
+                <input type="number" id="max-tokens" value="1000" min="1" max="4096" class="input-field">
+            </div>
+
+            <div class="mt-auto pt-4 border-t border-gray-700">
+                <button onclick="clearChat()" class="w-full text-center text-gray-400 hover:text-white text-sm transition">
+                    <i class="fas fa-trash mr-1"></i>Clear Chat
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chat Area -->
+    <div class="lg:col-span-3 flex flex-col">
+        <div class="card flex-1 flex flex-col overflow-hidden">
+            <div id="chat-messages" class="flex-1 overflow-y-auto p-4 space-y-4">
+                <div class="flex items-start gap-3">
+                    <div class="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center flex-shrink-0"><i class="fas fa-robot text-white text-xs"></i></div>
+                    <div class="bg-gray-700 rounded-xl rounded-tl-none p-4 max-w-[80%]">
+                        <p class="text-sm text-gray-200">Hello! I'm your AI assistant. Ask me anything, or select a skill to customize my behavior.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="border-t border-gray-700 p-4">
+                <form id="chat-form" class="flex gap-3">
+                    <input type="text" id="message-input" placeholder="Type your message..." autocomplete="off"
+                        class="flex-1 px-4 py-3 bg-gray-700 border border-gray-600 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    <button type="submit" class="btn btn-primary px-6 py-3 rounded-xl">
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const chatForm = document.getElementById('chat-form');
+const messageInput = document.getElementById('message-input');
+const chatMessages = document.getElementById('chat-messages');
+const temperature = document.getElementById('temperature');
+const tempVal = document.getElementById('temp-val');
+
+temperature.addEventListener('input', () => tempVal.textContent = temperature.value);
+
+let history = [];
+
+chatForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const msg = messageInput.value.trim();
+    if (!msg) return;
+
+    addMessage('user', msg);
+    messageInput.value = '';
+    history.push({ role: 'user', content: msg });
+
+    try {
+        const resp = await fetch('/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                messages: history,
+                model: document.getElementById('model-select').value || undefined,
+                skill_id: document.getElementById('skill-select').value || undefined,
+                temperature: parseFloat(temperature.value),
+                max_tokens: parseInt(document.getElementById('max-tokens').value)
+            })
+        });
+        const data = await resp.json();
+        if (resp.ok) {
+            const content = data.choices[0].message.content;
+            addMessage('assistant', content);
+            history.push({ role: 'assistant', content });
+        } else {
+            addMessage('assistant', 'Error: ' + (data.detail?.message || data.error || 'Request failed'));
+        }
+    } catch (err) {
+        addMessage('assistant', 'Connection error: ' + err.message);
+    }
+});
+
+function addMessage(role, content) {
+    const isUser = role === 'user';
+    const div = document.createElement('div');
+    div.className = `flex items-start gap-3 ${isUser ? 'justify-end' : ''}`;
+    div.innerHTML = isUser
+        ? `<div class="bg-blue-600 rounded-xl rounded-tr-none p-4 max-w-[80%]"><p class="text-sm text-gray-200 whitespace-pre-wrap">${esc(content)}</p></div><div class="w-8 h-8 bg-gray-600 rounded-full flex items-center justify-center flex-shrink-0"><i class="fas fa-user text-white text-xs"></i></div>`
+        : `<div class="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center flex-shrink-0"><i class="fas fa-robot text-white text-xs"></i></div><div class="bg-gray-700 rounded-xl rounded-tl-none p-4 max-w-[80%]"><p class="text-sm text-gray-200 whitespace-pre-wrap">${esc(content)}</p></div>`;
+    chatMessages.appendChild(div);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+function clearChat() {
+    history = [];
+    chatMessages.innerHTML = `<div class="flex items-start gap-3"><div class="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center flex-shrink-0"><i class="fas fa-robot text-white text-xs"></i></div><div class="bg-gray-700 rounded-xl rounded-tl-none p-4 max-w-[80%]"><p class="text-sm text-gray-200">Chat cleared. How can I help?</p></div></div>`;
+}
+
+function esc(t) { const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
+</script>
+{% endblock %}

@@ -1,0 +1,43 @@
+app:
+  name: "OpenLocalAI"
+  host: "0.0.0.0"
+  port: 8000
+  debug: false
+  secret_key: "openlocalai-prod-secret-key-2024-change-in-production"
+  cors_origins:
+    - "*"
+  allowed_hosts:
+    - "*"
+
+database:
+  url: "sqlite:///./openlocalai.db"
+  echo: false
+
+inference:
+  provider: "ollama"
+  ollama:
+    base_url: "http://localhost:11434"
+    timeout: 300
+  lmstudio:
+    base_url: "http://localhost:1234"
+    timeout: 300
+
+rate_limiting:
+  enabled: true
+  default_requests_per_minute: 120
+  burst_size: 20
+
+models:
+  default: "llama3.2:1b"
+  cache_dir: "./models"
+
+data:
+  upload_dir: "./data/uploads"
+  max_file_size: 104857600
+
+skills:
+  storage_dir: "./data/skills"
+
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"

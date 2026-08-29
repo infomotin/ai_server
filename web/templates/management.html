@@ -1,0 +1,672 @@
+{% extends "base.html" %}
+{% block title %}OpenLocalAI - Management{% endblock %}
+{% block header_title %}AI Model Management{% endblock %}
+
+{% block content %}
+<!-- Tabs -->
+<div class="flex flex-wrap gap-1 mb-6 bg-gray-800 p-1 rounded-xl">
+    <button onclick="showTab('models')" id="tab-models" class="px-3 py-2 rounded-lg text-sm font-medium bg-blue-600 text-white transition">
+        <i class="fas fa-cube mr-1"></i>Model Selection
+    </button>
+    <button onclick="showTab('info')" id="tab-info" class="px-3 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white transition">
+        <i class="fas fa-info-circle mr-1"></i>Model Info
+    </button>
+    <button onclick="showTab('pdf')" id="tab-pdf" class="px-3 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white transition">
+        <i class="fas fa-file-pdf mr-1"></i>Train from PDF
+    </button>
+    <button onclick="showTab('web')" id="tab-web" class="px-3 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white transition">
+        <i class="fas fa-globe mr-1"></i>Train from Web
+    </button>
+    <button onclick="showTab('restrict')" id="tab-restrict" class="px-3 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white transition">
+        <i class="fas fa-shield-halved mr-1"></i>Restriction Mode
+    </button>
+    <button onclick="showTab('security')" id="tab-security" class="px-3 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white transition">
+        <i class="fas fa-lock mr-1"></i>Security
+    </button>
+    <button onclick="showTab('resources')" id="tab-resources" class="px-3 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white transition">
+        <i class="fas fa-server mr-1"></i>Resources
+    </button>
+</div>
+
+<!-- ==================== MODEL SELECTION TAB ==================== -->
+<div id="panel-models" class="space-y-6">
+    {% if current_model %}
+    <div class="flex items-center gap-3 p-4 bg-blue-900/30 border border-blue-700 rounded-xl">
+        <i class="fas fa-check-circle text-blue-400"></i>
+        <span class="text-blue-200">Active Model:</span>
+        <span class="font-bold text-white">{{ current_model }}</span>
+    </div>
+    {% endif %}
+
+    <div class="card">
+        <h3 class="text-white font-semibold mb-4"><i class="fas fa-th-large mr-2 text-blue-400"></i>Available Models</h3>
+        <p class="text-gray-400 text-sm mb-4">Select a model. Lighter models use less memory and respond faster.</p>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {% for model in models %}
+            <div class="p-4 bg-gray-800/50 rounded-xl border border-gray-700 hover:border-blue-500 transition relative">
+                {% if model.recommendation == 'lightweight' %}
+                <span class="absolute top-2 right-2 badge badge-green text-[10px]">Lightweight</span>
+                {% elif model.recommendation == 'balanced' %}
+                <span class="absolute top-2 right-2 badge badge-blue text-[10px]">Balanced</span>
+                {% else %}
+                <span class="absolute top-2 right-2 badge badge-yellow text-[10px]">Powerful</span>
+                {% endif %}
+
+                <div class="flex items-center gap-3 mb-3">
+                    <div class="w-10 h-10 rounded-lg flex items-center justify-center
+                        {% if model.recommendation == 'lightweight' %}bg-green-600/20
+                        {% elif model.recommendation == 'balanced' %}bg-blue-600/20
+                        {% else %}bg-amber-600/20{% endif %}">
+                        <i class="fas fa-microchip
+                            {% if model.recommendation == 'lightweight' %}text-green-400
+                            {% elif model.recommendation == 'balanced' %}text-blue-400
+                            {% else %}text-amber-400{% endif %}"></i>
+                    </div>
+                    <div>
+                        <div class="font-medium text-white text-sm">{{ model.name }}</div>
+                        <div class="text-xs text-gray-500">{{ model.parameter_count // 1000000000 }}B params | {{ model.size_gb }}GB</div>
+                    </div>
+                </div>
+
+                <div class="flex flex-wrap gap-1 mb-3">
+                    {% for cap in model.capabilities[:3] %}
+                    <span class="px-2 py-0.5 bg-gray-700 rounded text-[10px] text-gray-300">{{ cap }}</span>
+                    {% endfor %}
+                </div>
+
+                <div class="flex items-center justify-between">
+                    <span class="text-xs text-gray-500">VRAM: {{ model.vram_required }}</span>
+                    {% if model.is_current %}
+                    <span class="badge badge-blue">Active</span>
+                    {% else %}
+                    <form method="POST" action="/management/model/switch" class="inline">
+                        <input type="hidden" name="model" value="{{ model.id }}">
+                        <button type="submit" class="btn btn-primary btn-sm text-xs">Switch</button>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<!-- ==================== MODEL INFO TAB ==================== -->
+<div id="panel-info" class="hidden space-y-6">
+    <div class="card">
+        <h3 class="text-white font-semibold mb-4"><i class="fas fa-info-circle mr-2 text-blue-400"></i>Model Information</h3>
+        <p class="text-gray-400 text-sm mb-4">Select a model to view detailed information.</p>
+
+        <div class="flex gap-3 mb-6">
+            <select id="info-model-select" class="input-field flex-1" onchange="loadModelInfo(this.value)">
+                <option value="">Choose a model...</option>
+                {% for model in models %}
+                <option value="{{ model.id }}" {% if model.is_current %}selected{% endif %}>{{ model.name }} ({{ model.id }})</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div id="model-info-content" class="hidden">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="p-4 bg-gray-800/50 rounded-lg">
+                    <p class="text-xs text-gray-500 mb-1">Provider</p>
+                    <p class="text-sm text-white font-medium" id="info-provider">-</p>
+                </div>
+                <div class="p-4 bg-gray-800/50 rounded-lg">
+                    <p class="text-xs text-gray-500 mb-1">Parameters</p>
+                    <p class="text-sm text-white font-medium" id="info-params">-</p>
+                </div>
+                <div class="p-4 bg-gray-800/50 rounded-lg">
+                    <p class="text-xs text-gray-500 mb-1">Quantization</p>
+                    <p class="text-sm text-white font-medium" id="info-quant">-</p>
+                </div>
+                <div class="p-4 bg-gray-800/50 rounded-lg">
+                    <p class="text-xs text-gray-500 mb-1">VRAM Required</p>
+                    <p class="text-sm text-white font-medium" id="info-vram">-</p>
+                </div>
+                <div class="p-4 bg-gray-800/50 rounded-lg">
+                    <p class="text-xs text-gray-500 mb-1">Category</p>
+                    <p class="text-sm text-white font-medium" id="info-rec">-</p>
+                </div>
+                <div class="p-4 bg-gray-800/50 rounded-lg">
+                    <p class="text-xs text-gray-500 mb-1">Capabilities</p>
+                    <p class="text-sm text-white font-medium" id="info-caps">-</p>
+                </div>
+            </div>
+
+            <div class="mt-4 p-4 bg-gray-800/50 rounded-lg">
+                <p class="text-xs text-gray-500 mb-2">Lighter Alternatives</p>
+                <div id="info-lighter" class="flex flex-wrap gap-2"></div>
+            </div>
+
+            <div class="mt-4 p-4 bg-gray-900 rounded-lg">
+                <p class="text-xs text-gray-500 mb-2">Raw Model Details</p>
+                <pre class="text-xs text-green-400 overflow-x-auto max-h-64 overflow-y-auto" id="info-raw"></pre>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ==================== TRAIN FROM PDF TAB ==================== -->
+<div id="panel-pdf" class="hidden space-y-6">
+    <div class="card">
+        <h3 class="text-white font-semibold mb-4"><i class="fas fa-file-pdf mr-2 text-red-400"></i>Train Model from PDF</h3>
+        <p class="text-gray-400 text-sm mb-4">Upload a PDF document. Text will be extracted and stored as a knowledge base that enhances model responses.</p>
+
+        <form method="POST" action="/management/pdf/upload" enctype="multipart/form-data" class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-300 mb-1.5">Knowledge Base Name</label>
+                <input type="text" name="kb_name" class="input-field" placeholder="e.g. Company Documentation" required>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-300 mb-1.5">PDF File</label>
+                <input type="file" name="pdf_file" accept=".pdf" class="input-field" required>
+                <p class="text-xs text-gray-500 mt-1">Maximum 10MB. Text will be extracted automatically.</p>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-300 mb-1.5">Target Model (optional)</label>
+                <select name="model_id" class="input-field">
+                    <option value="">Current model</option>
+                    {% for model in models %}
+                    <option value="{{ model.id }}">{{ model.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button type="submit" class="btn btn-primary w-full">
+                <i class="fas fa-upload mr-2"></i>Upload & Process PDF
+            </button>
+        </form>
+    </div>
+
+    <!-- Background Tasks -->
+    {% if tasks %}
+    <div class="card">
+        <h3 class="text-white font-semibold mb-4"><i class="fas fa-spinner mr-2 text-yellow-400"></i>Background Tasks</h3>
+        <div class="space-y-3" id="tasks-list">
+            {% for task in tasks %}
+            <div class="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg" data-task-id="{{ task.id }}">
+                <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 rounded-lg flex items-center justify-center
+                        {% if task.status == 'completed' %}bg-green-600/20
+                        {% elif task.status == 'running' %}bg-blue-600/20
+                        {% elif task.status == 'failed' %}bg-red-600/20
+                        {% else %}bg-gray-600/20{% endif %}">
+                        {% if task.status == 'completed' %}
+                        <i class="fas fa-check text-green-400 text-sm"></i>
+                        {% elif task.status == 'running' %}
+                        <i class="fas fa-spinner fa-spin text-blue-400 text-sm"></i>
+                        {% elif task.status == 'failed' %}
+                        <i class="fas fa-times text-red-400 text-sm"></i>
+                        {% else %}
+                        <i class="fas fa-clock text-gray-400 text-sm"></i>
+                        {% endif %}
+                    </div>
+                    <div>
+                        <div class="text-sm text-white">{{ task.task_type|upper }} - {{ task.id[:8] }}</div>
+                        <div class="text-xs text-gray-500">
+                            {% if task.result_summary %}{{ task.result_summary[:80] }}
+                            {% elif task.error_message %}Error: {{ task.error_message[:80] }}
+                            {% else %}{{ task.status }}{% endif %}
+                        </div>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    {% if task.status in ['pending', 'running'] %}
+                    <div class="w-24 bg-gray-700 rounded-full h-2">
+                        <div class="bg-blue-500 h-2 rounded-full transition-all" style="width: {{ task.progress_percent }}%"></div>
+                    </div>
+                    <span class="text-xs text-gray-500">{{ task.progress_percent }}%</span>
+                    <form method="POST" action="/management/task/cancel/{{ task.id }}" class="inline">
+                        <button type="submit" class="text-red-400 hover:text-red-300 text-xs"><i class="fas fa-times"></i></button>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- ==================== TRAIN FROM WEB TAB ==================== -->
+<div id="panel-web" class="hidden space-y-6">
+    <div class="card">
+        <h3 class="text-white font-semibold mb-4"><i class="fas fa-globe mr-2 text-blue-400"></i>Train Model from Web Crawling</h3>
+        <p class="text-gray-400 text-sm mb-4">Enter a website URL to crawl. Text content from pages will be extracted and stored as a knowledge base.</p>
+
+        <form method="POST" action="/management/web/crawl" class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-300 mb-1.5">Website URL</label>
+                <input type="url" name="url" class="input-field" placeholder="https://example.com" required>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-1.5">Max Pages</label>
+                    <input type="number" name="max_pages" class="input-field" value="10" min="1" max="100">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-1.5">Target Model</label>
+                    <select name="model_id" class="input-field">
+                        <option value="">Current model</option>
+                        {% for model in models %}
+                        <option value="{{ model.id }}">{{ model.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary w-full">
+                <i class="fas fa-spider mr-2"></i>Start Web Crawl
+            </button>
+        </form>
+    </div>
+</div>
+
+<!-- ==================== RESTRICTION MODE TAB ==================== -->
+<div id="panel-restrict" class="hidden space-y-6">
+    <div class="card">
+        <h3 class="text-white font-semibold mb-4"><i class="fas fa-shield-halved mr-2 text-purple-400"></i>Create Restriction Profile</h3>
+        <p class="text-gray-400 text-sm mb-4">Configure how the AI model filters and restricts its responses.</p>
+
+        <form method="POST" action="/management/restriction/create" class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-300 mb-1.5">Profile Name</label>
+                <input type="text" name="name" class="input-field" placeholder="e.g. Customer Support Bot" required>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-300 mb-1.5">Restriction Mode</label>
+                <select name="restriction_mode" class="input-field" onchange="toggleRestrictionFields(this.value)">
+                    <option value="none">No Restrictions</option>
+                    <option value="topic">Topic-Based Filtering</option>
+                    <option value="security">Security Level</option>
+                    <option value="custom">Custom Rules</option>
+                </select>
+            </div>
+
+            <div id="topic-fields" class="hidden space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-1.5">Allowed Topics (comma-separated)</label>
+                    <input type="text" name="allowed_topics" class="input-field" placeholder="e.g. products, pricing, support">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-1.5">Blocked Topics (comma-separated)</label>
+                    <input type="text" name="blocked_topics" class="input-field" placeholder="e.g. politics, religion, competitors">
+                </div>
+            </div>
+
+            <div id="security-fields" class="hidden">
+                <label class="block text-sm font-medium text-gray-300 mb-1.5">Security Level</label>
+                <div class="grid grid-cols-2 gap-3">
+                    <label class="p-3 bg-gray-800/50 rounded-lg border border-gray-700 cursor-pointer hover:border-blue-500 transition">
+                        <input type="radio" name="security_level" value="low" class="hidden peer">
+                        <div class="peer-checked:text-blue-400 text-center">
+                            <i class="fas fa-shield-halved text-lg mb-1"></i>
+                            <p class="text-sm font-medium">Low</p>
+                            <p class="text-[10px] text-gray-500">Basic filtering</p>
+                        </div>
+                    </label>
+                    <label class="p-3 bg-gray-800/50 rounded-lg border border-gray-700 cursor-pointer hover:border-blue-500 transition">
+                        <input type="radio" name="security_level" value="medium" class="hidden peer" checked>
+                        <div class="peer-checked:text-blue-400 text-center">
+                            <i class="fas fa-shield text-lg mb-1"></i>
+                            <p class="text-sm font-medium">Medium</p>
+                            <p class="text-[10px] text-gray-500">Standard protection</p>
+                        </div>
+                    </label>
+                    <label class="p-3 bg-gray-800/50 rounded-lg border border-gray-700 cursor-pointer hover:border-blue-500 transition">
+                        <input type="radio" name="security_level" value="high" class="hidden peer">
+                        <div class="peer-checked:text-blue-400 text-center">
+                            <i class="fas fa-shield-halved text-lg mb-1"></i>
+                            <p class="text-sm font-medium">High</p>
+                            <p class="text-[10px] text-gray-500">Maximum restriction</p>
+                        </div>
+                    </label>
+                    <label class="p-3 bg-gray-800/50 rounded-lg border border-gray-700 cursor-pointer hover:border-blue-500 transition">
+                        <input type="radio" name="security_level" value="none" class="hidden peer">
+                        <div class="peer-checked:text-blue-400 text-center">
+                            <i class="fas fa-unlock text-lg mb-1"></i>
+                            <p class="text-sm font-medium">None</p>
+                            <p class="text-[10px] text-gray-500">No security filtering</p>
+                        </div>
+                    </label>
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary w-full">
+                <i class="fas fa-plus mr-2"></i>Create Restriction Profile
+            </button>
+        </form>
+    </div>
+
+    <!-- Existing Profiles -->
+    {% if restrictions %}
+    <div class="card">
+        <h3 class="text-white font-semibold mb-4"><i class="fas fa-list mr-2 text-gray-400"></i>Restriction Profiles</h3>
+        <div class="space-y-3">
+            {% for profile in restrictions %}
+            <div class="flex items-center justify-between p-4 bg-gray-800/50 rounded-xl border border-gray-700">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-lg flex items-center justify-center
+                        {% if profile.is_active %}bg-green-600/20{% else %}bg-gray-600/20{% endif %}">
+                        {% if profile.restriction_mode == 'topic' %}
+                        <i class="fas fa-tag {% if profile.is_active %}text-green-400{% else %}text-gray-400{% endif %}"></i>
+                        {% elif profile.restriction_mode == 'security' %}
+                        <i class="fas fa-shield {% if profile.is_active %}text-green-400{% else %}text-gray-400{% endif %}"></i>
+                        {% elif profile.restriction_mode == 'custom' %}
+                        <i class="fas fa-cog {% if profile.is_active %}text-green-400{% else %}text-gray-400{% endif %}"></i>
+                        {% else %}
+                        <i class="fas fa-unlock {% if profile.is_active %}text-green-400{% else %}text-gray-400{% endif %}"></i>
+                        {% endif %}
+                    </div>
+                    <div>
+                        <div class="text-sm text-white font-medium">{{ profile.name }}</div>
+                        <div class="text-xs text-gray-500">Mode: {{ profile.recommendation_mode if profile.recommendation_mode else profile.restriction_mode }} | Level: {{ profile.security_level }}</div>
+                        {% if profile.allowed_topics %}
+                        <div class="text-[10px] text-gray-500 mt-1">Topics: {{ profile.allowed_topics|join(', ') }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    {% if profile.is_active %}
+                    <span class="badge badge-green">Active</span>
+                    {% else %}
+                    <form method="POST" action="/management/restriction/activate/{{ profile.id }}" class="inline">
+                        <button type="submit" class="btn btn-primary btn-sm text-xs">Activate</button>
+                    </form>
+                    {% endif %}
+                    <form method="POST" action="/management/restriction/delete/{{ profile.id }}" class="inline"
+                          onsubmit="return confirm('Delete this restriction profile?')">
+                        <button type="submit" class="text-red-400 hover:text-red-300 text-sm"><i class="fas fa-trash"></i></button>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        {% if restrictions|selectattr('is_active')|list %}
+        <form method="POST" action="/management/restriction/deactivate" class="mt-4">
+            <button type="submit" class="btn btn-danger w-full">
+                <i class="fas fa-times mr-2"></i>Deactivate All Restrictions
+            </button>
+        </form>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+
+<!-- ==================== SECURITY TAB ==================== -->
+<div id="panel-security" class="hidden space-y-6">
+    <div class="card">
+        <h3 class="text-white font-semibold mb-4"><i class="fas fa-lock mr-2 text-green-400"></i>Security Guidelines</h3>
+        <p class="text-gray-400 text-sm mb-4">Configure security levels to control what the AI model can discuss.</p>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="p-4 bg-gray-800/50 rounded-xl border border-gray-700">
+                <div class="flex items-center gap-3 mb-3">
+                    <div class="w-10 h-10 bg-green-600/20 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-unlock text-green-400"></i>
+                    </div>
+                    <div>
+                        <h4 class="text-sm font-medium text-white">No Security</h4>
+                        <p class="text-[10px] text-gray-500">Unrestricted responses</p>
+                    </div>
+                </div>
+                <p class="text-xs text-gray-400">The model responds without any content filtering. Best for private, trusted environments.</p>
+            </div>
+
+            <div class="p-4 bg-gray-800/50 rounded-xl border border-gray-700">
+                <div class="flex items-center gap-3 mb-3">
+                    <div class="w-10 h-10 bg-yellow-600/20 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-shield-halved text-yellow-400"></i>
+                    </div>
+                    <div>
+                        <h4 class="text-sm font-medium text-white">Low Security</h4>
+                        <p class="text-[10px] text-gray-500">Basic content filtering</p>
+                    </div>
+                </div>
+                <p class="text-xs text-gray-400">Filters harmful, illegal, and explicit content. Suitable for general use.</p>
+            </div>
+
+            <div class="p-4 bg-gray-800/50 rounded-xl border border-gray-700">
+                <div class="flex items-center gap-3 mb-3">
+                    <div class="w-10 h-10 bg-orange-600/20 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-shield text-orange-400"></i>
+                    </div>
+                    <div>
+                        <h4 class="text-sm font-medium text-white">Medium Security</h4>
+                        <p class="text-[10px] text-gray-500">Standard protection</p>
+                    </div>
+                </div>
+                <p class="text-xs text-gray-400">Blocks weapons, hacking, drugs, self-harm, fraud. Recommended for business use.</p>
+            </div>
+
+            <div class="p-4 bg-gray-800/50 rounded-xl border border-gray-700">
+                <div class="flex items-center gap-3 mb-3">
+                    <div class="w-10 h-10 bg-red-600/20 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-shield-halved text-red-400"></i>
+                    </div>
+                    <div>
+                        <h4 class="text-sm font-medium text-white">High Security</h4>
+                        <p class="text-[10px] text-gray-500">Maximum restriction</p>
+                    </div>
+                </div>
+                <p class="text-xs text-gray-400">Family-friendly only. Blocks all controversial, political, and sensitive topics. Best for public-facing applications.</p>
+            </div>
+        </div>
+
+        <div class="mt-6 p-4 bg-blue-900/20 border border-blue-700 rounded-xl">
+            <h4 class="text-sm font-medium text-blue-300 mb-2"><i class="fas fa-lightbulb mr-1"></i>How Security Works</h4>
+            <p class="text-xs text-gray-400">Security guidelines are applied via system prompts that instruct the model on what content to avoid. Create a restriction profile in the "Restriction Mode" tab to apply these guidelines.</p>
+        </div>
+    </div>
+</div>
+
+<!-- ==================== RESOURCES TAB ==================== -->
+<div id="panel-resources" class="hidden space-y-6">
+    <div class="card">
+        <h3 class="text-white font-semibold mb-4"><i class="fas fa-server mr-2 text-blue-400"></i>System Resources</h3>
+        <p class="text-gray-400 text-sm mb-4">Monitor server resource usage. Background tasks run with minimal resource impact.</p>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4" id="resource-gauges">
+            <div class="p-4 bg-gray-800/50 rounded-xl text-center">
+                <div class="relative w-20 h-20 mx-auto mb-3">
+                    <svg class="w-20 h-20 transform -rotate-90" viewBox="0 0 36 36">
+                        <path class="text-gray-700" stroke="currentColor" stroke-width="3" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
+                        <path id="cpu-arc" class="text-blue-500" stroke="currentColor" stroke-width="3" fill="none" stroke-dasharray="0, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
+                    </svg>
+                    <div class="absolute inset-0 flex items-center justify-center">
+                        <span class="text-lg font-bold text-white" id="cpu-value">{{ resources.cpu_percent|default(0) }}%</span>
+                    </div>
+                </div>
+                <p class="text-sm text-white font-medium">CPU Usage</p>
+            </div>
+
+            <div class="p-4 bg-gray-800/50 rounded-xl text-center">
+                <div class="relative w-20 h-20 mx-auto mb-3">
+                    <svg class="w-20 h-20 transform -rotate-90" viewBox="0 0 36 36">
+                        <path class="text-gray-700" stroke="currentColor" stroke-width="3" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
+                        <path id="mem-arc" class="text-purple-500" stroke="currentColor" stroke-width="3" fill="none" stroke-dasharray="0, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
+                    </svg>
+                    <div class="absolute inset-0 flex items-center justify-center">
+                        <span class="text-lg font-bold text-white" id="mem-value">{{ resources.memory_percent|default(0) }}%</span>
+                    </div>
+                </div>
+                <p class="text-sm text-white font-medium">Memory</p>
+                <p class="text-xs text-gray-500">{{ resources.memory_used_gb|default(0) }} / {{ resources.memory_total_gb|default(0) }} GB</p>
+            </div>
+
+            <div class="p-4 bg-gray-800/50 rounded-xl text-center">
+                <div class="relative w-20 h-20 mx-auto mb-3">
+                    <svg class="w-20 h-20 transform -rotate-90" viewBox="0 0 36 36">
+                        <path class="text-gray-700" stroke="currentColor" stroke-width="3" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
+                        <path id="disk-arc" class="text-green-500" stroke="currentColor" stroke-width="3" fill="none" stroke-dasharray="0, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
+                    </svg>
+                    <div class="absolute inset-0 flex items-center justify-center">
+                        <span class="text-lg font-bold text-white" id="disk-value">{{ resources.disk_percent|default(0) }}%</span>
+                    </div>
+                </div>
+                <p class="text-sm text-white font-medium">Disk</p>
+                <p class="text-xs text-gray-500">{{ resources.disk_used_gb|default(0) }} / {{ resources.disk_total_gb|default(0) }} GB</p>
+            </div>
+        </div>
+
+        <div class="mt-4 flex justify-center">
+            <button onclick="refreshResources()" class="btn btn-primary btn-sm">
+                <i class="fas fa-sync-alt mr-1"></i>Refresh
+            </button>
+        </div>
+    </div>
+
+    <!-- Active Tasks -->
+    <div class="card">
+        <h3 class="text-white font-semibold mb-4"><i class="fas fa-tasks mr-2 text-yellow-400"></i>Background Tasks</h3>
+        <div id="bg-tasks-list" class="space-y-2">
+            {% if tasks %}
+            {% for task in tasks %}
+            <div class="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
+                <div class="flex items-center gap-3">
+                    <div class="w-6 h-6 rounded flex items-center justify-center
+                        {% if task.status == 'completed' %}bg-green-600/20
+                        {% elif task.status == 'running' %}bg-blue-600/20
+                        {% elif task.status == 'failed' %}bg-red-600/20
+                        {% else %}bg-gray-600/20{% endif %}">
+                        {% if task.status == 'completed' %}
+                        <i class="fas fa-check text-green-400 text-[10px]"></i>
+                        {% elif task.status == 'running' %}
+                        <i class="fas fa-spinner fa-spin text-blue-400 text-[10px]"></i>
+                        {% elif task.status == 'failed' %}
+                        <i class="fas fa-times text-red-400 text-[10px]"></i>
+                        {% else %}
+                        <i class="fas fa-clock text-gray-400 text-[10px]"></i>
+                        {% endif %}
+                    </div>
+                    <span class="text-sm text-white">{{ task.task_type|upper }}</span>
+                    <span class="text-xs text-gray-500">{{ task.id[:8] }}</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="text-xs text-gray-500">{{ task.status }}</span>
+                    {% if task.status in ['pending', 'running'] %}
+                    <span class="text-xs text-blue-400">{{ task.progress_percent }}%</span>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+            {% else %}
+            <p class="text-gray-500 text-sm text-center py-4">No background tasks</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function showTab(name) {
+    document.querySelectorAll('[id^="panel-"]').forEach(p => p.classList.add('hidden'));
+    document.querySelectorAll('[id^="tab-"]').forEach(t => {
+        t.classList.remove('bg-blue-600', 'text-white');
+        t.classList.add('text-gray-400');
+    });
+    document.getElementById('panel-' + name).classList.remove('hidden');
+    const tab = document.getElementById('tab-' + name);
+    if (tab) {
+        tab.classList.add('bg-blue-600', 'text-white');
+        tab.classList.remove('text-gray-400');
+    }
+}
+
+function toggleRestrictionFields(mode) {
+    document.getElementById('topic-fields').classList.toggle('hidden', mode !== 'topic');
+    document.getElementById('security-fields').classList.toggle('hidden', mode !== 'security');
+}
+
+async function loadModelInfo(modelId) {
+    if (!modelId) {
+        document.getElementById('model-info-content').classList.add('hidden');
+        return;
+    }
+
+    try {
+        const resp = await fetch('/api/management/model-info/' + encodeURIComponent(modelId));
+        const data = await resp.json();
+
+        if (data.detail) {
+            alert('Error: ' + data.detail);
+            return;
+        }
+
+        document.getElementById('model-info-content').classList.remove('hidden');
+        document.getElementById('info-provider').textContent = data.id ? 'Ollama' : '-';
+        document.getElementById('info-params').textContent = data.capabilities ? data.capabilities.length + ' capabilities' : '-';
+        document.getElementById('info-rec').textContent = data.recommendation || '-';
+
+        const lighterDiv = document.getElementById('info-lighter');
+        if (data.lighter_models && data.lighter_models.length > 0) {
+            lighterDiv.innerHTML = data.lighter_models.map(m =>
+                '<span class="px-2 py-1 bg-green-600/20 border border-green-700 rounded text-xs text-green-300">' + m + '</span>'
+            ).join('');
+        } else {
+            lighterDiv.innerHTML = '<span class="text-xs text-gray-500">Already using the lightest model</span>';
+        }
+
+        document.getElementById('info-raw').textContent = JSON.stringify(data.details || data, null, 2);
+    } catch (err) {
+        console.error('Failed to load model info:', err);
+    }
+}
+
+async function refreshResources() {
+    try {
+        const resp = await fetch('/api/management/resources');
+        const data = await resp.json();
+
+        if (data.cpu_percent !== undefined) {
+            document.getElementById('cpu-value').textContent = data.cpu_percent + '%';
+            document.getElementById('cpu-arc').setAttribute('stroke-dasharray', data.cpu_percent + ', 100');
+        }
+        if (data.memory_percent !== undefined) {
+            document.getElementById('mem-value').textContent = data.memory_percent + '%';
+            document.getElementById('mem-arc').setAttribute('stroke-dasharray', data.memory_percent + ', 100');
+        }
+        if (data.disk_percent !== undefined) {
+            document.getElementById('disk-value').textContent = data.disk_percent + '%';
+            document.getElementById('disk-arc').setAttribute('stroke-dasharray', data.disk_percent + ', 100');
+        }
+    } catch (err) {
+        console.error('Failed to refresh resources:', err);
+    }
+}
+
+function updateArc(id, percent) {
+    const arc = document.getElementById(id);
+    if (arc) {
+        arc.setAttribute('stroke-dasharray', percent + ', 100');
+    }
+}
+
+updateArc('cpu-arc', {{ resources.cpu_percent|default(0) }});
+updateArc('mem-arc', {{ resources.memory_percent|default(0) }});
+updateArc('disk-arc', {{ resources.disk_percent|default(0) }});
+
+setInterval(refreshResources, 10000);
+
+setInterval(async () => {
+    try {
+        const resp = await fetch('/api/management/tasks');
+        const tasks = await resp.json();
+        const list = document.getElementById('tasks-list');
+        if (list && tasks.length > 0) {
+            tasks.forEach(task => {
+                const el = document.querySelector('[data-task-id="' + task.id + '"]');
+                if (el) {
+                    const progress = el.querySelector('.bg-blue-500');
+                    const label = el.querySelector('.text-xs.text-gray-500');
+                    if (progress) progress.style.width = task.progress_percent + '%';
+                    if (label && task.status === 'running') label.textContent = task.progress_percent + '%';
+                }
+            });
+        }
+    } catch (e) {}
+}, 3000);
+</script>
+{% endblock %}

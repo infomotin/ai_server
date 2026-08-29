@@ -1,0 +1,505 @@
+{% extends "base.html" %}
+{% block title %}OpenLocalAI - AI Assistants{% endblock %}
+{% block header_title %}AI Assistants{% endblock %}
+
+{% block content %}
+<!-- Stats Row -->
+<div class="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-6">
+    <div class="stat-card">
+        <div class="flex items-center justify-between mb-2">
+            <span class="text-gray-400 text-sm">Assistants</span>
+            <div class="w-9 h-9 bg-purple-600/20 rounded-lg flex items-center justify-center"><i class="fas fa-robot text-purple-400"></i></div>
+        </div>
+        <p class="text-2xl font-bold text-white">{{ stats.total_assistants }}</p>
+        <p class="text-xs text-gray-500 mt-1">Total assistants</p>
+    </div>
+    <div class="stat-card">
+        <div class="flex items-center justify-between mb-2">
+            <span class="text-gray-400 text-sm">Active</span>
+            <div class="w-9 h-9 bg-green-600/20 rounded-lg flex items-center justify-center"><i class="fas fa-check-circle text-green-400"></i></div>
+        </div>
+        <p class="text-2xl font-bold text-white">{{ stats.active_assistants }}</p>
+        <p class="text-xs text-gray-500 mt-1">Running</p>
+    </div>
+    <div class="stat-card">
+        <div class="flex items-center justify-between mb-2">
+            <span class="text-gray-400 text-sm">Tasks</span>
+            <div class="w-9 h-9 bg-blue-600/20 rounded-lg flex items-center justify-center"><i class="fas fa-tasks text-blue-400"></i></div>
+        </div>
+        <p class="text-2xl font-bold text-white">{{ stats.total_tasks }}</p>
+        <p class="text-xs text-gray-500 mt-1">Configured tasks</p>
+    </div>
+    <div class="stat-card">
+        <div class="flex items-center justify-between mb-2">
+            <span class="text-gray-400 text-sm">Actions</span>
+            <div class="w-9 h-9 bg-amber-600/20 rounded-lg flex items-center justify-center"><i class="fas fa-history text-amber-400"></i></div>
+        </div>
+        <p class="text-2xl font-bold text-white">{{ stats.total_logs }}</p>
+        <p class="text-xs text-gray-500 mt-1">Total actions</p>
+    </div>
+</div>
+
+<!-- Main Layout -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+    <!-- Left Column: Templates & Create -->
+    <div class="lg:col-span-1 space-y-6">
+        <div class="card">
+            <div class="flex items-center gap-3 mb-5">
+                <div class="w-10 h-10 bg-purple-600/20 rounded-xl flex items-center justify-center">
+                    <i class="fas fa-wand-magic-sparkles text-purple-400"></i>
+                </div>
+                <div>
+                    <h3 class="text-white font-semibold">Create Assistant</h3>
+                    <p class="text-xs text-gray-500">Choose a template to start</p>
+                </div>
+            </div>
+
+            <form method="POST" action="/assistants/create" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-2">Choose Template</label>
+                    <div class="grid grid-cols-2 gap-2" id="templateGrid">
+                        {% set templates = [
+                            ("email", "fas fa-envelope", "blue", "Email"),
+                            ("whatsapp", "fab fa-whatsapp", "green", "WhatsApp"),
+                            ("facebook", "fab fa-facebook", "indigo", "Facebook"),
+                            ("web_research", "fas fa-globe", "cyan", "Web Research"),
+                            ("calendar", "fas fa-calendar", "amber", "Calendar"),
+                            ("git", "fab fa-git-alt", "red", "Git Repo"),
+                            ("code", "fas fa-code", "purple", "Code"),
+                            ("data", "fas fa-chart-line", "teal", "Data"),
+                            ("customer", "fas fa-headset", "orange", "Support"),
+                            ("custom", "fas fa-user-gear", "gray", "Custom")
+                        ] %}
+                        {% for tmpl_id, icon, color, name in templates %}
+                        <button type="button" onclick="selectTemplate('{{ tmpl_id }}')" 
+                            class="template-btn p-3 rounded-lg border border-gray-700 text-left transition hover:border-purple-500/50"
+                            data-template="{{ tmpl_id }}">
+                            <i class="{{ icon }} text-{{ color }}-400 text-sm mb-1"></i>
+                            <p class="text-[10px] text-white font-medium">{{ name }}</p>
+                        </button>
+                        {% endfor %}
+                    </div>
+                    <input type="hidden" name="template" id="selectedTemplate" value="custom">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-1.5">Name <span class="text-red-400">*</span></label>
+                    <input type="text" name="name" id="assistantName" required class="input-field" placeholder="My Email Assistant">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-1.5">AI Model</label>
+                    <select name="model_id" class="input-field">
+                        <option value="llama3.2:1b">Llama 3.2 1B</option>
+                        <option value="qwen2.5:0.5b">Qwen 2.5 0.5B</option>
+                        <option value="phi3:mini">Phi-3 Mini</option>
+                        <option value="codellama:3.5">Code Llama 3.5</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-1.5">Personality</label>
+                    <select name="personality" class="input-field">
+                        <option value="professional">Professional</option>
+                        <option value="friendly">Friendly</option>
+                        <option value="concise">Concise</option>
+                        <option value="detailed">Detailed</option>
+                        <option value="technical">Technical</option>
+                    </select>
+                </div>
+
+                <button type="submit" class="btn btn-primary w-full py-3">
+                    <i class="fas fa-plus mr-2"></i>Create Assistant
+                </button>
+            </form>
+        </div>
+
+        <!-- Capabilities Info -->
+        <div class="card">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="w-10 h-10 bg-cyan-600/20 rounded-xl flex items-center justify-center">
+                    <i class="fas fa-info-circle text-cyan-400"></i>
+                </div>
+                <h3 class="text-white font-semibold">Capabilities</h3>
+            </div>
+            <div id="capabilitiesContent" class="space-y-2 text-sm">
+                <p class="text-gray-400">Select a template to see capabilities</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Column: Assistants List -->
+    <div class="lg:col-span-2 space-y-6">
+        <div class="flex items-center justify-between">
+            <h3 class="text-white font-semibold flex items-center gap-2">
+                <i class="fas fa-robot text-gray-400"></i> Your Assistants
+            </h3>
+            {% if assistants %}
+            <input type="text" id="assistantSearch" class="input-field py-1.5 px-3 text-sm w-48" placeholder="Search..." onkeyup="filterAssistants()">
+            {% endif %}
+        </div>
+
+        {% if assistants %}
+        <div class="space-y-4" id="assistantsList">
+            {% for a in assistants %}
+            <div class="card group hover:border-purple-500/30 transition-all assistant-card" data-name="{{ a.name|lower }}">
+                <div class="flex items-start justify-between mb-3">
+                    <div class="flex items-center gap-3 min-w-0">
+                        <div class="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0
+                            {% if a.is_active %}bg-green-600/20{% else %}bg-gray-700/50{% endif %}">
+                            <i class="{{ a.avatar or 'fas fa-robot' }} text-{{ 'green' if a.is_active else 'gray' }}-400 text-lg"></i>
+                        </div>
+                        <div class="min-w-0">
+                            <div class="flex items-center gap-2">
+                                <h4 class="text-white font-semibold truncate">{{ a.name }}</h4>
+                                {% if a.is_active %}
+                                <span class="badge badge-green text-[10px]">Active</span>
+                                {% else %}
+                                <span class="badge bg-gray-700 text-gray-400 text-[10px]">Inactive</span>
+                                {% endif %}
+                            </div>
+                            <p class="text-xs text-gray-500 truncate">{{ a.description }}</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-1 flex-shrink-0 ml-2">
+                        <button onclick="showAssistantDetail('{{ a.id }}')" class="p-2 text-gray-500 hover:text-blue-400 hover:bg-blue-600/10 rounded-lg transition" title="View & Configure">
+                            <i class="fas fa-eye text-sm"></i>
+                        </button>
+                        <form method="POST" action="/assistants/{{ a.id }}/delete" class="inline" onsubmit="return confirm('Delete assistant \'{{ a.name }}\'?')">
+                            <button type="submit" class="p-2 text-gray-500 hover:text-red-400 hover:bg-red-600/10 rounded-lg transition" title="Delete">
+                                <i class="fas fa-trash text-sm"></i>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+                <div class="flex items-center gap-4 text-xs text-gray-500">
+                    <span><i class="fas fa-cube mr-1"></i>{{ a.model_id }}</span>
+                    <span><i class="fas fa-user mr-1"></i>{{ a.personality }}</span>
+                    <span><i class="fas fa-clock mr-1"></i>{{ a.created_at[:10] }}</span>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="card text-center py-12">
+            <div class="w-16 h-16 bg-purple-600/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <i class="fas fa-robot text-purple-400 text-2xl"></i>
+            </div>
+            <h3 class="text-white font-semibold mb-2">No Assistants Yet</h3>
+            <p class="text-gray-500 text-sm mb-4">Create your first AI assistant to automate tasks</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Assistant Detail Modal -->
+<div id="assistantModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-gray-900 rounded-2xl border border-gray-700 w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
+        <div class="flex items-center justify-between p-5 border-b border-gray-700">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-purple-600/20 rounded-xl flex items-center justify-center">
+                    <i class="fas fa-robot text-purple-400"></i>
+                </div>
+                <div>
+                    <h3 class="text-white font-semibold text-lg" id="modalAssistantName">Assistant</h3>
+                    <p class="text-xs text-gray-500" id="modalAssistantModel">Model</p>
+                </div>
+            </div>
+            <button onclick="closeAssistantModal()" class="p-2 text-gray-500 hover:text-white hover:bg-gray-700 rounded-lg transition">
+                <i class="fas fa-times text-lg"></i>
+            </button>
+        </div>
+        <div class="overflow-y-auto p-5 flex-1" id="modalContent">
+            <div class="text-center py-8"><i class="fas fa-spinner fa-spin text-2xl text-gray-500"></i></div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Task Modal -->
+<div id="addTaskModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-gray-900 rounded-2xl border border-gray-700 w-full max-w-lg">
+        <div class="flex items-center justify-between p-5 border-b border-gray-700">
+            <h3 class="text-white font-semibold">Add Task</h3>
+            <button onclick="closeAddTaskModal()" class="p-2 text-gray-500 hover:text-white hover:bg-gray-700 rounded-lg transition">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <form method="POST" action="/assistants/task/add" class="p-5 space-y-4">
+            <input type="hidden" name="assistant_id" id="addTaskAssistantId">
+            <div>
+                <label class="block text-sm font-medium text-gray-300 mb-1.5">Task Type</label>
+                <select name="task_type" class="input-field">
+                    <optgroup label="Email">
+                        <option value="email_read">Read Emails</option>
+                        <option value="email_reply">Reply to Email</option>
+                        <option value="email_summary">Summarize Emails</option>
+                    </optgroup>
+                    <optgroup label="WhatsApp">
+                        <option value="whatsapp_read">Read Messages</option>
+                        <option value="whatsapp_reply">Reply to Message</option>
+                    </optgroup>
+                    <optgroup label="Facebook">
+                        <option value="facebook_read">Read Posts</option>
+                        <option value="facebook_post">Create Post</option>
+                    </optgroup>
+                    <optgroup label="Research">
+                        <option value="web_search">Web Search</option>
+                        <option value="web_read">Read Web Page</option>
+                        <option value="web_summarize">Summarize Content</option>
+                    </optgroup>
+                    <optgroup label="Calendar">
+                        <option value="reminder_set">Set Reminder</option>
+                        <option value="event_create">Create Event</option>
+                    </optgroup>
+                    <optgroup label="Git">
+                        <option value="git_read">Read Repository</option>
+                        <option value="git_commit">Create Commit</option>
+                        <option value="git_explain">Explain Code</option>
+                    </optgroup>
+                    <optgroup label="Code">
+                        <option value="code_write">Write Code</option>
+                        <option value="code_review">Review Code</option>
+                    </optgroup>
+                    <optgroup label="Data">
+                        <option value="data_analyze">Analyze Data</option>
+                        <option value="report_create">Create Report</option>
+                    </optgroup>
+                    <optgroup label="Support">
+                        <option value="ticket_handle">Handle Ticket</option>
+                        <option value="customer_reply">Reply to Customer</option>
+                    </optgroup>
+                    <optgroup label="Custom">
+                        <option value="custom_task">Custom Task</option>
+                    </optgroup>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-300 mb-1.5">Task Name</label>
+                <input type="text" name="name" class="input-field" placeholder="e.g. Morning Email Check">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-300 mb-1.5">Schedule (optional)</label>
+                <input type="text" name="schedule" class="input-field" placeholder="e.g. every day at 9am">
+            </div>
+            <button type="submit" class="btn btn-primary w-full py-3">
+                <i class="fas fa-plus mr-2"></i>Add Task
+            </button>
+        </form>
+    </div>
+</div>
+
+<!-- Toast -->
+<div id="toast" class="fixed bottom-6 right-6 bg-green-600 text-white px-4 py-2.5 rounded-lg shadow-lg z-50 hidden flex items-center gap-2 text-sm font-medium">
+    <i class="fas fa-check-circle"></i>
+    <span id="toastMsg">Done!</span>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentAssistantId = '';
+
+const templateData = {
+    email: { name: 'Email Assistant', desc: 'Read, draft, and reply to emails', caps: ['Read incoming emails', 'Draft professional replies', 'Send responses', 'Summarize email threads', 'Filter important messages'], color: 'blue' },
+    whatsapp: { name: 'WhatsApp Assistant', desc: 'Read and reply to WhatsApp messages', caps: ['Read messages', 'Send replies', 'Voice-to-text', 'Message summarization', 'Auto-reply'], color: 'green' },
+    facebook: { name: 'Facebook Assistant', desc: 'Manage Facebook posts and interactions', caps: ['Read posts', 'Draft replies', 'Create posts', 'Manage comments', 'Analytics'], color: 'indigo' },
+    web_research: { name: 'Web Research Assistant', desc: 'Search, read, and summarize web content', caps: ['Web search', 'Page reading', 'Content summarization', 'Fact checking', 'Source verification'], color: 'cyan' },
+    calendar: { name: 'Calendar Assistant', desc: 'Manage calendar events and reminders', caps: ['Set reminders', 'Create events', 'Manage schedule', 'Send notifications', 'Time zone handling'], color: 'amber' },
+    git: { name: 'Git Assistant', desc: 'Manage git repositories and code', caps: ['Read repos', 'Explain code', 'Create commits', 'Manage branches', 'Code review'], color: 'red' },
+    code: { name: 'Code Assistant', desc: 'Read, explain, and write code', caps: ['Code explanation', 'Code generation', 'Bug fixing', 'Refactoring', 'Documentation'], color: 'purple' },
+    data: { name: 'Data Assistant', desc: 'Analyze data and generate reports', caps: ['Data analysis', 'Chart generation', 'Report creation', 'Pattern detection', 'Predictions'], color: 'teal' },
+    customer: { name: 'Support Assistant', desc: 'Handle customer inquiries and support', caps: ['Answer questions', 'Ticket management', 'Escalation', 'Knowledge base', 'Sentiment analysis'], color: 'orange' },
+    custom: { name: 'Custom Assistant', desc: 'Build your own custom assistant', caps: ['Custom tasks', 'Custom integrations', 'Custom workflows', 'Flexible configuration'], color: 'gray' }
+};
+
+function selectTemplate(tmpl) {
+    document.getElementById('selectedTemplate').value = tmpl;
+    document.querySelectorAll('.template-btn').forEach(btn => {
+        btn.classList.remove('border-purple-500', 'bg-purple-600/10');
+        btn.classList.add('border-gray-700');
+    });
+    const selected = document.querySelector(`[data-template="${tmpl}"]`);
+    if (selected) {
+        selected.classList.add('border-purple-500', 'bg-purple-600/10');
+        selected.classList.remove('border-gray-700');
+        document.getElementById('assistantName').value = templateData[tmpl].name;
+    }
+    updateCapabilities(tmpl);
+}
+
+function updateCapabilities(tmpl) {
+    const info = templateData[tmpl];
+    const html = `
+        <p class="text-white font-medium mb-2">${info.name}</p>
+        <p class="text-gray-400 text-xs mb-3">${info.desc}</p>
+        <div class="space-y-1.5">
+            ${info.caps.map(c => `<div class="flex items-center gap-2 text-xs"><i class="fas fa-check text-${info.color}-400"></i><span class="text-gray-300">${c}</span></div>`).join('')}
+        </div>
+    `;
+    document.getElementById('capabilitiesContent').innerHTML = html;
+}
+
+function filterAssistants() {
+    const q = document.getElementById('assistantSearch').value.toLowerCase();
+    document.querySelectorAll('.assistant-card').forEach(card => {
+        card.style.display = card.dataset.name.includes(q) ? '' : 'none';
+    });
+}
+
+async function showAssistantDetail(assistantId) {
+    currentAssistantId = assistantId;
+    const modal = document.getElementById('assistantModal');
+    const content = document.getElementById('modalContent');
+    modal.classList.remove('hidden');
+    content.innerHTML = '<div class="text-center py-8"><i class="fas fa-spinner fa-spin text-2xl text-gray-500"></i></div>';
+
+    try {
+        const resp = await fetch(`/api/assistants/${assistantId}`);
+        const data = await resp.json();
+        
+        document.getElementById('modalAssistantName').textContent = data.assistant.name;
+        document.getElementById('modalAssistantModel').textContent = data.assistant.model_id;
+        
+        let html = `
+            <div class="grid grid-cols-2 gap-4 mb-6">
+                <div class="p-3 bg-gray-800/50 rounded-lg">
+                    <p class="text-xs text-gray-500">Status</p>
+                    <p class="text-white font-medium">${data.assistant.is_active ? 'Active' : 'Inactive'}</p>
+                </div>
+                <div class="p-3 bg-gray-800/50 rounded-lg">
+                    <p class="text-xs text-gray-500">Model</p>
+                    <p class="text-white font-medium">${data.assistant.model_id}</p>
+                </div>
+                <div class="p-3 bg-gray-800/50 rounded-lg">
+                    <p class="text-xs text-gray-500">Personality</p>
+                    <p class="text-white font-medium">${data.assistant.personality}</p>
+                </div>
+                <div class="p-3 bg-gray-800/50 rounded-lg">
+                    <p class="text-xs text-gray-500">Auto Reply</p>
+                    <p class="text-white font-medium">${data.assistant.auto_reply ? 'On' : 'Off'}</p>
+                </div>
+            </div>
+
+            <div class="mb-6">
+                <h4 class="text-white font-medium mb-2">System Prompt</h4>
+                <div class="p-3 bg-gray-800/50 rounded-lg text-sm text-gray-300 font-mono">${data.assistant.system_prompt}</div>
+            </div>
+        `;
+
+        // Integrations
+        html += `
+            <div class="mb-6">
+                <h4 class="text-white font-medium mb-3">Integrations (${data.integrations.length})</h4>
+                <div class="space-y-2">
+        `;
+        if (data.integrations.length > 0) {
+            data.integrations.forEach(integ => {
+                html += `
+                    <div class="p-3 bg-gray-800/50 rounded-lg border border-gray-700 flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <i class="fas fa-plug text-${integ.is_active ? 'green' : 'gray'}-400"></i>
+                            <div>
+                                <p class="text-sm text-white">${integ.name}</p>
+                                <p class="text-[10px] text-gray-500">${integ.status}</p>
+                            </div>
+                        </div>
+                        <span class="badge ${integ.is_active ? 'badge-green' : 'bg-gray-700 text-gray-400'} text-[10px]">${integ.is_active ? 'Connected' : 'Disconnected'}</span>
+                    </div>
+                `;
+            });
+        } else {
+            html += '<p class="text-gray-500 text-sm">No integrations configured</p>';
+        }
+        html += '</div></div>';
+
+        // Tasks
+        html += `
+            <div class="mb-6">
+                <div class="flex items-center justify-between mb-3">
+                    <h4 class="text-white font-medium">Tasks (${data.tasks.length})</h4>
+                    <button onclick="openAddTaskModal('${assistantId}')" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white text-xs rounded-lg transition">
+                        <i class="fas fa-plus mr-1"></i>Add Task
+                    </button>
+                </div>
+                <div class="space-y-2">
+        `;
+        if (data.tasks.length > 0) {
+            data.tasks.forEach(task => {
+                html += `
+                    <div class="p-3 bg-gray-800/50 rounded-lg border border-gray-700 flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <i class="fas fa-tasks text-blue-400"></i>
+                            <div>
+                                <p class="text-sm text-white">${task.name}</p>
+                                <p class="text-[10px] text-gray-500">${task.task_type} ${task.schedule ? '| ' + task.schedule : ''}</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-[10px] text-gray-500">${task.run_count} runs</span>
+                            <form method="POST" action="/assistants/task/${task.id}/delete" class="inline" onsubmit="return confirm('Delete task?')">
+                                <button type="submit" class="p-1 text-gray-500 hover:text-red-400 transition"><i class="fas fa-trash text-xs"></i></button>
+                            </form>
+                        </div>
+                    </div>
+                `;
+            });
+        } else {
+            html += '<p class="text-gray-500 text-sm">No tasks configured</p>';
+        }
+        html += '</div></div>';
+
+        // Recent Logs
+        html += `
+            <div>
+                <h4 class="text-white font-medium mb-3">Recent Activity</h4>
+                <div class="space-y-2 max-h-48 overflow-y-auto">
+        `;
+        if (data.recent_logs.length > 0) {
+            data.recent_logs.forEach(log => {
+                const logColor = log.status === 'success' ? 'green' : 'red';
+                html += `
+                    <div class="p-2 bg-gray-800/30 rounded text-xs flex items-center gap-2">
+                        <span class="px-1.5 py-0.5 bg-${logColor}-600/20 text-${logColor}-400 rounded text-[9px] uppercase">${log.status}</span>
+                        <span class="text-gray-400 flex-1">${log.action}</span>
+                        <span class="text-gray-600 text-[9px]">${log.created_at[:16]}</span>
+                    </div>
+                `;
+            });
+        } else {
+            html += '<p class="text-gray-500 text-sm">No activity yet</p>';
+        }
+        html += '</div></div>';
+        
+        content.innerHTML = html;
+    } catch (e) {
+        content.innerHTML = '<div class="text-center py-8 text-red-400">Failed to load assistant details</div>';
+    }
+}
+
+function closeAssistantModal() {
+    document.getElementById('assistantModal').classList.add('hidden');
+}
+
+function openAddTaskModal(assistantId) {
+    document.getElementById('addTaskAssistantId').value = assistantId;
+    document.getElementById('addTaskModal').classList.remove('hidden');
+}
+
+function closeAddTaskModal() {
+    document.getElementById('addTaskModal').classList.add('hidden');
+}
+
+function showToast(msg) {
+    const toast = document.getElementById('toast');
+    document.getElementById('toastMsg').textContent = msg;
+    toast.classList.remove('hidden');
+    setTimeout(() => toast.classList.add('hidden'), 3000);
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    selectTemplate('email');
+});
+</script>
+{% endblock %}

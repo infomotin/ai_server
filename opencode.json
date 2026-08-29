@@ -1,0 +1,76 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "openlocalai/llama3.2:1b",
+  "small_model": "openlocalai/qwen2.5:0.5b",
+  "provider": {
+    "openlocalai": {
+      "name": "OpenLocalAI",
+      "api": "openai",
+      "id": "openlocalai",
+      "options": {
+        "apiKey": "sk-local-f61f4d314363e693de5b7fd9792d4bbb91f6a064b5f09be1eb247100476f17ea",
+        "baseURL": "http://203.55.176.101:8000/v1",
+        "timeout": 120000
+      },
+      "models": {
+        "llama3.2:1b": {
+          "id": "llama3.2:1b",
+          "name": "Llama 3.2 1B",
+          "family": "llama",
+          "limit": {
+            "context": 8192,
+            "output": 2048
+          }
+        },
+        "qwen2.5:0.5b": {
+          "id": "qwen2.5:0.5b",
+          "name": "Qwen 2.5 0.5B",
+          "family": "qwen",
+          "limit": {
+            "context": 8192,
+            "output": 2048
+          }
+        },
+        "phi3:mini": {
+          "id": "phi3:mini",
+          "name": "Phi-3 Mini",
+          "family": "phi",
+          "limit": {
+            "context": 8192,
+            "output": 2048
+          }
+        },
+        "codellama:3.5": {
+          "id": "codellama:3.5",
+          "name": "Code Llama 3.5",
+          "family": "codellama",
+          "limit": {
+            "context": 8192,
+            "output": 2048
+          }
+        }
+      }
+    }
+  },
+  "enabled_providers": ["openlocalai"],
+  "permission": {
+    "edit": "allow",
+    "bash": "allow",
+    "read": "allow",
+    "glob": "allow",
+    "grep": "allow",
+    "list": "allow",
+    "task": "deny"
+  },
+  "tools": {
+    "bash": true,
+    "edit": true,
+    "read": true,
+    "glob": true,
+    "grep": true,
+    "list": true,
+    "task": false,
+    "webfetch": false,
+    "websearch": false
+  }
+}

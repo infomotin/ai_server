@@ -1,0 +1,663 @@
+{% extends "base.html" %}
+
+{% block title %}Integrations - OpenLocalAI{% endblock %}
+
+{% block content %}
+<div class="p-6">
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h1 class="text-2xl font-bold text-white">Integrations</h1>
+      <p class="text-gray-400 mt-1">Connect your accounts and manage messages across all platforms</p>
+    </div>
+    <button onclick="openConnectModal()" class="px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg text-white font-medium transition">
+      <i class="fas fa-plus mr-2"></i>Connect Account
+    </button>
+  </div>
+
+  <!-- Connected Accounts -->
+  <div class="bg-gray-800 rounded-xl border border-gray-700 p-6 mb-6">
+    <h2 class="text-lg font-semibold text-white mb-4">Connected Accounts</h2>
+    <div id="connectedAccounts" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div class="text-center py-8 text-gray-500">
+        <i class="fas fa-plug text-4xl mb-3"></i>
+        <p>No accounts connected yet</p>
+        <p class="text-sm mt-2">Click "Connect Account" to get started</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Platform Cards -->
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
+    <!-- Email -->
+    <div class="bg-gray-800 rounded-xl border border-gray-700 p-6 hover:border-purple-500 transition cursor-pointer" onclick="openPlatform('email')">
+      <div class="flex items-center mb-4">
+        <div class="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center mr-4">
+          <i class="fas fa-envelope text-xl text-white"></i>
+        </div>
+        <div>
+          <h3 class="text-lg font-semibold text-white">Email</h3>
+          <p class="text-gray-400 text-sm">IMAP / SMTP</p>
+        </div>
+      </div>
+      <p class="text-gray-400 text-sm mb-3">Read, compose, reply, and manage emails with AI assistance</p>
+      <div class="flex items-center text-sm">
+        <span class="px-2 py-1 bg-blue-600/20 text-blue-400 rounded">Read</span>
+        <span class="px-2 py-1 bg-green-600/20 text-green-400 rounded ml-2">Send</span>
+        <span class="px-2 py-1 bg-purple-600/20 text-purple-400 rounded ml-2">Reply</span>
+      </div>
+    </div>
+
+    <!-- Telegram -->
+    <div class="bg-gray-800 rounded-xl border border-gray-700 p-6 hover:border-blue-500 transition cursor-pointer" onclick="openPlatform('telegram')">
+      <div class="flex items-center mb-4">
+        <div class="w-12 h-12 bg-sky-500 rounded-xl flex items-center justify-center mr-4">
+          <i class="fab fa-telegram text-xl text-white"></i>
+        </div>
+        <div>
+          <h3 class="text-lg font-semibold text-white">Telegram</h3>
+          <p class="text-gray-400 text-sm">Bot API</p>
+        </div>
+      </div>
+      <p class="text-gray-400 text-sm mb-3">Read messages, send replies, and manage conversations</p>
+      <div class="flex items-center text-sm">
+        <span class="px-2 py-1 bg-blue-600/20 text-blue-400 rounded">Read</span>
+        <span class="px-2 py-1 bg-green-600/20 text-green-400 rounded ml-2">Send</span>
+        <span class="px-2 py-1 bg-purple-600/20 text-purple-400 rounded ml-2">Reply</span>
+      </div>
+    </div>
+
+    <!-- Discord -->
+    <div class="bg-gray-800 rounded-xl border border-gray-700 p-6 hover:border-indigo-500 transition cursor-pointer" onclick="openPlatform('discord')">
+      <div class="flex items-center mb-4">
+        <div class="w-12 h-12 bg-indigo-600 rounded-xl flex items-center justify-center mr-4">
+          <i class="fab fa-discord text-xl text-white"></i>
+        </div>
+        <div>
+          <h3 class="text-lg font-semibold text-white">Discord</h3>
+          <p class="text-gray-400 text-sm">Bot API</p>
+        </div>
+      </div>
+      <p class="text-gray-400 text-sm mb-3">Read messages, send replies, and manage servers</p>
+      <div class="flex items-center text-sm">
+        <span class="px-2 py-1 bg-blue-600/20 text-blue-400 rounded">Read</span>
+        <span class="px-2 py-1 bg-green-600/20 text-green-400 rounded ml-2">Send</span>
+        <span class="px-2 py-1 bg-purple-600/20 text-purple-400 rounded ml-2">Reply</span>
+      </div>
+    </div>
+
+    <!-- WhatsApp -->
+    <div class="bg-gray-800 rounded-xl border border-gray-700 p-6 hover:border-green-500 transition cursor-pointer" onclick="openPlatform('whatsapp')">
+      <div class="flex items-center mb-4">
+        <div class="w-12 h-12 bg-green-600 rounded-xl flex items-center justify-center mr-4">
+          <i class="fab fa-whatsapp text-xl text-white"></i>
+        </div>
+        <div>
+          <h3 class="text-lg font-semibold text-white">WhatsApp</h3>
+          <p class="text-gray-400 text-sm">Business API</p>
+        </div>
+      </div>
+      <p class="text-gray-400 text-sm mb-3">Send messages, manage conversations with AI</p>
+      <div class="flex items-center text-sm">
+        <span class="px-2 py-1 bg-green-600/20 text-green-400 rounded">Send</span>
+        <span class="px-2 py-1 bg-purple-600/20 text-purple-400 rounded ml-2">Reply</span>
+      </div>
+    </div>
+
+    <!-- Facebook -->
+    <div class="bg-gray-800 rounded-xl border border-gray-700 p-6 hover:border-blue-700 transition cursor-pointer" onclick="openPlatform('facebook')">
+      <div class="flex items-center mb-4">
+        <div class="w-12 h-12 bg-blue-700 rounded-xl flex items-center justify-center mr-4">
+          <i class="fab fa-facebook text-xl text-white"></i>
+        </div>
+        <div>
+          <h3 class="text-lg font-semibold text-white">Facebook</h3>
+          <p class="text-gray-400 text-sm">Graph API</p>
+        </div>
+      </div>
+      <p class="text-gray-400 text-sm mb-3">Read posts, comment, and manage pages</p>
+      <div class="flex items-center text-sm">
+        <span class="px-2 py-1 bg-blue-600/20 text-blue-400 rounded">Read</span>
+        <span class="px-2 py-1 bg-green-600/20 text-green-400 rounded ml-2">Comment</span>
+      </div>
+    </div>
+
+    <!-- Messenger -->
+    <div class="bg-gray-800 rounded-xl border border-gray-700 p-6 hover:border-blue-500 transition cursor-pointer" onclick="openPlatform('messenger')">
+      <div class="flex items-center mb-4">
+        <div class="w-12 h-12 bg-blue-500 rounded-xl flex items-center justify-center mr-4">
+          <i class="fab fa-facebook-messenger text-xl text-white"></i>
+        </div>
+        <div>
+          <h3 class="text-lg font-semibold text-white">Messenger</h3>
+          <p class="text-gray-400 text-sm">Page API</p>
+        </div>
+      </div>
+      <p class="text-gray-400 text-sm mb-3">Read and send messages via Facebook Messenger</p>
+      <div class="flex items-center text-sm">
+        <span class="px-2 py-1 bg-blue-600/20 text-blue-400 rounded">Read</span>
+        <span class="px-2 py-1 bg-green-600/20 text-green-400 rounded ml-2">Send</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Active Chat Section -->
+  <div id="chatSection" class="hidden bg-gray-800 rounded-xl border border-gray-700 p-6">
+    <div class="flex items-center justify-between mb-4">
+      <div class="flex items-center">
+        <div id="chatPlatformIcon" class="w-10 h-10 rounded-lg flex items-center justify-center mr-3"></div>
+        <div>
+          <h2 id="chatPlatformName" class="text-lg font-semibold text-white"></h2>
+          <p id="chatPlatformStatus" class="text-gray-400 text-sm">Connected</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <button onclick="loadMessages()" class="px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-white text-sm transition">
+          <i class="fas fa-sync mr-1"></i>Refresh
+        </button>
+        <button onclick="closeChat()" class="px-3 py-2 bg-red-600 hover:bg-red-700 rounded-lg text-white text-sm transition">
+          <i class="fas fa-times mr-1"></i>Close
+        </button>
+      </div>
+    </div>
+
+    <!-- Messages Area -->
+    <div id="messagesArea" class="bg-gray-900 rounded-lg p-4 h-96 overflow-y-auto mb-4">
+      <div class="text-center text-gray-500 py-8">
+        <i class="fas fa-inbox text-4xl mb-3"></i>
+        <p>Load messages to start chatting</p>
+      </div>
+    </div>
+
+    <!-- Compose Area -->
+    <div class="bg-gray-700 rounded-lg p-4">
+      <div class="flex items-center gap-3">
+        <input type="text" id="chatRecipient" placeholder="To / Chat ID / Channel" class="flex-shrink-0 w-48 bg-gray-600 border border-gray-500 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:border-purple-500 text-sm">
+        <input type="text" id="chatMessage" placeholder="Type your message..." class="flex-1 bg-gray-600 border border-gray-500 rounded-lg px-4 py-2 text-white placeholder-gray-400 focus:outline-none focus:border-purple-500" onkeypress="if(event.key==='Enter')sendMessage()">
+        <button onclick="sendMessage()" class="px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg text-white font-medium transition">
+          <i class="fas fa-paper-plane mr-1"></i>Send
+        </button>
+        <button onclick="aiReply()" class="px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg text-white font-medium transition" title="AI generates reply to last message">
+          <i class="fas fa-robot mr-1"></i>AI Reply
+        </button>
+      </div>
+      <div class="flex items-center gap-3 mt-3">
+        <select id="chatModel" class="bg-gray-600 border border-gray-500 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-purple-500">
+          <option value="llama3.2:1b">Llama 3.2 1B</option>
+          <option value="qwen2.5:1.5b">Qwen 2.5 1.5B</option>
+          <option value="phi3:mini">Phi-3 Mini</option>
+          <option value="gemma2:2b">Gemma 2 2B</option>
+        </select>
+        <select id="chatTone" class="bg-gray-600 border border-gray-500 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-purple-500">
+          <option value="professional">Professional</option>
+          <option value="friendly">Friendly</option>
+          <option value="casual">Casual</option>
+          <option value="formal">Formal</option>
+          <option value="concise">Concise</option>
+        </select>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Connect Modal -->
+<div id="connectModal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+  <div class="bg-gray-800 rounded-2xl border border-gray-700 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+    <div class="p-6 border-b border-gray-700">
+      <div class="flex items-center justify-between">
+        <h2 class="text-xl font-bold text-white">Connect Account</h2>
+        <button onclick="closeConnectModal()" class="text-gray-400 hover:text-white">
+          <i class="fas fa-times text-xl"></i>
+        </button>
+      </div>
+    </div>
+    <div class="p-6">
+      <div class="mb-4">
+        <label class="block text-gray-400 text-sm mb-2">Platform</label>
+        <select id="connectPlatform" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-purple-500" onchange="showPlatformFields()">
+          <option value="">Select platform...</option>
+          <option value="email">Email (IMAP/SMTP)</option>
+          <option value="telegram">Telegram Bot</option>
+          <option value="discord">Discord Bot</option>
+          <option value="whatsapp">WhatsApp Business</option>
+          <option value="facebook">Facebook Page</option>
+          <option value="messenger">Facebook Messenger</option>
+        </select>
+      </div>
+
+      <div id="platformFields" class="hidden space-y-4">
+        <div class="mb-4">
+          <label class="block text-gray-400 text-sm mb-2">Account Name</label>
+          <input type="text" id="connectName" placeholder="My Email / My Bot" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:border-purple-500">
+        </div>
+        <div id="platformSpecificFields"></div>
+      </div>
+
+      <div class="flex gap-3 mt-6">
+        <button onclick="testConnection()" class="flex-1 px-4 py-3 bg-gray-700 hover:bg-gray-600 rounded-lg text-white font-medium transition">
+          <i class="fas fa-plug mr-2"></i>Test Connection
+        </button>
+        <button onclick="saveConnection()" class="flex-1 px-4 py-3 bg-purple-600 hover:bg-purple-700 rounded-lg text-white font-medium transition">
+          <i class="fas fa-save mr-2"></i>Save Connection
+        </button>
+      </div>
+
+      <div id="connectionStatus" class="hidden mt-4 p-4 rounded-lg"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+let currentPlatform = null;
+let currentConfig = null;
+let connectedAccounts = JSON.parse(localStorage.getItem('integrations') || '{}');
+
+function openConnectModal() {
+  document.getElementById('connectModal').classList.remove('hidden');
+}
+
+function closeConnectModal() {
+  document.getElementById('connectModal').classList.add('hidden');
+  document.getElementById('connectPlatform').value = '';
+  document.getElementById('platformFields').classList.add('hidden');
+  document.getElementById('connectionStatus').classList.add('hidden');
+}
+
+function showPlatformFields() {
+  const platform = document.getElementById('connectPlatform').value;
+  const fieldsDiv = document.getElementById('platformFields');
+  const specificDiv = document.getElementById('platformSpecificFields');
+
+  if (!platform) {
+    fieldsDiv.classList.add('hidden');
+    return;
+  }
+
+  fieldsDiv.classList.remove('hidden');
+
+  const fields = {
+    email: `
+      <div><label class="block text-gray-400 text-sm mb-1">IMAP Host</label><input type="text" id="imap_host" value="imap.gmail.com" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-purple-500"></div>
+      <div><label class="block text-gray-400 text-sm mb-1">IMAP Port</label><input type="number" id="imap_port" value="993" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-purple-500"></div>
+      <div><label class="block text-gray-400 text-sm mb-1">SMTP Host</label><input type="text" id="smtp_host" value="smtp.gmail.com" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-purple-500"></div>
+      <div><label class="block text-gray-400 text-sm mb-1">SMTP Port</label><input type="number" id="smtp_port" value="587" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-purple-500"></div>
+      <div><label class="block text-gray-400 text-sm mb-1">Email</label><input type="email" id="username" placeholder="you@gmail.com" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-purple-500"></div>
+      <div><label class="block text-gray-400 text-sm mb-1">App Password</label><input type="password" id="password" placeholder="xxxx xxxx xxxx xxxx" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-purple-500"></div>
+    `,
+    telegram: `
+      <div><label class="block text-gray-400 text-sm mb-1">Bot Token</label><input type="text" id="bot_token" placeholder="123456789:ABCdefGHIjklMNOpqrsTUVwxyz" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-purple-500"></div>
+      <p class="text-gray-500 text-xs mt-2">Get token from @BotFather on Telegram</p>
+    `,
+    discord: `
+      <div><label class="block text-gray-400 text-sm mb-1">Bot Token</label><input type="text" id="bot_token" placeholder="MTEx..." class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-purple-500"></div>
+      <p class="text-gray-500 text-xs mt-2">Get token from Discord Developer Portal</p>
+    `,
+    whatsapp: `
+      <div><label class="block text-gray-400 text-sm mb-1">Phone Number ID</label><input type="text" id="phone_number_id" placeholder="1234567890" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-purple-500"></div>
+      <div><label class="block text-gray-400 text-sm mb-1">Access Token</label><input type="text" id="access_token" placeholder="EAA..." class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-purple-500"></div>
+      <p class="text-gray-500 text-xs mt-2">Get from Meta Business Suite</p>
+    `,
+    facebook: `
+      <div><label class="block text-gray-400 text-sm mb-1">Page ID</label><input type="text" id="page_id" placeholder="1234567890" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-purple-500"></div>
+      <div><label class="block text-gray-400 text-sm mb-1">Access Token</label><input type="text" id="access_token" placeholder="EAA..." class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-purple-500"></div>
+      <p class="text-gray-500 text-xs mt-2">Get from Facebook Developer Portal</p>
+    `,
+    messenger: `
+      <div><label class="block text-gray-400 text-sm mb-1">Page ID</label><input type="text" id="page_id" placeholder="1234567890" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-purple-500"></div>
+      <div><label class="block text-gray-400 text-sm mb-1">Access Token</label><input type="text" id="access_token" placeholder="EAA..." class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-purple-500"></div>
+    `
+  };
+
+  specificDiv.innerHTML = fields[platform] || '';
+}
+
+function getConfigFromForm() {
+  const platform = document.getElementById('connectPlatform').value;
+  const config = {};
+  const fields = document.getElementById('platformSpecificFields').querySelectorAll('input');
+  fields.forEach(f => { if (f.id && f.value) config[f.id] = f.value; });
+  return config;
+}
+
+async function testConnection() {
+  const platform = document.getElementById('connectPlatform').value;
+  const config = getConfigFromForm();
+  const statusDiv = document.getElementById('connectionStatus');
+
+  statusDiv.classList.remove('hidden');
+  statusDiv.className = 'mt-4 p-4 rounded-lg bg-gray-700 text-gray-300';
+  statusDiv.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Testing connection...';
+
+  try {
+    const resp = await fetch('/api/integrations/test', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({integration_type: platform, config: config})
+    });
+    const data = await resp.json();
+
+    if (data.success) {
+      statusDiv.className = 'mt-4 p-4 rounded-lg bg-green-600/20 border border-green-600 text-green-400';
+      statusDiv.innerHTML = '<i class="fas fa-check-circle mr-2"></i>' + data.message;
+    } else {
+      statusDiv.className = 'mt-4 p-4 rounded-lg bg-red-600/20 border border-red-600 text-red-400';
+      statusDiv.innerHTML = '<i class="fas fa-times-circle mr-2"></i>' + data.message;
+    }
+  } catch(e) {
+    statusDiv.className = 'mt-4 p-4 rounded-lg bg-red-600/20 border border-red-600 text-red-400';
+    statusDiv.innerHTML = '<i class="fas fa-times-circle mr-2"></i>Connection error';
+  }
+}
+
+function saveConnection() {
+  const platform = document.getElementById('connectPlatform').value;
+  const name = document.getElementById('connectName').value || platform;
+  const config = getConfigFromForm();
+
+  connectedAccounts[platform] = {name, config, connected: true};
+  localStorage.setItem('integrations', JSON.stringify(connectedAccounts));
+  renderConnectedAccounts();
+  closeConnectModal();
+}
+
+function renderConnectedAccounts() {
+  const div = document.getElementById('connectedAccounts');
+  const accounts = Object.entries(connectedAccounts);
+
+  if (accounts.length === 0) {
+    div.innerHTML = '<div class="text-center py-8 text-gray-500"><i class="fas fa-plug text-4xl mb-3"></i><p>No accounts connected yet</p></div>';
+    return;
+  }
+
+  const icons = {email:'fa-envelope',telegram:'fa-telegram',discord:'fa-discord',whatsapp:'fa-whatsapp',facebook:'fa-facebook',messenger:'fa-facebook-messenger'};
+  const colors = {email:'bg-blue-600',telegram:'bg-sky-500',discord:'bg-indigo-600',whatsapp:'bg-green-600',facebook:'bg-blue-700',messenger:'bg-blue-500'};
+
+  div.innerHTML = accounts.map(([platform, acc]) => `
+    <div class="bg-gray-700 rounded-lg p-4 border border-gray-600">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center">
+          <div class="w-10 h-10 ${colors[platform] || 'bg-gray-600'} rounded-lg flex items-center justify-center mr-3">
+            <i class="fab ${icons[platform] || 'fa-plug'} text-white"></i>
+          </div>
+          <div>
+            <h3 class="text-white font-medium">${acc.name}</h3>
+            <p class="text-gray-400 text-sm capitalize">${platform}</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="openPlatform('${platform}')" class="px-3 py-1 bg-purple-600 hover:bg-purple-700 rounded text-white text-sm transition">Open</button>
+          <button onclick="removeAccount('${platform}')" class="px-3 py-1 bg-red-600 hover:bg-red-700 rounded text-white text-sm transition">Remove</button>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function removeAccount(platform) {
+  delete connectedAccounts[platform];
+  localStorage.setItem('integrations', JSON.stringify(connectedAccounts));
+  renderConnectedAccounts();
+}
+
+function openPlatform(platform) {
+  if (!connectedAccounts[platform]) {
+    document.getElementById('connectPlatform').value = platform;
+    showPlatformFields();
+    openConnectModal();
+    return;
+  }
+
+  currentPlatform = platform;
+  currentConfig = connectedAccounts[platform].config;
+
+  const icons = {email:'fa-envelope',telegram:'fa-telegram',discord:'fa-discord',whatsapp:'fa-whatsapp',facebook:'fa-facebook',messenger:'fa-facebook-messenger'};
+  const colors = {email:'bg-blue-600',telegram:'bg-sky-500',discord:'bg-indigo-600',whatsapp:'bg-green-600',facebook:'bg-blue-700',messenger:'bg-blue-500'};
+
+  document.getElementById('chatPlatformIcon').className = `w-10 h-10 ${colors[platform]} rounded-lg flex items-center justify-center mr-3`;
+  document.getElementById('chatPlatformIcon').innerHTML = `<i class="fab ${icons[platform]} text-white"></i>`;
+  document.getElementById('chatPlatformName').textContent = connectedAccounts[platform].name;
+  document.getElementById('chatPlatformStatus').textContent = 'Connected';
+
+  document.getElementById('chatSection').classList.remove('hidden');
+  document.getElementById('messagesArea').innerHTML = '<div class="text-center text-gray-500 py-8"><i class="fas fa-inbox text-4xl mb-3"></i><p>Click "Refresh" to load messages</p></div>';
+
+  loadMessages();
+}
+
+function closeChat() {
+  document.getElementById('chatSection').classList.add('hidden');
+  currentPlatform = null;
+  currentConfig = null;
+}
+
+async function loadMessages() {
+  if (!currentPlatform || !currentConfig) return;
+
+  const msgArea = document.getElementById('messagesArea');
+  msgArea.innerHTML = '<div class="text-center text-gray-500 py-8"><i class="fas fa-spinner fa-spin text-2xl mb-3"></i><p>Loading messages...</p></div>';
+
+  try {
+    let resp;
+    if (currentPlatform === 'email') {
+      resp = await fetch('/api/integrations/email/read', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({config: currentConfig, limit: 20})
+      });
+    } else if (currentPlatform === 'telegram') {
+      resp = await fetch('/api/integrations/telegram/updates', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({config: currentConfig, limit: 20})
+      });
+    } else if (currentPlatform === 'discord') {
+      const guildsResp = await fetch('/api/integrations/discord/guilds', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({config: currentConfig})
+      });
+      const guildsData = await guildsResp.json();
+      if (guildsData.guilds && guildsData.guilds.length > 0) {
+        const channelsResp = await fetch('/api/integrations/discord/channels', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({guild_id: guildsData.guilds[0].id, config: currentConfig})
+        });
+        const channelsData = await channelsResp.json();
+        if (channelsData.channels && channelsData.channels.length > 0) {
+          resp = await fetch('/api/integrations/discord/messages', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({channel_id: channelsData.channels[0].id, config: currentConfig, limit: 20})
+          });
+        }
+      }
+    } else if (currentPlatform === 'facebook') {
+      resp = await fetch('/api/integrations/facebook/posts', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({config: currentConfig, limit: 10})
+      });
+    } else if (currentPlatform === 'whatsapp' || currentPlatform === 'messenger') {
+      msgArea.innerHTML = '<div class="text-center text-gray-500 py-8"><i class="fas fa-info-circle text-2xl mb-3"></i><p>Use the compose area below to send messages</p></div>';
+      return;
+    }
+
+    if (!resp) {
+      msgArea.innerHTML = '<div class="text-center text-gray-500 py-8"><i class="fas fa-info-circle text-2xl mb-3"></i><p>No messages to display</p></div>';
+      return;
+    }
+
+    const data = await resp.json();
+    const messages = data.messages || data.emails || data.posts || [];
+
+    if (messages.length === 0) {
+      msgArea.innerHTML = '<div class="text-center text-gray-500 py-8"><i class="fas fa-inbox text-4xl mb-3"></i><p>No messages found</p></div>';
+      return;
+    }
+
+    msgArea.innerHTML = messages.map(m => `
+      <div class="bg-gray-700 rounded-lg p-4 mb-3 border border-gray-600">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-purple-400 font-medium text-sm">${m.from || m.from_id || 'Unknown'}</span>
+          <span class="text-gray-500 text-xs">${m.date || m.created_time || ''}</span>
+        </div>
+        <p class="text-white text-sm mb-2">${m.subject || m.text || m.message || ''}</p>
+        ${m.body ? `<p class="text-gray-400 text-xs">${m.body.substring(0, 200)}</p>` : ''}
+        <div class="flex gap-2 mt-3">
+          <button onclick="replyTo('${m.from || m.from_id || ''}', '${(m.subject || '').replace(/'/g, "\\'")}', '${m.id || ''}')" class="px-3 py-1 bg-purple-600 hover:bg-purple-700 rounded text-white text-xs transition">Reply</button>
+          <button onclick="aiReplyTo('${(m.text || m.body || m.message || '').replace(/'/g, "\\'")}', '${m.from || ''}', '${(m.subject || '').replace(/'/g, "\\'")}')" class="px-3 py-1 bg-green-600 hover:bg-green-700 rounded text-white text-xs transition">AI Reply</button>
+        </div>
+      </div>
+    `).join('');
+
+  } catch(e) {
+    msgArea.innerHTML = '<div class="text-center text-red-400 py-8"><i class="fas fa-exclamation-triangle text-2xl mb-3"></i><p>Error loading messages: ' + e.message + '</p></div>';
+  }
+}
+
+function replyTo(to, subject, replyToId) {
+  document.getElementById('chatRecipient').value = to;
+  document.getElementById('chatMessage').value = '';
+  document.getElementById('chatMessage').focus();
+  if (subject) {
+    document.getElementById('chatMessage').placeholder = `Reply to: ${subject}`;
+  }
+}
+
+async function aiReplyTo(originalMessage, from, subject) {
+  const model = document.getElementById('chatModel').value;
+  const tone = document.getElementById('chatTone').value;
+
+  const msgArea = document.getElementById('messagesArea');
+  msgArea.innerHTML += '<div class="bg-green-600/20 border border-green-600 rounded-lg p-3 mb-3 text-green-400"><i class="fas fa-spinner fa-spin mr-2"></i>AI is generating reply...</div>';
+  msgArea.scrollTop = msgArea.scrollHeight;
+
+  try {
+    const resp = await fetch('http://203.55.176.101:8000/v1/chat/completions', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer sk-local-f61f4d314363e693de5b7fd9792d4bbb91f6a064b5f09be1eb247100476f17ea'},
+      body: JSON.stringify({
+        model: model,
+        messages: [
+          {role: 'system', content: `You are a helpful assistant replying to messages. Use a ${tone} tone. Keep replies concise and relevant.`},
+          {role: 'user', content: `Original message from ${from}: "${originalMessage}"\n\nPlease write a reply:`}
+        ],
+        max_tokens: 500
+      })
+    });
+    const data = await resp.json();
+    const reply = data.choices?.[0]?.message?.content || 'Sorry, I could not generate a reply.';
+
+    document.getElementById('chatMessage').value = reply;
+    document.getElementById('chatRecipient').value = from;
+    if (subject) {
+      document.getElementById('chatMessage').placeholder = `Reply to: ${subject}`;
+    }
+  } catch(e) {
+    console.error('AI reply error:', e);
+  }
+}
+
+async function sendMessage() {
+  if (!currentPlatform || !currentConfig) return;
+
+  const to = document.getElementById('chatRecipient').value;
+  const text = document.getElementById('chatMessage').value;
+
+  if (!to || !text) {
+    alert('Please enter recipient and message');
+    return;
+  }
+
+  try {
+    let resp;
+    if (currentPlatform === 'email') {
+      resp = await fetch('/api/integrations/email/compose', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({to, subject: 'Reply', body: text, config: currentConfig})
+      });
+    } else if (currentPlatform === 'telegram') {
+      resp = await fetch('/api/integrations/telegram/send', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({chat_id: to, text, config: currentConfig})
+      });
+    } else if (currentPlatform === 'discord') {
+      resp = await fetch('/api/integrations/discord/send', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({channel_id: to, text, config: currentConfig})
+      });
+    } else if (currentPlatform === 'whatsapp') {
+      resp = await fetch('/api/integrations/whatsapp/send', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({to, text, config: currentConfig})
+      });
+    } else if (currentPlatform === 'facebook') {
+      resp = await fetch('/api/integrations/facebook/comment', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({post_id: to, text, config: currentConfig})
+      });
+    } else if (currentPlatform === 'messenger') {
+      resp = await fetch('/api/integrations/messenger/send', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({recipient_id: to, text, config: currentConfig})
+      });
+    }
+
+    if (resp) {
+      const data = await resp.json();
+      if (data.success) {
+        document.getElementById('chatMessage').value = '';
+        document.getElementById('messagesArea').innerHTML += `<div class="bg-green-600/20 border border-green-600 rounded-lg p-3 mb-3"><span class="text-green-400 text-sm"><i class="fas fa-check mr-1"></i>Message sent to ${to}</span></div>`;
+        document.getElementById('messagesArea').scrollTop = document.getElementById('messagesArea').scrollHeight;
+      } else {
+        document.getElementById('messagesArea').innerHTML += `<div class="bg-red-600/20 border border-red-600 rounded-lg p-3 mb-3"><span class="text-red-400 text-sm"><i class="fas fa-times mr-1"></i>${data.message || 'Send failed'}</span></div>`;
+      }
+    }
+  } catch(e) {
+    console.error('Send error:', e);
+  }
+}
+
+async function aiReply() {
+  if (!currentPlatform) return;
+
+  const model = document.getElementById('chatModel').value;
+  const tone = document.getElementById('chatTone').value;
+  const lastMsg = document.getElementById('messagesArea').querySelectorAll('.bg-gray-700');
+  const lastMessage = lastMsg.length > 0 ? lastMsg[lastMsg.length - 1].textContent : '';
+
+  if (!lastMessage) {
+    alert('No messages to reply to');
+    return;
+  }
+
+  try {
+    const resp = await fetch('http://203.55.176.101:8000/v1/chat/completions', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer sk-local-f61f4d314363e693de5b7fd9792d4bbb91f6a064b5f09be1eb247100476f17ea'},
+      body: JSON.stringify({
+        model: model,
+        messages: [
+          {role: 'system', content: `You are a helpful assistant replying to messages on ${currentPlatform}. Use a ${tone} tone.`},
+          {role: 'user', content: `Last message: "${lastMessage}"\n\nWrite a reply:`}
+        ],
+        max_tokens: 500
+      })
+    });
+    const data = await resp.json();
+    const reply = data.choices?.[0]?.message?.content || '';
+    document.getElementById('chatMessage').value = reply;
+  } catch(e) {
+    console.error('AI reply error:', e);
+  }
+}
+
+renderConnectedAccounts();
+</script>
+{% endblock %}

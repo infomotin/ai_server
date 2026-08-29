@@ -1,0 +1,193 @@
+{% extends "base.html" %}
+{% block title %}OpenLocalAI - Dashboard{% endblock %}
+{% block header_title %}Dashboard{% endblock %}
+
+{% block content %}
+<!-- Stats Row -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-6">
+    <div class="stat-card">
+        <div class="flex items-center justify-between mb-3">
+            <span class="text-gray-400 text-sm">API Keys</span>
+            <div class="w-10 h-10 bg-blue-600/20 rounded-lg flex items-center justify-center"><i class="fas fa-key text-blue-400"></i></div>
+        </div>
+        <p class="text-3xl font-bold text-white">{{ api_keys|length }}</p>
+        <p class="text-xs text-gray-500 mt-1">Active keys</p>
+    </div>
+    <div class="stat-card">
+        <div class="flex items-center justify-between mb-3">
+            <span class="text-gray-400 text-sm">Skills</span>
+            <div class="w-10 h-10 bg-purple-600/20 rounded-lg flex items-center justify-center"><i class="fas fa-wand-magic-sparkles text-purple-400"></i></div>
+        </div>
+        <p class="text-3xl font-bold text-white">{{ skills|length }}</p>
+        <p class="text-xs text-gray-500 mt-1">Custom skills</p>
+    </div>
+    <div class="stat-card">
+        <div class="flex items-center justify-between mb-3">
+            <span class="text-gray-400 text-sm">Data Sources</span>
+            <div class="w-10 h-10 bg-emerald-600/20 rounded-lg flex items-center justify-center"><i class="fas fa-database text-emerald-400"></i></div>
+        </div>
+        <p class="text-3xl font-bold text-white">{{ data_sources|length }}</p>
+        <p class="text-xs text-gray-500 mt-1">Uploaded files</p>
+    </div>
+    <div class="stat-card">
+        <div class="flex items-center justify-between mb-3">
+            <span class="text-gray-400 text-sm">Total Tokens</span>
+            <div class="w-10 h-10 bg-amber-600/20 rounded-lg flex items-center justify-center"><i class="fas fa-fire text-amber-400"></i></div>
+        </div>
+        <p class="text-3xl font-bold text-white">{{ usage.total_tokens if usage else 0 }}</p>
+        <p class="text-xs text-gray-500 mt-1">Last 30 days</p>
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="card mb-6">
+    <h3 class="text-white font-semibold mb-4">Quick Actions</h3>
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <a href="/chat" class="flex flex-col items-center gap-2 p-4 rounded-xl bg-blue-600/10 border border-blue-600/30 hover:bg-blue-600/20 transition">
+            <i class="fas fa-comments text-blue-400 text-xl"></i>
+            <span class="text-sm text-blue-300">Open Chat</span>
+        </a>
+        <a href="/keys" class="flex flex-col items-center gap-2 p-4 rounded-xl bg-gray-600/10 border border-gray-600/30 hover:bg-gray-600/20 transition">
+            <i class="fas fa-key text-gray-400 text-xl"></i>
+            <span class="text-sm text-gray-300">API Keys</span>
+        </a>
+        <a href="/models" class="flex flex-col items-center gap-2 p-4 rounded-xl bg-gray-600/10 border border-gray-600/30 hover:bg-gray-600/20 transition">
+            <i class="fas fa-cube text-gray-400 text-xl"></i>
+            <span class="text-sm text-gray-300">Models</span>
+        </a>
+        <a href="/skills" class="flex flex-col items-center gap-2 p-4 rounded-xl bg-gray-600/10 border border-gray-600/30 hover:bg-gray-600/20 transition">
+            <i class="fas fa-wand-magic-sparkles text-gray-400 text-xl"></i>
+            <span class="text-sm text-gray-300">Create Skill</span>
+        </a>
+    </div>
+</div>
+
+<!-- Two Column Layout -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- Left: Account + Server -->
+    <div class="lg:col-span-2 space-y-6">
+        <!-- Account Info -->
+        <div class="card">
+            <h3 class="text-white font-semibold mb-4"><i class="fas fa-user-circle mr-2 text-gray-400"></i>Account Information</h3>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div class="p-3 bg-gray-800/50 rounded-lg">
+                    <p class="text-xs text-gray-500 mb-1">Username</p>
+                    <p class="text-sm text-white font-medium">{{ user.username }}</p>
+                </div>
+                <div class="p-3 bg-gray-800/50 rounded-lg">
+                    <p class="text-xs text-gray-500 mb-1">Email</p>
+                    <p class="text-sm text-white font-medium">{{ user.email }}</p>
+                </div>
+                <div class="p-3 bg-gray-800/50 rounded-lg">
+                    <p class="text-xs text-gray-500 mb-1">Default Model</p>
+                    <p class="text-sm text-white font-medium">{{ user_settings.default_model if user_settings else 'llama3.2:1b' }}</p>
+                </div>
+                <div class="p-3 bg-gray-800/50 rounded-lg">
+                    <p class="text-xs text-gray-500 mb-1">Member Since</p>
+                    <p class="text-sm text-white font-medium">{{ user.created_at[:10] }}</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Server Info -->
+        <div class="card">
+            <h3 class="text-white font-semibold mb-4"><i class="fas fa-server mr-2 text-gray-400"></i>Server Endpoints</h3>
+            <div class="space-y-3">
+                <div class="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
+                    <div class="flex items-center gap-3">
+                        <span class="badge badge-blue">API</span>
+                        <code class="text-sm text-green-400">http://203.55.176.101:8000/v1</code>
+                    </div>
+                    <a href="http://203.55.176.101:8000/docs" target="_blank" class="text-blue-400 hover:text-blue-300 text-sm"><i class="fas fa-external-link-alt"></i></a>
+                </div>
+                <div class="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
+                    <div class="flex items-center gap-3">
+                        <span class="badge badge-green">Web</span>
+                        <code class="text-sm text-green-400">http://203.55.176.101:5000</code>
+                    </div>
+                    <a href="http://203.55.176.101:5000" target="_blank" class="text-blue-400 hover:text-blue-300 text-sm"><i class="fas fa-external-link-alt"></i></a>
+                </div>
+                <div class="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
+                    <div class="flex items-center gap-3">
+                        <span class="badge badge-yellow">Docs</span>
+                        <code class="text-sm text-green-400">http://203.55.176.101:8000/docs</code>
+                    </div>
+                    <a href="http://203.55.176.101:8000/docs" target="_blank" class="text-blue-400 hover:text-blue-300 text-sm"><i class="fas fa-external-link-alt"></i></a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right: Sidebar Widgets -->
+    <div class="space-y-6">
+        <!-- Usage -->
+        <div class="card">
+            <h3 class="text-white font-semibold mb-4"><i class="fas fa-chart-bar mr-2 text-gray-400"></i>Usage (30d)</h3>
+            {% if usage %}
+            <div class="space-y-3">
+                <div class="flex justify-between items-center">
+                    <span class="text-gray-400 text-sm">Requests</span>
+                    <span class="text-white font-semibold">{{ usage.total_requests }}</span>
+                </div>
+                <div class="w-full bg-gray-700 rounded-full h-2">
+                    <div class="bg-blue-500 h-2 rounded-full" style="width: {{ [usage.total_requests, 100]|min }}%"></div>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-gray-400 text-sm">Prompt Tokens</span>
+                    <span class="text-white font-semibold">{{ usage.total_prompt_tokens }}</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-gray-400 text-sm">Completion Tokens</span>
+                    <span class="text-white font-semibold">{{ usage.total_completion_tokens }}</span>
+                </div>
+            </div>
+            {% else %}
+            <p class="text-gray-500 text-sm text-center py-4">No usage data yet</p>
+            {% endif %}
+        </div>
+
+        <!-- API Keys Preview -->
+        <div class="card">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-white font-semibold"><i class="fas fa-key mr-2 text-gray-400"></i>API Keys</h3>
+                <a href="/keys" class="text-blue-400 hover:text-blue-300 text-sm">View All</a>
+            </div>
+            {% if api_keys %}
+            <div class="space-y-2">
+                {% for key in api_keys[:3] %}
+                <div class="flex items-center justify-between p-2 bg-gray-800/50 rounded-lg">
+                    <div class="flex items-center gap-2 min-w-0">
+                        <span class="w-2 h-2 rounded-full {{ 'bg-green-500' if key.is_active else 'bg-red-500' }}"></span>
+                        <span class="text-sm text-white truncate">{{ key.name }}</span>
+                    </div>
+                    <span class="text-xs text-gray-500">{{ key.key_prefix }}...</span>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-gray-500 text-sm text-center py-4">No keys yet</p>
+            {% endif %}
+        </div>
+
+        <!-- Skills Preview -->
+        <div class="card">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-white font-semibold"><i class="fas fa-wand-magic-sparkles mr-2 text-gray-400"></i>Skills</h3>
+                <a href="/skills" class="text-blue-400 hover:text-blue-300 text-sm">View All</a>
+            </div>
+            {% if skills %}
+            <div class="space-y-2">
+                {% for skill in skills[:3] %}
+                <div class="flex items-center gap-2 p-2 bg-gray-800/50 rounded-lg">
+                    <span class="w-2 h-2 rounded-full {{ 'bg-green-500' if skill.is_active else 'bg-gray-500' }}"></span>
+                    <span class="text-sm text-white truncate">{{ skill.name }}</span>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-gray-500 text-sm text-center py-4">No skills created</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

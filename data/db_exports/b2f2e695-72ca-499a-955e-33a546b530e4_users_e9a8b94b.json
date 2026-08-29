@@ -1,0 +1,17 @@
+[
+  {
+    "text": "id: b2f2e695-72ca-499a-955e-33a546b530e4. username: admin. email: admin@openlocalai.dev. password_hash: $2b$12$kYYthyBqcVufb.Yig87WWeNBcj53LKID6IOquqTpzljglWgtm9wpy. is_active: 1. is_admin: 0. created_at: 2026-08-28 09:12:29. updated_at: 2026-08-29 06:06:22. last_login: 2026-08-29 06:06:22.494412",
+    "source": "users",
+    "metadata": {
+      "id": "b2f2e695-72ca-499a-955e-33a546b530e4",
+      "username": "admin",
+      "email": "admin@openlocalai.dev",
+      "password_hash": "$2b$12$kYYthyBqcVufb.Yig87WWeNBcj53LKID6IOquqTpzljglWgtm9wpy",
+      "is_active": 1,
+      "is_admin": 0,
+      "created_at": "2026-08-28 09:12:29",
+      "updated_at": "2026-08-29 06:06:22",
+      "last_login": "2026-08-29 06:06:22.494412"
+    }
+  }
+]

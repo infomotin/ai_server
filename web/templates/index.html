@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}OpenLocalAI - Home{% endblock %}
+{% block header_title %}Home{% endblock %}
+
+{% block content %}
+<div class="text-center py-12">
+    <div class="w-20 h-20 bg-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
+        <i class="fas fa-robot text-white text-3xl"></i>
+    </div>
+    <h1 class="text-4xl font-bold text-white mb-3">Welcome to OpenLocalAI</h1>
+    <p class="text-gray-400 max-w-xl mx-auto mb-8">Self-hosted AI API server with OpenAI-compatible endpoints. Full control, your data stays private.</p>
+    <div class="flex justify-center gap-4">
+        <a href="/dashboard" class="btn btn-primary px-6 py-2.5"><i class="fas fa-th-large mr-2"></i>Go to Dashboard</a>
+        <a href="/chat" class="bg-gray-700 hover:bg-gray-600 text-white px-6 py-2.5 rounded-lg font-medium transition"><i class="fas fa-comments mr-2"></i>Open Chat</a>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
+    <div class="card text-center p-6">
+        <div class="w-12 h-12 bg-blue-600/20 rounded-xl flex items-center justify-center mx-auto mb-4"><i class="fas fa-key text-blue-400 text-xl"></i></div>
+        <h3 class="text-white font-semibold mb-2">API Key Management</h3>
+        <p class="text-gray-400 text-sm">Generate and manage API keys with per-key rate limiting and scoping.</p>
+    </div>
+    <div class="card text-center p-6">
+        <div class="w-12 h-12 bg-purple-600/20 rounded-xl flex items-center justify-center mx-auto mb-4"><i class="fas fa-cube text-purple-400 text-xl"></i></div>
+        <h3 class="text-white font-semibold mb-2">Multiple Models</h3>
+        <p class="text-gray-400 text-sm">Run Llama, Qwen, Phi, Mistral and more. Switch models instantly.</p>
+    </div>
+    <div class="card text-center p-6">
+        <div class="w-12 h-12 bg-emerald-600/20 rounded-xl flex items-center justify-center mx-auto mb-4"><i class="fas fa-wand-magic-sparkles text-emerald-400 text-xl"></i></div>
+        <h3 class="text-white font-semibold mb-2">Skills & Agents</h3>
+        <p class="text-gray-400 text-sm">Create custom AI skills with system prompts and behavior control.</p>
+    </div>
+</div>
+
+<div class="card mt-8">
+    <h3 class="text-white font-semibold mb-3">Quick Start (Python)</h3>
+    <pre class="bg-gray-900 rounded-lg p-4 overflow-x-auto text-sm"><code class="text-green-400">import openai
+
+openai.api_key = "sk-local-your-api-key"
+openai.api_base = "http://203.55.176.101:8000/v1"
+
+response = openai.ChatCompletion.create(
+    model="llama3.2:1b",
+    messages=[
+        {"role": "system", "content": "You are helpful."},
+        {"role": "user", "content": "Hello!"}
+    ]
+)
+print(response.choices[0].message.content)</code></pre>
+</div>
+{% endblock %}

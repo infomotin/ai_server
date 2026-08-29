@@ -1,0 +1,363 @@
+{% extends "base.html" %}
+{% block title %}Coding Agent - OpenLocalAI{% endblock %}
+{% block content %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/material-darker.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/javascript/javascript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/python/python.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/htmlmixed/htmlmixed.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/css/css.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/xml/xml.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/markdown/markdown.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/yaml/yaml.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/shell/shell.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/sql/sql.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/matchbrackets.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/closebrackets.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/selection/active-line.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body,#app{height:100%;overflow:hidden}
+.ide{display:flex;height:100%;width:100%}
+.exp{width:220px;min-width:180px;background:#1e1e1e;border-right:1px solid #3c3c3c;display:flex;flex-direction:column;overflow:hidden}
+.exp-hdr{padding:8px 12px;background:#252526;border-bottom:1px solid #3c3c3c;font-size:11px;font-weight:700;text-transform:uppercase;color:#888;letter-spacing:.5px;display:flex;align-items:center;justify-content:space-between}
+.exp-actions button{background:none;border:none;color:#666;cursor:pointer;font-size:11px;padding:2px}
+.exp-actions button:hover{color:#ccc}
+.exp-tree{flex:1;overflow-y:auto;padding:4px 0}
+.tree-item{display:flex;align-items:center;padding:3px 8px;cursor:pointer;font-size:13px;color:#bbb;white-space:nowrap}
+.tree-item:hover{background:#2a2d2e}
+.tree-item.sel{background:#094771}
+.tree-item .arr{width:14px;text-align:center;font-size:10px;color:#6b6b6b;flex-shrink:0;margin-right:2px}
+.tree-item .arr.open{transform:rotate(90deg)}
+.tree-item .fi{width:16px;text-align:center;font-size:11px;flex-shrink:0;margin-right:4px}
+.exp-path{padding:6px 8px;border-top:1px solid #3c3c3c}
+.exp-path input{width:100%;background:#3c3c3c;border:1px solid #555;color:#ccc;font-size:11px;padding:4px 6px;border-radius:3px}
+.ed-col{flex:1;display:flex;flex-direction:column;min-width:0;overflow:hidden}
+.ed-tabs{display:flex;background:#252526;border-bottom:1px solid #3c3c3c;min-height:35px;overflow-x:auto;flex-shrink:0}
+.ed-tab{display:flex;align-items:center;gap:6px;padding:6px 14px;font-size:12px;cursor:pointer;border-right:1px solid #3c3c3c;background:#2d2d2d;color:#888;white-space:nowrap}
+.ed-tab:hover{background:#333}
+.ed-tab.act{background:#1e1e1e;color:#fff;border-bottom:2px solid #007acc}
+.ed-tab .x{font-size:14px;opacity:.4;margin-left:4px}
+.ed-tab:hover .x{opacity:1}
+.ed-tab .x:hover{color:#f14c4c}
+.ed-tab .dot{width:7px;height:7px;border-radius:50%;background:#f14c4c;display:none;margin-left:2px}
+.ed-tab.dirty .dot{display:block}
+.ed-wrap{flex:1;overflow:hidden;position:relative;min-height:0}
+.cm-wrap{height:100%}
+.welcome{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:#444}
+.welcome i{font-size:48px;margin-bottom:16px;color:#333}
+.bot-pane{border-top:1px solid #3c3c3c;flex-shrink:0;display:flex;flex-direction:column}
+.bot-tabs{display:flex;background:#252526;border-bottom:1px solid #3c3c3c;flex-shrink:0}
+.bot-tab{padding:5px 14px;font-size:12px;cursor:pointer;color:#888;border-bottom:2px solid transparent}
+.bot-tab:hover{color:#bbb}
+.bot-tab.on{color:#fff;border-bottom-color:#007acc}
+.bot-body{height:150px;overflow:hidden;display:flex;flex-direction:column}
+.bot-body.hid{display:none}
+.term-box{flex:1;background:#1e1e1e;color:#ccc;font-family:'Cascadia Code','Fira Code',monospace;font-size:13px;padding:6px 10px;overflow-y:auto;white-space:pre-wrap;word-break:break-all}
+.term-in{display:flex;align-items:center;gap:6px;padding:4px 10px;background:#1e1e1e;border-top:1px solid #333}
+.term-in .pr{color:#6a9955;font-family:monospace;font-size:13px}
+.term-in input{flex:1;background:transparent;border:none;color:#ccc;font-family:monospace;font-size:13px;outline:none}
+.chat-col{width:320px;min-width:280px;background:#1e1e1e;border-left:1px solid #3c3c3c;display:flex;flex-direction:column;overflow:hidden}
+.chat-col.hid{display:none}
+.chat-hdr{padding:8px 12px;background:#252526;border-bottom:1px solid #3c3c3c;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.chat-hdr .l{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:#ccc}
+.chat-hdr .r{display:flex;align-items:center;gap:6px}
+.chat-hdr select{background:#3c3c33;border:1px solid #555;color:#ccc;font-size:11px;padding:2px 6px;border-radius:3px}
+.chat-hdr button{background:none;border:none;color:#888;cursor:pointer;font-size:13px}
+.chat-hdr button:hover{color:#ccc}
+.prov-bar{padding:5px 10px;background:#007acc15;border-bottom:1px solid #3c3c3c;display:flex;align-items:center;gap:6px;flex-shrink:0}
+.prov-bar .dot{width:8px;height:8px;border-radius:50%;background:#666;flex-shrink:0}
+.prov-bar select{flex:1;background:#3c3c3c;border:1px solid #555;color:#ccc;font-size:11px;padding:3px 6px;border-radius:3px;min-width:0}
+.prov-bar button{background:#0e639c;color:#fff;border:none;border-radius:3px;padding:3px 8px;font-size:11px;cursor:pointer;white-space:nowrap}
+.prov-bar button:hover{background:#1177bb}
+.chat-msgs{flex:1;overflow-y:auto;padding:10px}
+.msg{margin-bottom:8px}
+.msg .bbl{padding:8px 12px;border-radius:8px;font-size:13px;line-height:1.5;white-space:pre-wrap;word-break:break-word}
+.msg.user .bbl{background:#0e639c;color:#fff;margin-left:24px;border-bottom-right-radius:3px}
+.msg.assistant .bbl{background:#2d2d2d;color:#d4d4d4;border:1px solid #3c3c3c;border-bottom-left-radius:3px}
+.msg.tool .bbl{background:#1a1a2a;color:#9cdcfe;border:1px solid #333;font-family:monospace;font-size:11px;max-height:120px;overflow-y:auto}
+.msg .bdg{display:inline-block;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:700;margin-bottom:4px}
+.msg .bdg.r{background:#1e3a5f;color:#4fc1ff}
+.msg .bdg.w{background:#1a3a2e;color:#4ec9b0}
+.msg .bdg.e{background:#3a3a1a;color:#dcdcaa}
+.msg .bdg.c{background:#3a1a1a;color:#f14c4c}
+.chat-in{padding:8px 10px;border-top:1px solid #3c3c3c;flex-shrink:0}
+.chat-in textarea{width:100%;background:#3c3c3c;border:1px solid #555;color:#ccc;border-radius:4px;padding:6px 8px;font-size:13px;resize:none;outline:none;font-family:inherit;line-height:1.4}
+.chat-in textarea:focus{border-color:#007acc}
+.chat-in .btns{display:flex;gap:4px;margin-top:4px}
+.chat-in button{padding:5px 10px;border:none;border-radius:4px;font-size:11px;font-weight:600;cursor:pointer}
+.btn-s{background:#0e639c;color:#fff}.btn-s:hover{background:#1177bb}
+.btn-a{background:#388a34;color:#fff}.btn-a:hover{background:#45a540}
+.btn-n{background:#555;color:#fff}.btn-n:hover{background:#666}
+.sbar{height:22px;background:#007acc;color:#fff;font-size:11px;display:flex;align-items:center;padding:0 8px;justify-content:space-between;position:fixed;bottom:0;left:0;right:0;z-index:100}
+.sbar .g{display:flex;align-items:center;gap:10px}
+.sbar .g span{display:flex;align-items:center;gap:4px;cursor:default}
+.spinner{display:inline-block;width:12px;height:12px;border:2px solid #007acc;border-top-color:transparent;border-radius:50%;animation:spin .6s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.mbg{position:fixed;inset:0;background:rgba(0,0,0,.65);backdrop-filter:blur(3px);z-index:300;display:flex;align-items:center;justify-content:center}
+.mbox{background:#252526;border:1px solid #454545;border-radius:8px;width:400px;max-height:85vh;overflow-y:auto}
+.mbox .mh{padding:12px 16px;border-bottom:1px solid #3c3c3c;display:flex;align-items:center;justify-content:space-between}
+.mbox .mh span{color:#fff;font-weight:600;font-size:14px}
+.mbox .mh button{background:none;border:none;color:#888;cursor:pointer;font-size:18px}
+.mbox .mc{padding:14px 16px}
+.mbox label{display:block;font-size:12px;color:#999;margin-bottom:4px}
+.mbox input,.mbox select{width:100%;background:#3c3c3c;border:1px solid #555;color:#d4d4d4;padding:7px 10px;border-radius:4px;font-size:13px;margin-bottom:10px}
+.mbox input:focus,.mbox select:focus{border-color:#007acc;outline:none}
+.mbox .mb{padding:12px 16px;border-top:1px solid #3c3c3c;display:flex;gap:8px}
+.mbox .mb button{flex:1;padding:8px;border:none;border-radius:4px;font-size:13px;cursor:pointer;font-weight:500}
+.mbox .mb .btn-t{background:#0e639c;color:#fff}
+.mbox .mb .btn-s{background:#388a34;color:#fff}
+.mbox .res{margin:0 16px 12px;padding:8px;border-radius:4px;font-size:12px;display:none}
+</style>
+
+<div id="app">
+<div class="ide">
+  <!-- Explorer -->
+  <div class="exp">
+    <div class="exp-hdr">Explorer<span class="exp-actions"><button onclick="refreshTree()" title="Refresh"><i class="fas fa-sync"></i></button><button onclick="collapseAll()" title="Collapse"><i class="fas fa-compress-alt"></i></button></span></div>
+    <div class="exp-tree" id="fileTree"></div>
+    <div class="exp-path"><input type="text" id="projPath" value="/www" onchange="refreshTree()" placeholder="Project path..."></div>
+  </div>
+
+  <!-- Editor Column -->
+  <div class="ed-col">
+    <div class="ed-tabs" id="edTabs"></div>
+    <div class="ed-wrap" id="edWrap">
+      <div class="welcome" id="welcome"><i class="fas fa-code"></i><h3 style="color:#777;margin-bottom:6px">OpenLocalAI Agent</h3><p style="font-size:12px;color:#555">Click a file to edit or chat with AI</p></div>
+    </div>
+    <div class="bot-pane" id="botPane">
+      <div class="bot-tabs">
+        <div class="bot-tab on" onclick="switchBot('term')" id="bTabTerm">Terminal</div>
+        <div class="bot-tab" onclick="switchBot('out')" id="bTabOut">Output</div>
+      </div>
+      <div class="bot-body" id="bTerm">
+        <div class="term-box" id="termOut"><span style="color:#6a9955">$ Welcome to OpenLocalAI Terminal</span>\n</div>
+        <div class="term-in"><span class="pr">$</span><input type="text" id="termCmd" placeholder="Enter command..." onkeydown="if(event.key==='Enter')runCmd()"></div>
+      </div>
+      <div class="bot-body hid" id="bOut">
+        <div class="term-box" id="agentOut"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Chat Column -->
+  <div class="chat-col" id="chatCol">
+    <div class="chat-hdr">
+      <div class="l"><i class="fas fa-robot" style="color:#007acc"></i>AI Assistant</div>
+      <div class="r">
+        <select id="modeSel" onchange="switchMode(this.value)"><option value="plan">Plan</option><option value="build">Build</option></select>
+        <button onclick="toggleChat()" title="Toggle"><i class="fas fa-chevron-right"></i></button>
+      </div>
+    </div>
+    <div class="prov-bar">
+      <span class="dot" id="mDot"></span>
+      <select id="provSel" onchange="changeProvider(this.value)"><option value="">No provider</option></select>
+      <button onclick="showAddProv()">+ Add</button>
+    </div>
+    <div class="chat-msgs" id="chatMsgs">
+      <div style="text-align:center;padding:40px 20px;color:#444"><i class="fas fa-robot" style="font-size:40px;margin-bottom:12px;color:#333"></i><p style="font-size:13px">Ask AI to read, write or edit code</p><p style="font-size:11px;color:#555;margin-top:6px">Agent uses tools to work with your files</p></div>
+    </div>
+    <div class="chat-in">
+      <textarea id="chatInput" rows="2" placeholder="Describe what you want..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMsg()}"></textarea>
+      <div class="btns">
+        <button class="btn-s" onclick="sendMsg()"><i class="fas fa-paper-plane"></i> Send</button>
+        <button class="btn-a" onclick="aiQuick()"><i class="fas fa-magic"></i> AI</button>
+        <button class="btn-n" onclick="newSess()">New</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="sbar">
+  <div class="g">
+    <span id="sFile"><i class="fas fa-file"></i> No file</span>
+    <span id="sCursor">Ln 1, Col 1</span>
+  </div>
+  <div class="g">
+    <span id="sMcp"><i class="fas fa-puzzle-piece"></i> MCP: 0</span>
+    <span id="sModel"><i class="fas fa-robot"></i> <span id="sModelName">No model</span></span>
+  </div>
+</div>
+</div>
+
+<!-- Provider Modal -->
+<div id="provModal" class="mbg" style="display:none">
+  <div class="mbox">
+    <div class="mh"><span>Add AI Provider</span><button onclick="closeProv()">&times;</button></div>
+    <div class="mc">
+      <label>Provider Type</label>
+      <select id="pType" onchange="updProvFields()">
+        <option value="ollama">Ollama (Local)</option>
+        <option value="openai">OpenAI</option>
+        <option value="anthropic">Anthropic (Claude)</option>
+        <option value="nvidia">NVIDIA NIM</option>
+        <option value="groq">Groq</option>
+        <option value="deepseek">DeepSeek</option>
+        <option value="mistral">Mistral AI</option>
+        <option value="together">Together AI</option>
+        <option value="openrouter">OpenRouter</option>
+        <option value="opencode">OpenCode (opencode.ai)</option>
+        <option value="custom">Custom OpenAI-Compatible</option>
+      </select>
+      <label>Name</label>
+      <input type="text" id="pName" placeholder="My Provider">
+      <label>API URL</label>
+      <input type="text" id="pUrl" value="http://localhost:11434">
+      <label>API Key</label>
+      <input type="password" id="pKey" placeholder="sk-...">
+      <label>Model</label>
+      <input type="text" id="pModel" placeholder="llama3.2:1b">
+    </div>
+    <div class="mb">
+      <button class="btn-t" onclick="testProv()">Test & Connect</button>
+      <button class="btn-s" onclick="saveProv()">Save</button>
+    </div>
+    <div class="res" id="pRes"></div>
+  </div>
+</div>
+
+<script>
+const API='/api/agent';
+let cm=null,files=[],actFile=null,expDirs=new Set(['/www']),sess=null,provs=[];
+const LM={js:'javascript',py:'python',html:'htmlmixed',css:'css',json:'application/json',md:'markdown',yaml:'yaml',sh:'shell',sql:'sql',xml:'xml'};
+const IC={js:'fab fa-js-square',py:'fab fa-python',html:'fab fa-html5',css:'fab fa-css3-alt',json:'fas fa-code',md:'fas fa-file-alt',sh:'fas fa-terminal',sql:'fas fa-database',def:'fas fa-file'};
+const CL={js:'#f7df1e',py:'#3572a5',html:'#e34c26',css:'#563d7c',json:'#a8b9cc',md:'#519aba',sh:'#89e051',sql:'#e38c00',def:'#999'};
+const PURL={ollama:'http://localhost:11434',openai:'https://api.openai.com/v1',anthropic:'https://api.anthropic.com/v1',nvidia:'https://integrate.api.nvidia.com/v1',groq:'https://api.groq.com/openai/v1',deepseek:'https://api.deepseek.com/v1',mistral:'https://api.mistral.ai/v1',together:'https://api.together.xyz/v1',openrouter:'https://openrouter.ai/api/v1',opencode:'https://opencode.ai/api/v1',custom:'http://localhost:8000/v1'};
+const PMOD={ollama:'llama3.2:1b',openai:'gpt-4o-mini',anthropic:'claude-sonnet-4-20250514',nvidia:'meta/llama-3.1-8b-instruct',groq:'llama-3.3-70b-versatile',deepseek:'deepseek-chat',mistral:'mistral-small-latest',together:'meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo',openrouter:'meta-llama/llama-3.1-8b-instruct',opencode:'claude-sonnet-4-20250514',custom:'model'};
+
+function H(){const t=document.cookie.match(/access_token=([^;]+)/);return{'Authorization':'Bearer '+(t?t[1]:''),'Content-Type':'application/json'}}
+function esc(s){return s?String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'):''}
+
+// File Tree
+async function refreshTree(){
+  const p=document.getElementById('projPath').value||'/www';
+  try{const r=await fetch(`${API}/files/list`,{method:'POST',headers:H(),body:JSON.stringify({path:p,max_depth:1})});const d=await r.json();renderT(d,document.getElementById('fileTree'),0)}catch(e){console.error(e)}
+}
+function renderT(items,el,depth){
+  el.innerHTML='';
+  items.sort((a,b)=>{if(a.type==='directory'&&b.type!=='directory')return-1;if(a.type!=='directory'&&b.type==='directory')return 1;return a.name.localeCompare(b.name)});
+  items.forEach(f=>{
+    if(f.type==='error')return;
+    const d=document.createElement('div');d.className='tree-item'+(actFile===f.path?' sel':'');d.style.paddingLeft=(8+depth*14)+'px';
+    const ext=f.name.split('.').pop().toLowerCase(),isDir=f.type==='directory';
+    if(isDir){
+      const op=expDirs.has(f.path);
+      d.innerHTML=`<span class="arr ${op?'open':''}"><i class="fas fa-caret-right"></i></span><span class="fi" style="color:#dcb67a"><i class="fas fa-folder"></i></span><span>${esc(f.name)}</span>`;
+      d.onclick=e=>{e.stopPropagation();expDirs.has(f.path)?expDirs.delete(f.path):expDirs.add(f.path);refreshTree()};
+    }else{
+      const ic=IC[ext]||IC.def,cl=CL[ext]||CL.def;
+      d.innerHTML=`<span class="arr"></span><span class="fi" style="color:${cl}"><i class="${ic}"></i></span><span>${esc(f.name)}</span>`;
+      d.onclick=e=>{e.stopPropagation();openF(f.path,f.name)};
+    }
+    el.appendChild(d);
+    if(isDir&&expDirs.has(f.path)&&f.children){const ch=document.createElement('div');el.appendChild(ch);renderT(f.children,ch,depth+1)}
+  });
+}
+function collapseAll(){expDirs.clear();expDirs.add('/www');refreshTree()}
+
+// Editor
+async function openF(path,name){
+  if(!name)name=path.split('/').pop();
+  const ex=files.find(f=>f.path===path);
+  if(ex){actF(path);return}
+  try{const r=await fetch(`${API}/files/read`,{method:'POST',headers:H(),body:JSON.stringify({path,limit:2000})});const d=await r.json();
+  if(!d.success){alert('Cannot open: '+d.error);return}
+  const ext=name.split('.').pop().toLowerCase();
+  files.push({path,name,content:d.content,lang:LM[ext]||'text/plain',dirty:false});
+  actF(path);refreshTree();document.getElementById('sFile').textContent=path;
+  }catch(e){}
+}
+function actF(path){actFile=path;renderTabs();renderEd()}
+function closeF(path,e){if(e)e.stopPropagation();const i=files.findIndex(f=>f.path===path);if(i===-1)return;files.splice(i,1);if(actFile===path)actFile=files.length>0?files[Math.min(i,files.length-1)].path:null;renderTabs();renderEd();refreshTree()}
+function renderTabs(){
+  document.getElementById('edTabs').innerHTML=files.map(f=>{
+    const ext=f.name.split('.').pop().toLowerCase(),cl=CL[ext]||CL.def,ic=IC[ext]||IC.def;
+    return`<div class="ed-tab ${f.path===actFile?'act':''} ${f.dirty?'dirty':''}" onclick="actF('${esc(f.path)}')"><i class="${ic}" style="color:${cl};font-size:11px"></i>${esc(f.name)}<span class="dot"></span><span class="x" onclick="closeF('${esc(f.path)}',event)">&times;</span></div>`;
+  }).join('');
+}
+function renderEd(){
+  const w=document.getElementById('edWrap'),wel=document.getElementById('welcome');
+  if(!actFile){if(cm){cm.toTextArea();cm=null}w.innerHTML='';w.appendChild(wel);wel.style.display='flex';return}
+  const f=files.find(f=>f.path===actFile);if(!f)return;
+  wel.style.display='none';const old=w.querySelector('.CodeMirror');if(old)old.remove();
+  const ta=document.createElement('textarea');w.appendChild(ta);
+  cm=CodeMirror.fromTextArea(ta,{mode:f.lang==='application/json'?{name:'javascript',json:true}:f.lang,theme:'material-darker',lineNumbers:true,matchBrackets:true,autoCloseBrackets:true,styleActiveLine:true,indentUnit:4,tabSize:4});
+  cm.setValue(f.content);
+  cm.on('change',()=>{f.dirty=true;f.content=cm.getValue();renderTabs()});
+  cm.on('cursorActivity',()=>{const c=cm.getCursor();document.getElementById('sCursor').textContent=`Ln ${c.line+1}, Col ${c.ch+1}`});
+  setTimeout(()=>cm.refresh(),50);
+}
+async function saveF(){if(!actFile||!cm)return;const f=files.find(f=>f.path===actFile);if(!f)return;await fetch(`${API}/files/write`,{method:'POST',headers:H(),body:JSON.stringify({path:f.path,content:cm.getValue()})});f.dirty=false;renderTabs()}
+
+// Terminal
+async function runCmd(){
+  const inp=document.getElementById('termCmd'),cmd=inp.value.trim();if(!cmd)return;inp.value='';
+  const out=document.getElementById('termOut');
+  out.innerHTML+=`<span style="color:#6a9955">$ ${esc(cmd)}</span>\n`;
+  try{const r=await fetch(`${API}/command/run`,{method:'POST',headers:H(),body:JSON.stringify({command:cmd,cwd:document.getElementById('projPath').value})});const d=await r.json();
+  if(d.stdout)out.innerHTML+=esc(d.stdout);if(d.stderr)out.innerHTML+=`<span style="color:#f14c4c">${esc(d.stderr)}</span>`;if(d.error)out.innerHTML+=`<span style="color:#f14c4c">${esc(d.error)}</span>`;
+  }catch(e){out.innerHTML+=`<span style="color:#f14c4c">${e.message}</span>`}
+  out.scrollTop=out.scrollHeight;
+}
+function switchBot(p){document.getElementById('bTabTerm').classList.toggle('on',p==='term');document.getElementById('bTabOut').classList.toggle('on',p==='out');document.getElementById('bTerm').classList.toggle('hid',p!=='term');document.getElementById('bOut').classList.toggle('hid',p!=='out')}
+
+// Chat
+async function sendMsg(){
+  const inp=document.getElementById('chatInput'),msg=inp.value.trim();if(!msg)return;inp.value='';
+  addM('user',msg);addM('assistant','<span class="spinner"></span> Thinking...');
+  try{const r=await fetch(`${API}/sessions/${sess?.id||'new'}/chat`,{method:'POST',headers:H(),body:JSON.stringify({message:msg})});const d=await r.json();
+  rmS();if(d.session_id&&sess?.id!==d.session_id){sess={id:d.session_id};history.pushState(null,'','/agent')}
+  if(d.content)addM('assistant',d.content);
+  if(d.tool_results)d.tool_results.forEach(tr=>{const b=tr.tool.includes('read')?'r':tr.tool.includes('write')?'w':tr.tool.includes('edit')?'e':'c';addM('tool',`<span class="bdg ${b}">${tr.tool}</span>\n${esc(JSON.stringify(tr.result,null,2).substring(0,1000))}`)});
+  if(d.error)addM('tool',`<span class="bdg c">error</span>\n${esc(d.error)}`);
+  }catch(e){rmS();addM('tool',`<span class="bdg c">error</span>\n${e.message}`)}
+}
+function aiQuick(){const inp=document.getElementById('chatInput');if(!cm||!actFile){inp.value='List files in /www/AI_server/src';inp.focus();return}inp.value=`Review and improve this code:\n\n${cm.getValue().substring(0,2000)}`;inp.focus()}
+function addM(role,html){const d=document.getElementById('chatMsgs'),el=document.createElement('div');el.className='msg '+role;el.innerHTML=`<div class="bbl">${html}</div>`;d.appendChild(el);d.scrollTop=d.scrollHeight}
+function rmS(){document.querySelectorAll('.msg .spinner').forEach(s=>s.closest('.msg').remove())}
+function toggleChat(){document.getElementById('chatCol').classList.toggle('hid')}
+async function newSess(){sess=null;document.getElementById('chatMsgs').innerHTML='<div style="text-align:center;padding:40px;color:#444"><i class="fas fa-plus" style="font-size:24px;margin-bottom:8px"></i><p style="font-size:12px">New session started</p></div>'}
+
+// Providers
+async function loadProv(){
+  try{const r=await fetch(`${API}/providers`,{headers:H()});provs=await r.json();renderProv();updMDisp()}catch(e){}
+}
+function renderProv(){
+  const sel=document.getElementById('provSel');
+  sel.innerHTML=(provs.length?provs.map(p=>`<option value="${p.id}">${p.model} (${p.provider_type})</option>`).join(''):'<option value="">No provider</option>');
+  const act=provs.find(p=>p.is_active)||provs[0];
+  if(act){sel.value=act.id;document.getElementById('mDot').style.background='#4ec9b0'}else{document.getElementById('mDot').style.background='#666'}
+}
+async function changeProvider(id){if(!id)return;const p=provs.find(pr=>pr.id===id);if(!p)return;updMDisp();document.getElementById('sModelName').textContent=p.model}
+function showAddProv(){document.getElementById('provModal').style.display='flex'}
+function closeProv(){document.getElementById('provModal').style.display='none';document.getElementById('pRes').style.display='none'}
+function updProvFields(){const t=document.getElementById('pType').value;document.getElementById('pUrl').value=PURL[t]||'';document.getElementById('pModel').value=PMOD[t]||''}
+async function testProv(){
+  const data={name:document.getElementById('pName').value||document.getElementById('pType').value,provider_type:document.getElementById('pType').value,api_url:document.getElementById('pUrl').value,api_key:document.getElementById('pKey').value||null,model:document.getElementById('pModel').value};
+  const res=document.getElementById('pRes');res.style.display='block';res.style.background='#3c3c3c';res.style.color='#d4d4d4';res.innerHTML='<span class="spinner"></span> Testing...';
+  try{const r=await fetch(`${API}/providers`,{method:'POST',headers:H(),body:JSON.stringify(data)});const d=await r.json();
+  if(d.success&&d.id){const t=await fetch(`${API}/providers/${d.id}/test`,{method:'POST',headers:H()});const td=await t.json();
+  if(td.success){res.style.background='#264f78';res.style.color='#4ec9b0';res.innerHTML='<i class="fas fa-check"></i> Connected: '+esc((td.content||'').substring(0,80));loadProv();setTimeout(closeProv,1500)}
+  else{res.style.background='#4e2b2f';res.style.color='#f14c4c';res.innerHTML=`<i class="fas fa-times"></i> ${esc(td.error||'Failed')}`}
+  }}catch(e){res.style.background='#4e2b2f';res.style.color='#f14c4c';res.innerHTML=e.message}
+}
+async function saveProv(){
+  const data={name:document.getElementById('pName').value||document.getElementById('pType').value,provider_type:document.getElementById('pType').value,api_url:document.getElementById('pUrl').value,api_key:document.getElementById('pKey').value||null,model:document.getElementById('pModel').value};
+  await fetch(`${API}/providers`,{method:'POST',headers:H(),body:JSON.stringify(data)});closeProv();loadProv()
+}
+function updMDisp(){const act=provs.find(p=>p.is_active)||provs[0];if(act){document.getElementById('mDot').style.background='#4ec9b0';document.getElementById('sModelName').textContent=act.model}else{document.getElementById('mDot').style.background='#666';document.getElementById('sModelName').textContent='No model'}}
+
+// Session
+async function initSess(){
+  try{const r=await fetch(`${API}/sessions`,{headers:H()});const ss=await r.json();
+  if(ss.length>0){const s=await fetch(`${API}/sessions/${ss[0].id}`,{headers:H()});sess=await s.json();document.getElementById('modeSel').value=sess.mode||'plan'}
+  }catch(e){}
+}
+async function switchMode(m){if(!sess)return;await fetch(`${API}/sessions/${sess.id}/mode?mode=${m}`,{method:'PUT',headers:H()})}
+
+// Init
+refreshTree();loadProv();initSess();
+document.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key==='s'){e.preventDefault();saveF()}});
+</script>
+{% endblock %}

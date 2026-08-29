@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}OpenLocalAI - Dashboard{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background: #0f172a; color: #e2e8f0; }
+        .sidebar { width: 260px; min-height: 100vh; background: #1e293b; border-right: 1px solid #334155; position: fixed; top: 0; left: 0; z-index: 50; transition: transform 0.3s; }
+        .sidebar.collapsed { transform: translateX(-260px); }
+        .main-content { margin-left: 260px; min-height: 100vh; display: flex; flex-direction: column; transition: margin-left 0.3s; }
+        .main-content.expanded { margin-left: 0; }
+        .header { height: 64px; background: #1e293b; border-bottom: 1px solid #334155; display: flex; align-items: center; justify-content: space-between; padding: 0 24px; position: sticky; top: 0; z-index: 40; }
+        .content-area { flex: 1; padding: 24px; }
+        .footer { background: #1e293b; border-top: 1px solid #334155; padding: 16px 24px; text-align: center; font-size: 13px; color: #64748b; }
+        .nav-item { display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-radius: 8px; color: #94a3b8; text-decoration: none; transition: all 0.2s; margin: 2px 8px; font-size: 14px; }
+        .nav-item:hover { background: #334155; color: #e2e8f0; }
+        .nav-item.active { background: #3b82f6; color: #ffffff; font-weight: 500; }
+        .nav-section { padding: 8px 16px; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #64748b; margin-top: 16px; }
+        .card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 24px; }
+        .stat-card { background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); border: 1px solid #334155; border-radius: 12px; padding: 20px; }
+        .flash { padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; font-size: 14px; }
+        .flash-success { background: #065f46; border: 1px solid #047857; color: #a7f3d0; }
+        .flash-error { background: #7f1d1d; border: 1px solid #991b1b; color: #fecaca; }
+        .flash-info { background: #1e3a5f; border: 1px solid #1e40af; color: #bfdbfe; }
+        .btn { padding: 8px 16px; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.2s; border: none; }
+        .btn-primary { background: #3b82f6; color: white; }
+        .btn-primary:hover { background: #2563eb; }
+        .btn-danger { background: #dc2626; color: white; }
+        .btn-danger:hover { background: #b91c1c; }
+        .btn-sm { padding: 4px 10px; font-size: 12px; }
+        .input-field { width: 100%; padding: 10px 14px; background: #0f172a; border: 1px solid #334155; border-radius: 8px; color: #e2e8f0; font-size: 14px; outline: none; transition: border-color 0.2s; }
+        .input-field:focus { border-color: #3b82f6; }
+        .badge { padding: 2px 8px; border-radius: 9999px; font-size: 11px; font-weight: 600; }
+        .badge-green { background: #065f46; color: #a7f3d0; }
+        .badge-yellow { background: #78350f; color: #fde68a; }
+        .badge-red { background: #7f1d1d; color: #fecaca; }
+        .badge-blue { background: #1e3a5f; color: #bfdbfe; }
+        @media (max-width: 768px) {
+            .sidebar { transform: translateX(-260px); }
+            .sidebar.mobile-open { transform: translateX(0); }
+            .main-content { margin-left: 0; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+        <div class="p-6 border-b border-gray-700">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center">
+                    <i class="fas fa-robot text-white text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold text-white">OpenLocalAI</h1>
+                    <p class="text-xs text-gray-500">v1.0 Self-Hosted</p>
+                </div>
+            </div>
+        </div>
+
+        <nav class="py-4">
+            <div class="nav-section">Main</div>
+            <a href="/dashboard" class="nav-item {% if request.path == '/dashboard' %}active{% endif %}">
+                <i class="fas fa-th-large w-5"></i> Dashboard
+            </a>
+            <a href="/chat" class="nav-item {% if request.path == '/chat' %}active{% endif %}">
+                <i class="fas fa-comments w-5"></i> AI Chat
+            </a>
+
+            <div class="nav-section">Management</div>
+            <a href="/management" class="nav-item {% if request.path == '/management' %}active{% endif %}">
+                <i class="fas fa-sliders w-5"></i> AI Management
+            </a>
+            <a href="/model-builder" class="nav-item {% if request.path == '/model-builder' %}active{% endif %}">
+                <i class="fas fa-hammer w-5"></i> Model Builder
+            </a>
+            <a href="/firewall" class="nav-item {% if request.path == '/firewall' %}active{% endif %}">
+                <i class="fas fa-shield-halved w-5"></i> Model Firewall
+            </a>
+            <a href="/assistants" class="nav-item {% if request.path == '/assistants' %}active{% endif %}">
+                <i class="fas fa-robot w-5"></i> AI Assistants
+            </a>
+            <a href="/integrations" class="nav-item {% if request.path == '/integrations' %}active{% endif %}">
+                <i class="fas fa-plug w-5"></i> Integrations
+            </a>
+            <a href="/agent" class="nav-item {% if request.path == '/agent' %}active{% endif %}">
+                <i class="fas fa-terminal w-5"></i> Coding Agent
+            </a>
+            <a href="/models" class="nav-item {% if request.path == '/models' %}active{% endif %}">
+                <i class="fas fa-cube w-5"></i> Models
+            </a>
+            <a href="/skills" class="nav-item {% if request.path == '/skills' %}active{% endif %}">
+                <i class="fas fa-wand-magic-sparkles w-5"></i> Skills
+            </a>
+            <a href="/data" class="nav-item {% if request.path == '/data' %}active{% endif %}">
+                <i class="fas fa-database w-5"></i> Data Sources
+            </a>
+
+            <div class="nav-section">Account</div>
+            <a href="/keys" class="nav-item {% if request.path == '/keys' %}active{% endif %}">
+                <i class="fas fa-key w-5"></i> API Keys
+            </a>
+
+            <div class="mt-8 mx-4 p-4 bg-gray-800 rounded-xl border border-gray-700">
+                {% if session.get('user') %}
+                <div class="flex items-center gap-3 mb-3">
+                    <div class="w-9 h-9 bg-blue-600 rounded-full flex items-center justify-center text-sm font-bold">{{ session['user']['username'][0]|upper }}</div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-medium text-white truncate">{{ session['user']['username'] }}</p>
+                        <p class="text-xs text-gray-500 truncate">{{ session['user']['email'] }}</p>
+                    </div>
+                </div>
+                <a href="/logout" class="flex items-center gap-2 text-xs text-gray-400 hover:text-red-400 transition">
+                    <i class="fas fa-sign-out-alt"></i> Sign Out
+                </a>
+                {% else %}
+                <a href="/login" class="flex items-center gap-2 text-sm text-gray-300 hover:text-white transition">
+                    <i class="fas fa-sign-in-alt"></i> Sign In
+                </a>
+                {% endif %}
+            </div>
+        </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <div class="main-content" id="mainContent">
+        <!-- Header -->
+        <header class="header">
+            <div class="flex items-center gap-4">
+                <button onclick="toggleSidebar()" class="text-gray-400 hover:text-white md:hidden">
+                    <i class="fas fa-bars text-xl"></i>
+                </button>
+                <h2 class="text-lg font-semibold text-white hidden md:block">{% block header_title %}Dashboard{% endblock %}</h2>
+            </div>
+            <div class="flex items-center gap-4">
+                <a href="http://203.55.176.101:8000/docs" target="_blank" class="text-gray-400 hover:text-white text-sm hidden sm:flex items-center gap-2">
+                    <i class="fas fa-book"></i> API Docs
+                </a>
+                <div class="flex items-center gap-2 px-3 py-1.5 bg-green-900/30 border border-green-700 rounded-lg">
+                    <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                    <span class="text-xs text-green-400 font-medium">System Online</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Content -->
+        <main class="content-area">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="flash flash-{{ category }} flex items-center gap-3">
+                            <i class="fas {{ 'fa-check-circle' if category == 'success' else 'fa-exclamation-circle' if category == 'error' else 'fa-info-circle' }}"></i>
+                            <span>{{ message }}</span>
+                            <button onclick="this.parentElement.remove()" class="ml-auto opacity-70 hover:opacity-100"><i class="fas fa-times"></i></button>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            {% block content %}{% endblock %}
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <div class="flex flex-col sm:flex-row justify-between items-center gap-2">
+                <span>OpenLocalAI &copy; 2024 &mdash; Self-hosted AI API Server</span>
+                <div class="flex items-center gap-4">
+                    <span class="text-gray-500">Port 8000 (API) &bull; Port 5000 (Web)</span>
+                    <a href="http://203.55.176.101:8000/health" target="_blank" class="text-gray-500 hover:text-gray-300">
+                        <i class="fas fa-heartbeat"></i> Health
+                    </a>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const main = document.getElementById('mainContent');
+            sidebar.classList.toggle('collapsed');
+            sidebar.classList.toggle('mobile-open');
+            main.classList.toggle('expanded');
+        }
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>
