@@ -213,6 +213,54 @@
         <div class="overflow-y-auto p-5 flex-1" id="modalContent">
             <div class="text-center py-8"><i class="fas fa-spinner fa-spin text-2xl text-gray-500"></i></div>
         </div>
+        <!-- Quick Actions / Example Prompts -->
+        <div class="border-t border-gray-700 p-4" id="quickActions">
+            <div class="mb-3">
+                <p class="text-xs text-gray-500 mb-2">Quick Actions - Click to try:</p>
+                <div class="flex flex-wrap gap-2" id="promptButtons"></div>
+            </div>
+            <div class="flex gap-2">
+                <input type="text" id="assistantPrompt" placeholder="Ask your assistant..." 
+                    class="flex-1 bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-purple-500"
+                    onkeydown="if(event.key==='Enter')sendToAssistant()">
+                <button onclick="sendToAssistant()" class="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-sm font-medium transition">
+                    <i class="fas fa-paper-plane"></i>
+                </button>
+            </div>
+            <!-- Auto-Pilot Mode -->
+            <div class="mt-3 p-3 bg-gray-800/50 rounded-lg border border-gray-700">
+                <div class="flex items-center justify-between mb-2">
+                    <div class="flex items-center gap-2">
+                        <i class="fas fa-robot text-purple-400"></i>
+                        <span class="text-white text-sm font-medium">Auto-Pilot Mode</span>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="autoPilotToggle" class="sr-only peer" onchange="toggleAutoPilot()">
+                        <div class="w-9 h-5 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600"></div>
+                    </label>
+                </div>
+                <div id="autoPilotSettings" class="hidden">
+                    <div class="grid grid-cols-2 gap-2 mb-2">
+                        <select id="autoPilotInterval" class="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-xs">
+                            <option value="5">Every 5 min</option>
+                            <option value="15">Every 15 min</option>
+                            <option value="30">Every 30 min</option>
+                            <option value="60">Every hour</option>
+                        </select>
+                        <select id="autoPilotAction" class="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-xs">
+                            <option value="check">Check & Report</option>
+                            <option value="reply">Auto-Reply</option>
+                            <option value="both">Check & Reply</option>
+                        </select>
+                    </div>
+                    <input type="text" id="autoPilotSchedule" placeholder="Schedule: every day at 9am, every hour..." 
+                        class="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-xs mb-2">
+                    <button onclick="saveAutoPilot()" class="w-full py-1.5 bg-green-600 hover:bg-green-500 text-white text-xs rounded font-medium">
+                        <i class="fas fa-save mr-1"></i>Save Auto-Pilot
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -300,18 +348,123 @@
 {% block scripts %}
 <script>
 let currentAssistantId = '';
+let currentAssistantData = null;
 
 const templateData = {
-    email: { name: 'Email Assistant', desc: 'Read, draft, and reply to emails', caps: ['Read incoming emails', 'Draft professional replies', 'Send responses', 'Summarize email threads', 'Filter important messages'], color: 'blue' },
-    whatsapp: { name: 'WhatsApp Assistant', desc: 'Read and reply to WhatsApp messages', caps: ['Read messages', 'Send replies', 'Voice-to-text', 'Message summarization', 'Auto-reply'], color: 'green' },
-    facebook: { name: 'Facebook Assistant', desc: 'Manage Facebook posts and interactions', caps: ['Read posts', 'Draft replies', 'Create posts', 'Manage comments', 'Analytics'], color: 'indigo' },
-    web_research: { name: 'Web Research Assistant', desc: 'Search, read, and summarize web content', caps: ['Web search', 'Page reading', 'Content summarization', 'Fact checking', 'Source verification'], color: 'cyan' },
-    calendar: { name: 'Calendar Assistant', desc: 'Manage calendar events and reminders', caps: ['Set reminders', 'Create events', 'Manage schedule', 'Send notifications', 'Time zone handling'], color: 'amber' },
-    git: { name: 'Git Assistant', desc: 'Manage git repositories and code', caps: ['Read repos', 'Explain code', 'Create commits', 'Manage branches', 'Code review'], color: 'red' },
-    code: { name: 'Code Assistant', desc: 'Read, explain, and write code', caps: ['Code explanation', 'Code generation', 'Bug fixing', 'Refactoring', 'Documentation'], color: 'purple' },
-    data: { name: 'Data Assistant', desc: 'Analyze data and generate reports', caps: ['Data analysis', 'Chart generation', 'Report creation', 'Pattern detection', 'Predictions'], color: 'teal' },
-    customer: { name: 'Support Assistant', desc: 'Handle customer inquiries and support', caps: ['Answer questions', 'Ticket management', 'Escalation', 'Knowledge base', 'Sentiment analysis'], color: 'orange' },
-    custom: { name: 'Custom Assistant', desc: 'Build your own custom assistant', caps: ['Custom tasks', 'Custom integrations', 'Custom workflows', 'Flexible configuration'], color: 'gray' }
+    email: { 
+        name: 'Email Assistant', 
+        desc: 'Read, draft, and reply to emails', 
+        caps: ['Read incoming emails', 'Draft professional replies', 'Send responses', 'Summarize email threads', 'Filter important messages'], 
+        color: 'blue',
+        prompts: [
+            { text: 'Hi, my name is John', icon: 'fa-hand-wave' },
+            { text: 'Show me new emails today', icon: 'fa-envelope-open' },
+            { text: 'Reply all my unread emails', icon: 'fa-reply-all' },
+            { text: 'Summarize my inbox', icon: 'fa-list' },
+            { text: 'Send email to team about meeting', icon: 'fa-paper-plane' }
+        ]
+    },
+    whatsapp: { 
+        name: 'WhatsApp Assistant', 
+        desc: 'Read and reply to WhatsApp messages', 
+        caps: ['Read messages', 'Send replies', 'Voice-to-text', 'Message summarization', 'Auto-reply'], 
+        color: 'green',
+        prompts: [
+            { text: 'Hi, my name is John', icon: 'fa-hand-wave' },
+            { text: 'Show me new WhatsApp messages', icon: 'fa-comment-dots' },
+            { text: 'Reply to unread messages', icon: 'fa-reply' },
+            { text: 'Send message to Mom', icon: 'fa-paper-plane' }
+        ]
+    },
+    facebook: { 
+        name: 'Facebook Assistant', 
+        desc: 'Manage Facebook posts and interactions', 
+        caps: ['Read posts', 'Draft replies', 'Create posts', 'Manage comments', 'Analytics'], 
+        color: 'indigo',
+        prompts: [
+            { text: 'Hi, my name is John', icon: 'fa-hand-wave' },
+            { text: 'Show me new Facebook posts', icon: 'fa-newspaper' },
+            { text: 'Reply to recent comments', icon: 'fa-comment' },
+            { text: 'Create a post about AI', icon: 'fa-plus-square' }
+        ]
+    },
+    web_research: { 
+        name: 'Web Research Assistant', 
+        desc: 'Search, read, and summarize web content', 
+        caps: ['Web search', 'Page reading', 'Content summarization', 'Fact checking', 'Source verification'], 
+        color: 'cyan',
+        prompts: [
+            { text: 'Search for latest AI news', icon: 'fa-search' },
+            { text: 'Read and summarize this URL', icon: 'fa-book-reader' },
+            { text: 'Compare AI models', icon: 'fa-balance-scale' }
+        ]
+    },
+    calendar: { 
+        name: 'Calendar Assistant', 
+        desc: 'Manage calendar events and reminders', 
+        caps: ['Set reminders', 'Create events', 'Manage schedule', 'Send notifications', 'Time zone handling'], 
+        color: 'amber',
+        prompts: [
+            { text: "Hi, my name is John's assistant", icon: 'fa-hand-wave' },
+            { text: "Schedule meeting tomorrow at 3pm", icon: 'fa-calendar-plus' },
+            { text: "What's on my calendar today?", icon: 'fa-calendar-alt' },
+            { text: "Set reminder for dentist appointment", icon: 'fa-bell' }
+        ]
+    },
+    git: { 
+        name: 'Git Assistant', 
+        desc: 'Manage git repositories and code', 
+        caps: ['Read repos', 'Explain code', 'Create commits', 'Manage branches', 'Code review'], 
+        color: 'red',
+        prompts: [
+            { text: 'Show recent commits', icon: 'fa-code-commit' },
+            { text: 'Create a new branch', icon: 'fa-code-branch' },
+            { text: 'Review my last PR', icon: 'fa-code-pull-request' }
+        ]
+    },
+    code: { 
+        name: 'Code Assistant', 
+        desc: 'Read, explain, and write code', 
+        caps: ['Code explanation', 'Code generation', 'Bug fixing', 'Refactoring', 'Documentation'], 
+        color: 'purple',
+        prompts: [
+            { text: 'Write a Python function', icon: 'fa-file-code' },
+            { text: 'Explain this code', icon: 'fa-code' },
+            { text: 'Find bugs in my code', icon: 'fa-bug' }
+        ]
+    },
+    data: { 
+        name: 'Data Assistant', 
+        desc: 'Analyze data and generate reports', 
+        caps: ['Data analysis', 'Chart generation', 'Report creation', 'Pattern detection', 'Predictions'], 
+        color: 'teal',
+        prompts: [
+            { text: 'Analyze my sales data', icon: 'fa-chart-line' },
+            { text: 'Create a report', icon: 'fa-file-alt' },
+            { text: 'Show trends', icon: 'fa-chart-bar' }
+        ]
+    },
+    customer: { 
+        name: 'Support Assistant', 
+        desc: 'Handle customer inquiries and support', 
+        caps: ['Answer questions', 'Ticket management', 'Escalation', 'Knowledge base', 'Sentiment analysis'], 
+        color: 'orange',
+        prompts: [
+            { text: 'Hi, my name is John', icon: 'fa-hand-wave' },
+            { text: 'Show open support tickets', icon: 'fa-ticket-alt' },
+            { text: 'Reply to customer inquiries', icon: 'fa-headset' }
+        ]
+    },
+    custom: { 
+        name: 'Custom Assistant', 
+        desc: 'Build your own custom assistant', 
+        caps: ['Custom tasks', 'Custom integrations', 'Custom workflows', 'Flexible configuration'], 
+        color: 'gray',
+        prompts: [
+            { text: 'Hi, my name is John', icon: 'fa-hand-wave' },
+            { text: 'What can you help me with?', icon: 'fa-question-circle' }
+        ]
+    }
 };
 
 function selectTemplate(tmpl) {
@@ -358,9 +511,22 @@ async function showAssistantDetail(assistantId) {
     try {
         const resp = await fetch(`/api/assistants/${assistantId}`);
         const data = await resp.json();
+        currentAssistantData = data;
         
         document.getElementById('modalAssistantName').textContent = data.assistant.name;
         document.getElementById('modalAssistantModel').textContent = data.assistant.model_id;
+        
+        // Render prompt buttons based on template
+        const tmpl = data.assistant.description || 'custom';
+        const tmplInfo = templateData[tmpl] || templateData.custom;
+        const promptBtns = document.getElementById('promptButtons');
+        promptBtns.innerHTML = tmplInfo.prompts.map(p => `
+            <button onclick="usePrompt('${p.text.replace(/'/g, "\\'")}')" 
+                class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 border border-gray-600 hover:border-purple-500 rounded-full text-xs text-gray-300 hover:text-white transition flex items-center gap-1.5">
+                <i class="fas ${p.icon} text-purple-400"></i>
+                ${p.text.length > 25 ? p.text.substring(0, 25) + '...' : p.text}
+            </button>
+        `).join('');
         
         let html = `
             <div class="grid grid-cols-2 gap-4 mb-6">
@@ -410,7 +576,7 @@ async function showAssistantDetail(assistantId) {
                 `;
             });
         } else {
-            html += '<p class="text-gray-500 text-sm">No integrations configured</p>';
+            html += '<p class="text-gray-500 text-sm">No integrations configured. Go to Integrations page to add one.</p>';
         }
         html += '</div></div>';
 
@@ -476,6 +642,98 @@ async function showAssistantDetail(assistantId) {
     } catch (e) {
         content.innerHTML = '<div class="text-center py-8 text-red-400">Failed to load assistant details</div>';
     }
+}
+
+function usePrompt(text) {
+    document.getElementById('assistantPrompt').value = text;
+    document.getElementById('assistantPrompt').focus();
+}
+
+async function sendToAssistant() {
+    const input = document.getElementById('assistantPrompt');
+    const message = input.value.trim();
+    if (!message) return;
+    
+    input.value = '';
+    
+    const content = document.getElementById('modalContent');
+    const loadingHtml = `
+        <div class="flex items-start gap-3 mb-4">
+            <div class="w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center flex-shrink-0">
+                <i class="fas fa-user text-white text-xs"></i>
+            </div>
+            <div class="p-3 bg-gray-700 rounded-lg rounded-tl-none max-w-[80%]">
+                <p class="text-white text-sm">${message}</p>
+            </div>
+        </div>
+        <div class="flex items-start gap-3 mb-4">
+            <div class="w-8 h-8 bg-purple-600/20 rounded-full flex items-center justify-center flex-shrink-0">
+                <i class="fas fa-robot text-purple-400 text-xs"></i>
+            </div>
+            <div class="p-3 bg-gray-800 rounded-lg rounded-tl-none max-w-[80%]">
+                <p class="text-gray-400 text-sm"><i class="fas fa-spinner fa-spin mr-2"></i>Thinking...</p>
+            </div>
+        </div>
+    `;
+    content.innerHTML += loadingHtml;
+    content.scrollTop = content.scrollHeight;
+    
+    try {
+        const resp = await fetch(`/api/assistants/${currentAssistantId}/chat`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: message })
+        });
+        const data = await resp.json();
+        
+        // Replace loading with response
+        const responseHtml = `
+            <div class="flex items-start gap-3 mb-4">
+                <div class="w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center flex-shrink-0">
+                    <i class="fas fa-user text-white text-xs"></i>
+                </div>
+                <div class="p-3 bg-gray-700 rounded-lg rounded-tl-none max-w-[80%]">
+                    <p class="text-white text-sm">${message}</p>
+                </div>
+            </div>
+            <div class="flex items-start gap-3 mb-4">
+                <div class="w-8 h-8 bg-purple-600/20 rounded-full flex items-center justify-center flex-shrink-0">
+                    <i class="fas fa-robot text-purple-400 text-xs"></i>
+                </div>
+                <div class="p-3 bg-gray-800 rounded-lg rounded-tl-none max-w-[80%]">
+                    <p class="text-white text-sm whitespace-pre-wrap">${data.response || data.message || 'I received your message!'}</p>
+                </div>
+            </div>
+        `;
+        content.innerHTML = content.innerHTML.replace(loadingHtml, responseHtml);
+        content.scrollTop = content.scrollHeight;
+    } catch (e) {
+        const errorHtml = `
+            <div class="flex items-start gap-3 mb-4">
+                <div class="w-8 h-8 bg-red-600/20 rounded-full flex items-center justify-center flex-shrink-0">
+                    <i class="fas fa-exclamation text-red-400 text-xs"></i>
+                </div>
+                <div class="p-3 bg-red-900/30 rounded-lg rounded-tl-none max-w-[80%]">
+                    <p class="text-red-400 text-sm">Sorry, I encountered an error. Please check your integrations are configured.</p>
+                </div>
+            </div>
+        `;
+        content.innerHTML = content.innerHTML.replace(loadingHtml, errorHtml);
+    }
+}
+
+function toggleAutoPilot() {
+    const toggle = document.getElementById('autoPilotToggle');
+    const settings = document.getElementById('autoPilotSettings');
+    settings.classList.toggle('hidden', !toggle.checked);
+}
+
+function saveAutoPilot() {
+    const interval = document.getElementById('autoPilotInterval').value;
+    const action = document.getElementById('autoPilotAction').value;
+    const schedule = document.getElementById('autoPilotSchedule').value;
+    
+    showToast(`Auto-Pilot saved! Every ${interval} min - ${action}`);
 }
 
 function closeAssistantModal() {

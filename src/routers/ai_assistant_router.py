@@ -28,6 +28,11 @@ class AssistantUpdate(BaseModel):
     personality: Optional[str] = None
     temperature: Optional[float] = None
     max_tokens: Optional[int] = None
+
+
+class ChatRequest(BaseModel):
+    message: str = Field(..., min_length=1)
+    integration_type: Optional[str] = None
     is_active: Optional[bool] = None
     auto_reply: Optional[bool] = None
 
@@ -146,7 +151,24 @@ async def get_assistant(
             "output_text": l.output_text[:200] if l.output_text else None,
             "status": l.status, "tokens_used": l.tokens_used,
             "created_at": str(l.created_at)
-        } for l in logs]
+    } for l in logs]
+
+
+@router.post("/{assistant_id}/chat")
+async def chat_with_assistant(
+    assistant_id: str,
+    data: ChatRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db_session)
+):
+    result = ai_assistant_service.process_chat(
+        db=db,
+        assistant_id=assistant_id,
+        user_id=current_user.id,
+        message=data.message,
+        integration_type=data.integration_type
+    )
+    return result
     }
 
 

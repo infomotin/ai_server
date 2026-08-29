@@ -1815,6 +1815,23 @@ def api_assistants_stats():
         return {}
 
 
+@app.route("/api/assistants/<assistant_id>/chat", methods=["POST"])
+def api_assistants_chat(assistant_id):
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    try:
+        data = request.get_json()
+        resp = requests.post(
+            f"{API_BASE_URL}/assistants/{assistant_id}/chat",
+            json=data,
+            headers=get_api_headers(),
+            timeout=30
+        )
+        return resp.json() if resp.status_code == 200 else {"response": "Error", "success": False}
+    except requests.exceptions.RequestException:
+        return {"response": "Connection error", "success": False}
+
+
 # ============= Integrations API Routes =============
 
 @app.route("/api/integrations/test", methods=["POST"])
