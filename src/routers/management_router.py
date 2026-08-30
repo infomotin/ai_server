@@ -444,11 +444,13 @@ async def prompt_playground(
 
     started = time.time()
     try:
-        text, usage = await ollama_client.chat(
+        result = await ollama_client.chat(
             model=model_id,
             messages=messages,
             stream=False,
         )
+        text = result.get("message", {}).get("content", "")
+        usage = result.get("usage", {})
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     elapsed = time.time() - started
