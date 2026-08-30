@@ -34,3 +34,16 @@ models/
 
 # Uvicorn
 *.pid
+
+# Node / WhatsApp Web bridge
+node_modules/
+whatsapp_web/node_modules/
+whatsapp_web/sessions/
+whatsapp_web/bridge.log
+whatsapp_web/package-lock.json
+
+# Runtime data
+data/webhooks.json
+data/whatsapp_messages.json
+data/uploads/
+data/db_exports/

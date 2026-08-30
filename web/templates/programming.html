@@ -1,0 +1,2189 @@
+{% extends "base.html" %}
+{% block title %}OpenLocalAI - Programming Hub{% endblock %}
+{% block header_title %}Programming Hub{% endblock %}
+
+{% block content %}
+<style>
+    .ph-hero { background: linear-gradient(135deg, rgba(59,130,246,0.12) 0%, rgba(16,185,129,0.08) 50%, rgba(245,158,11,0.06) 100%); border: 1px solid rgba(59,130,246,0.15); border-radius: 20px; padding: 28px 32px; margin-bottom: 24px; }
+    .ph-hero h1 { font-size: 26px; font-weight: 800; background: linear-gradient(135deg, #60a5fa, #34d399); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 4px; }
+    .ph-hero p { color: #94a3b8; font-size: 13px; }
+    .ph-tabs { display: flex; gap: 4px; background: rgba(30,41,59,0.6); border-radius: 14px; padding: 4px; margin-bottom: 24px; border: 1px solid rgba(71,85,105,0.3); flex-wrap: wrap; }
+    .ph-tab { padding: 8px 14px; border-radius: 10px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all .2s; border: none; background: transparent; color: #94a3b8; display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+    .ph-tab.active { background: linear-gradient(135deg, rgba(59,130,246,0.25), rgba(16,185,129,0.15)); color: #e2e8f0; box-shadow: 0 2px 8px rgba(59,130,246,0.15); }
+    .ph-tab:hover:not(.active) { background: rgba(51,65,85,0.3); color: #cbd5e1; }
+    .ph-panel { display: none; }
+    .ph-panel.active { display: block; animation: fadeIn .3s; }
+    @keyframes fadeIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
+    .ph-card { background: rgba(30,41,59,0.5); border: 1px solid rgba(71,85,105,0.3); border-radius: 16px; padding: 20px; transition: all .25s; }
+    .ph-card:hover { border-color: rgba(59,130,246,0.3); }
+    .code-editor { background: #0d1117; border: 1px solid rgba(71,85,105,0.4); border-radius: 12px; overflow: hidden; }
+    .code-editor-header { background: rgba(30,41,59,0.8); padding: 10px 16px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(71,85,105,0.3); }
+    .code-editor textarea { width: 100%; min-height: 250px; background: transparent; color: #e2e8f0; font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 13px; line-height: 1.6; padding: 16px; border: none; resize: vertical; outline: none; tab-size: 4; }
+    .output-box { background: #0d1117; border: 1px solid rgba(71,85,105,0.4); border-radius: 12px; padding: 16px; min-height: 120px; max-height: 300px; overflow-y: auto; font-family: 'JetBrains Mono', monospace; font-size: 12px; line-height: 1.6; white-space: pre-wrap; }
+    .output-box .stdout { color: #e2e8f0; }
+    .output-box .stderr { color: #f87171; }
+    .output-box .success { color: #34d399; }
+    .output-box .error { color: #f87171; }
+    .algo-bar { border-radius: 4px 4px 0 0; transition: all .3s; display: flex; align-items: flex-end; justify-content: center; font-size: 10px; font-weight: 700; color: #60a5fa; }
+    .algo-bar.comparing { background: rgba(245,158,11,0.6) !important; color: #fbbf24; }
+    .algo-bar.sorted { background: rgba(16,185,129,0.5) !important; color: #34d399; }
+    .algo-bar.active { background: rgba(59,130,246,0.4) !important; }
+    .algo-bar.pivot { background: rgba(239,68,68,0.5) !important; color: #f87171; }
+    .quiz-option { padding: 12px 16px; background: rgba(15,23,42,0.6); border: 1px solid rgba(71,85,105,0.3); border-radius: 10px; cursor: pointer; transition: all .2s; font-size: 13px; color: #e2e8f0; }
+    .quiz-option:hover { border-color: rgba(59,130,246,0.5); background: rgba(59,130,246,0.08); }
+    .quiz-option.correct { border-color: #10b981; background: rgba(16,185,129,0.15); color: #34d399; }
+    .quiz-option.wrong { border-color: #ef4444; background: rgba(239,68,68,0.1); color: #f87171; }
+    .book-card { background: rgba(15,23,42,0.5); border: 1px solid rgba(71,85,105,0.2); border-radius: 12px; padding: 16px; }
+    .dfd-canvas { background: rgba(15,23,42,0.8); border: 1px solid rgba(71,85,105,0.3); border-radius: 12px; min-height: 450px; position: relative; overflow: hidden; }
+    .dfd-entity { position: absolute; padding: 12px 20px; background: rgba(59,130,246,0.15); border: 2px solid rgba(59,130,246,0.4); border-radius: 12px; cursor: move; font-size: 12px; color: #60a5fa; font-weight: 600; user-select: none; z-index: 10; }
+    .dfd-process { position: absolute; padding: 12px 20px; background: rgba(16,185,129,0.15); border: 2px solid rgba(16,185,129,0.4); border-radius: 50%; cursor: move; font-size: 11px; color: #34d399; font-weight: 600; user-select: none; z-index: 10; min-width: 80px; min-height: 80px; display: flex; align-items: center; justify-content: center; text-align: center; }
+    .dfd-store { position: absolute; padding: 12px 20px; background: rgba(245,158,11,0.15); border: 2px solid rgba(245,158,11,0.4); border-bottom: 4px solid rgba(245,158,11,0.6); cursor: move; font-size: 12px; color: #fbbf24; font-weight: 600; user-select: none; z-index: 10; }
+    .kids-card { background: linear-gradient(135deg, rgba(168,85,247,0.08), rgba(236,72,153,0.06)); border: 1px solid rgba(168,85,247,0.2); border-radius: 16px; padding: 20px; }
+    .sql-block { background: #0d1117; border: 1px solid rgba(71,85,105,0.4); border-radius: 12px; padding: 16px; font-family: 'JetBrains Mono', monospace; font-size: 12px; line-height: 1.6; color: #e2e8f0; overflow-x: auto; }
+    .var-trace { background: rgba(15,23,42,0.8); border: 1px solid rgba(71,85,105,0.3); border-radius: 12px; padding: 12px; font-family: 'JetBrains Mono', monospace; font-size: 11px; max-height: 350px; overflow-y: auto; }
+    .var-trace .var-name { color: #60a5fa; font-weight: 700; }
+    .var-trace .var-val { color: #34d399; }
+    .var-trace .var-changed { color: #fbbf24; font-weight: 700; }
+    .step-log { max-height: 200px; overflow-y: auto; font-size: 11px; }
+    .step-log .step-entry { padding: 4px 8px; border-left: 2px solid transparent; margin-bottom: 2px; }
+    .step-log .step-entry.current { border-left-color: #3b82f6; background: rgba(59,130,246,0.1); }
+    .input-field { background: rgba(15,23,42,0.6); border: 1px solid rgba(71,85,105,0.4); border-radius: 10px; padding: 10px 14px; color: #e2e8f0; font-size: 13px; width: 100%; outline: none; transition: border-color .2s; }
+    .input-field:focus { border-color: rgba(59,130,246,0.5); }
+    .btn { padding: 10px 20px; border-radius: 10px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all .2s; border: none; display: inline-flex; align-items: center; gap: 6px; }
+    .btn-primary { background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white; }
+    .btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    .btn-success { background: linear-gradient(135deg, #059669, #10b981); color: white; }
+    .btn-secondary { background: rgba(51,65,85,0.5); color: #e2e8f0; }
+    .ph-block-item { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 8px; border: 1px solid; cursor: pointer; transition: all 0.2s; font-size: 12px; }
+    .ph-block-item:hover { transform: translateX(4px); filter: brightness(1.2); }
+</style>
+
+<!-- Hero -->
+<div class="ph-hero">
+    <div class="flex items-center justify-between">
+        <div>
+            <h1>Programming Hub</h1>
+            <p>Code, visualize, learn, and master programming with AI-powered tools.</p>
+        </div>
+        <div class="flex items-center gap-3">
+            <span class="text-xs text-gray-500">AI Model:</span>
+            <select id="aiModelSelect" class="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white" onchange="changeAIModel()">
+                <option value="qwen2.5-coder:1.5b" selected>qwen2.5-coder:1.5b (Coder)</option>
+                <option value="qwen2.5:0.5b">qwen2.5:0.5b (Light)</option>
+                <option value="llama3.2:1b">llama3.2:1b (General)</option>
+            </select>
+            <span id="modelStatus" class="flex items-center gap-1.5 text-xs"><span class="w-2 h-2 rounded-full bg-green-500"></span><span class="text-green-400">Active</span></span>
+        </div>
+    </div>
+</div>
+
+<!-- Tabs -->
+<div class="ph-tabs">
+    <button class="ph-tab active" onclick="phTab('playground', this)"><i class="fas fa-play-circle"></i> Code Playground</button>
+    <button class="ph-tab" onclick="phTab('visualizer', this)"><i class="fas fa-project-diagram"></i> Algo Visualizer</button>
+    <button class="ph-tab" onclick="phTab('explain', this)"><i class="fas fa-brain"></i> Code Explainer</button>
+    <button class="ph-tab" onclick="phTab('quiz', this)"><i class="fas fa-question-circle"></i> Skill Test</button>
+    <button class="ph-tab" onclick="phTab('exam', this)"><i class="fas fa-graduation-cap"></i> Exam System</button>
+    <button class="ph-tab" onclick="phTab('book', this)"><i class="fas fa-book-open"></i> Book Analyzer</button>
+    <button class="ph-tab" onclick="phTab('kids', this)"><i class="fas fa-child"></i> Kids Corner</button>
+    <button class="ph-tab" onclick="phTab('dfd', this)"><i class="fas fa-sitemap"></i> DFD Designer</button>
+    <button class="ph-tab" onclick="phTab('sql', this)"><i class="fas fa-database"></i> SQL Lab</button>
+    <button class="ph-tab" onclick="phTab('optimizer', this)"><i class="fas fa-gauge-high"></i> DB Optimizer</button>
+</div>
+
+<!-- ============ 1. CODE PLAYGROUND ============ -->
+<div id="ph-playground" class="ph-panel active">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <div>
+            <div class="code-editor">
+                <div class="code-editor-header">
+                    <div class="flex items-center gap-3">
+                        <select id="codeLang" class="bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-white" onchange="loadExample()">
+                            <option value="python">Python</option>
+                            <option value="javascript">JavaScript</option>
+                            <option value="bash">Bash</option>
+                            <option value="c">C</option>
+                            <option value="java">Java</option>
+                            <option value="go">Go</option>
+                            <option value="rust">Rust</option>
+                            <option value="typescript">TypeScript</option>
+                        </select>
+                        <select id="codeExample" class="bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-gray-400" onchange="loadExample()">
+                            <option value="">Examples...</option>
+                            <optgroup label="Basics">
+                                <option value="hello">Hello World</option>
+                                <option value="variables">Variables</option>
+                                <option value="loops">Loops</option>
+                                <option value="conditionals">Conditionals</option>
+                            </optgroup>
+                            <optgroup label="Algorithms">
+                                <option value="fibonacci">Fibonacci</option>
+                                <option value="sort">Bubble Sort</option>
+                                <option value="binary_search">Binary Search</option>
+                                <option value="factorial">Factorial</option>
+                            </optgroup>
+                            <optgroup label="Data Structures">
+                                <option value="class">Class Example</option>
+                                <option value="json">JSON Parse</option>
+                                <option value="linkedlist">Linked List</option>
+                            </optgroup>
+                        </select>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span id="codeLineCount" class="text-[10px] text-gray-600 mr-2">Ln 1, Col 1</span>
+                        <button onclick="saveCode()" class="px-3 py-1.5 text-xs text-gray-400 hover:text-white transition" title="Save code"><i class="fas fa-save mr-1"></i>Save</button>
+                        <button onclick="shareCode()" class="px-3 py-1.5 text-xs text-gray-400 hover:text-white transition" title="Share code"><i class="fas fa-share-alt mr-1"></i>Share</button>
+                        <button onclick="clearEditor()" class="px-3 py-1.5 text-xs text-gray-400 hover:text-white transition">Clear</button>
+                        <button onclick="runCode()" id="runBtn" class="px-4 py-1.5 bg-green-600 hover:bg-green-500 text-white rounded-lg text-xs font-semibold transition">
+                            <i class="fas fa-play mr-1"></i> Run
+                        </button>
+                    </div>
+                </div>
+                <textarea id="codeEditor" spellcheck="false" placeholder="Write your code here..." oninput="updateLineCount()" onkeyup="updateLineCount()" onclick="updateLineCount()"># Python Playground - Write and execute code instantly!
+
+def fibonacci(n):
+    if n <= 1:
+        return n
+    return fibonacci(n-1) + fibonacci(n-2)
+
+# Generate first 10 Fibonacci numbers
+for i in range(10):
+    print(f"F({i}) = {fibonacci(i)}")
+
+print("\nHello from OpenLocalAI Programming Hub!")</textarea>
+            </div>
+        </div>
+        <div>
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-sm text-gray-400 font-medium"><i class="fas fa-terminal mr-1"></i> Output</span>
+                <span id="codeLatency" class="text-[10px] text-gray-600"></span>
+            </div>
+            <div class="output-box" id="codeOutput">
+                <span class="text-gray-500">Click "Run" to execute your code...</span>
+            </div>
+            <div class="mt-4 grid grid-cols-3 gap-3">
+                <div class="ph-card text-center py-3"><p class="text-lg font-bold text-blue-400" id="totalRuns">0</p><p class="text-[10px] text-gray-500">Runs</p></div>
+                <div class="ph-card text-center py-3"><p class="text-lg font-bold text-green-400" id="totalSuccess">0</p><p class="text-[10px] text-gray-500">Success</p></div>
+                <div class="ph-card text-center py-3"><p class="text-lg font-bold text-amber-400" id="avgLatency">0ms</p><p class="text-[10px] text-gray-500">Avg Time</p></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ============ 2. ALGO VISUALIZER ============ -->
+<div id="ph-visualizer" class="ph-panel">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        <div class="lg:col-span-2">
+            <div class="ph-card">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-white font-semibold flex items-center gap-2"><i class="fas fa-sort text-blue-400"></i> Algorithm Visualizer</h3>
+                    <div class="flex gap-2 items-center">
+                        <select id="algoSelect" class="bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-white" onchange="initAlgo()">
+                            <option value="bubble">Bubble Sort</option>
+                            <option value="selection">Selection Sort</option>
+                            <option value="insertion">Insertion Sort</option>
+                            <option value="merge">Merge Sort</option>
+                            <option value="quick">Quick Sort</option>
+                            <option value="binary">Binary Search</option>
+                            <option value="linear">Linear Search</option>
+                        </select>
+                        <div class="flex items-center gap-1.5">
+                            <span class="text-[10px] text-gray-500">Speed:</span>
+                            <input type="range" id="algoSpeed" min="50" max="1000" value="400" step="50" class="w-20 h-1 accent-blue-500" title="Auto-play speed">
+                        </div>
+                        <button onclick="initAlgo()" class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded-lg text-xs text-white transition"><i class="fas fa-sync mr-1"></i>Reset</button>
+                        <button onclick="stepAlgo()" id="algoStepBtn" class="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 rounded-lg text-xs text-white font-semibold transition"><i class="fas fa-forward mr-1"></i>Step</button>
+                        <button onclick="autoAlgo()" id="algoAutoBtn" class="px-4 py-1.5 bg-green-600 hover:bg-green-500 rounded-lg text-xs text-white font-semibold transition"><i class="fas fa-play mr-1"></i>Auto</button>
+                    </div>
+                </div>
+                <div class="bg-gray-900/60 rounded-xl p-6 min-h-[280px]" id="algoCanvas">
+                    <div class="flex items-end justify-center gap-1.5 h-56" id="algoBars"></div>
+                </div>
+                <div class="mt-4 flex items-center justify-between">
+                    <div class="flex gap-4 text-xs text-gray-500">
+                        <span id="algoComparisons"><i class="fas fa-exchange-alt mr-1"></i>Comparisons: 0</span>
+                        <span id="algoSwaps"><i class="fas fa-arrows-alt-h mr-1"></i>Swaps: 0</span>
+                        <span id="algoStatus" class="text-green-400">Ready</span>
+                    </div>
+                    <div class="flex gap-3 text-[10px]">
+                        <span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-blue-500/40 border border-blue-500"></span> Unsorted</span>
+                        <span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-amber-500/40 border border-amber-500"></span> Comparing</span>
+                        <span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-green-500/40 border border-green-500"></span> Sorted</span>
+                        <span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-red-500/40 border border-red-500"></span> Pivot</span>
+                    </div>
+                </div>
+                <!-- Algorithm Code Panel -->
+                <div class="mt-4 bg-gray-900/80 border border-gray-700/40 rounded-xl overflow-hidden">
+                    <div class="flex items-center justify-between px-4 py-2 bg-gray-800/60 border-b border-gray-700/30">
+                        <span class="text-xs text-gray-400 font-medium"><i class="fas fa-code mr-1"></i> Algorithm Code</span>
+                        <span id="algoCodeLine" class="text-[10px] text-blue-400">-</span>
+                    </div>
+                    <pre id="algoCodeBlock" class="p-4 text-xs font-mono leading-relaxed overflow-x-auto max-h-[220px] overflow-y-auto"><span class="text-gray-500">Select an algorithm and click Step/Auto to see code execution...</span></pre>
+                </div>
+            </div>
+        </div>
+        <div class="space-y-4">
+            <div class="ph-card">
+                <h4 class="text-white font-semibold mb-3 flex items-center gap-2"><i class="fas fa-info-circle text-blue-400"></i> Algorithm Info</h4>
+                <div id="algoInfo" class="text-sm text-gray-400 space-y-2"></div>
+            </div>
+            <div class="ph-card">
+                <h4 class="text-white font-semibold mb-3 flex items-center gap-2"><i class="fas fa-database text-green-400"></i> Data Set</h4>
+                <div class="flex gap-2 mb-3">
+                    <button onclick="generateData('random')" class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded-lg text-[11px] text-white transition">Random</button>
+                    <button onclick="generateData('sorted')" class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded-lg text-[11px] text-white transition">Sorted</button>
+                    <button onclick="generateData('reversed')" class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded-lg text-[11px] text-white transition">Reversed</button>
+                    <button onclick="generateData('nearly')" class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded-lg text-[11px] text-white transition">Nearly</button>
+                </div>
+                <p class="text-[10px] text-gray-600">Array: <span id="algoArray" class="text-gray-400">-</span></p>
+            </div>
+            <div class="ph-card">
+                <h4 class="text-white font-semibold mb-3 flex items-center gap-2"><i class="fas fa-list-ol text-amber-400"></i> Live Data</h4>
+                <div id="algoLiveData" class="var-trace">
+                    <p class="text-gray-500 text-xs">Click Step or Auto to see live changes...</p>
+                </div>
+            </div>
+            <div class="ph-card">
+                <h4 class="text-white font-semibold mb-3 flex items-center gap-2"><i class="fas fa-history text-purple-400"></i> Step History</h4>
+                <div id="algoStepLog" class="step-log text-gray-500">
+                    <p class="text-xs">No steps yet</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ============ 3. CODE EXPLAINER ============ -->
+<div id="ph-explain" class="ph-panel">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        <div class="lg:col-span-2">
+            <div class="code-editor">
+                <div class="code-editor-header">
+                    <span class="text-sm text-gray-400"><i class="fas fa-code mr-1"></i> Paste Code to Explain</span>
+                    <button onclick="explainCode()" id="explainBtn" class="px-4 py-1.5 bg-purple-600 hover:bg-purple-500 rounded-lg text-xs text-white font-semibold transition">
+                        <i class="fas fa-brain mr-1"></i> Explain
+                    </button>
+                </div>
+                <textarea id="explainInput" spellcheck="false" placeholder="Paste any code here..." style="min-height:200px;">def binary_search(arr, target):
+    low, high = 0, len(arr) - 1
+    while low <= high:
+        mid = (low + high) // 2
+        if arr[mid] == target:
+            return mid
+        elif arr[mid] < target:
+            low = mid + 1
+        else:
+            high = mid - 1
+    return -1</textarea>
+            </div>
+        </div>
+        <div class="space-y-4">
+            <div class="ph-card">
+                <h4 class="text-white font-semibold mb-3 flex items-center gap-2"><i class="fas fa-table text-blue-400"></i> Variable Trace</h4>
+                <div id="explainVars" class="var-trace">
+                    <p class="text-gray-500 text-xs">Variables will appear here after analysis...</p>
+                </div>
+            </div>
+            <div class="ph-card">
+                <h4 class="text-white font-semibold mb-3 flex items-center gap-2"><i class="fas fa-project-diagram text-green-400"></i> Flow Visualization</h4>
+                <div id="explainFlow" class="text-xs text-gray-400 space-y-1">
+                    <p class="text-gray-500">Flow diagram will appear after analysis...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="mt-5">
+        <div class="flex items-center justify-between mb-2">
+            <span class="text-sm text-gray-400 font-medium"><i class="fas fa-lightbulb mr-1"></i> AI Explanation</span>
+            <span id="explainLatency" class="text-[10px] text-gray-600"></span>
+        </div>
+        <div class="bg-gray-900/60 border border-gray-700/30 rounded-xl p-5 min-h-[200px] text-sm text-gray-300 leading-relaxed" id="explainOutput">
+            <p class="text-gray-500 italic">Click "Explain" and the AI will break down your code step by step with variable traces...</p>
+        </div>
+    </div>
+</div>
+
+<!-- ============ 4. SKILL TEST ============ -->
+<div id="ph-quiz" class="ph-panel">
+    <div class="max-w-3xl mx-auto">
+        <div class="ph-card mb-5">
+            <h3 class="text-white font-semibold mb-4 flex items-center gap-2"><i class="fas fa-brain text-purple-400"></i> Programming Skill Test</h3>
+            <div class="grid grid-cols-4 gap-3 mb-4">
+                <div>
+                    <label class="block text-xs text-gray-500 mb-1">Topic</label>
+                    <select id="quizTopic" class="input-field text-sm w-full">
+                        <option value="python">Python</option>
+                        <option value="javascript">JavaScript</option>
+                        <option value="java">Java</option>
+                        <option value="cpp">C++</option>
+                        <option value="sql">SQL</option>
+                        <option value="algorithms">Algorithms</option>
+                        <option value="data structures">Data Structures</option>
+                        <option value="web development">Web Development</option>
+                        <option value="rust">Rust</option>
+                        <option value="go">Go</option>
+                        <option value="typescript">TypeScript</option>
+                        <option value="react">React</option>
+                        <option value="nodejs">Node.js</option>
+                        <option value="devops">DevOps/Docker</option>
+                        <option value="cybersecurity">Cybersecurity</option>
+                        <option value="machine learning">Machine Learning</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-500 mb-1">Difficulty</label>
+                    <select id="quizDifficulty" class="input-field text-sm w-full">
+                        <option value="easy">Easy</option>
+                        <option value="medium" selected>Medium</option>
+                        <option value="hard">Hard</option>
+                        <option value="expert">Expert</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-500 mb-1">Questions</label>
+                    <select id="quizCount" class="input-field text-sm w-full">
+                        <option value="5" selected>5</option>
+                        <option value="10">10</option>
+                        <option value="15">15</option>
+                        <option value="20">20</option>
+                    </select>
+                </div>
+                <div class="flex items-end">
+                    <button onclick="generateQuiz()" id="quizGenBtn" class="btn btn-primary w-full py-2.5 text-sm">
+                        <i class="fas fa-play mr-1"></i> Generate
+                    </button>
+                </div>
+            </div>
+            <div class="flex gap-3 text-xs text-gray-500">
+                <span>Score: <strong class="text-green-400" id="quizScore">0/0</strong></span>
+                <span>Accuracy: <strong class="text-blue-400" id="quizAccuracy">0%</strong></span>
+            </div>
+        </div>
+        <div id="quizArea" class="space-y-4"></div>
+    </div>
+</div>
+
+<!-- ============ 5. EXAM SYSTEM ============ -->
+<div id="ph-exam" class="ph-panel">
+    <div class="max-w-4xl mx-auto">
+        <div class="ph-card mb-5">
+            <h3 class="text-white font-semibold mb-4 flex items-center gap-2"><i class="fas fa-graduation-cap text-amber-400"></i> Exam System</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                    <label class="block text-xs text-gray-500 mb-1">Exam Mode</label>
+                    <select id="examMode" class="input-field text-sm w-full" onchange="onExamModeChange()">
+                        <option value="topic">By Topic</option>
+                        <option value="book">From Book/Document</option>
+                        <option value="url">From Web Page</option>
+                    </select>
+                </div>
+                <div id="examTopicDiv">
+                    <label class="block text-xs text-gray-500 mb-1">Topic</label>
+                    <select id="examTopic" class="input-field text-sm w-full">
+                        <option value="python">Python</option>
+                        <option value="javascript">JavaScript</option>
+                        <option value="sql">SQL</option>
+                        <option value="java">Java</option>
+                        <option value="cpp">C++</option>
+                        <option value="algorithms">Algorithms</option>
+                    </select>
+                </div>
+                <div id="examFileDiv" class="hidden">
+                    <label class="block text-xs text-gray-500 mb-1">Upload Book/Document</label>
+                    <input type="file" id="examFile" accept=".txt,.pdf,.md,.docx" class="input-field text-sm w-full">
+                </div>
+                <div id="examUrlDiv" class="hidden">
+                    <label class="block text-xs text-gray-500 mb-1">Web Page URL</label>
+                    <input type="url" id="examUrl" class="input-field text-sm w-full" placeholder="https://example.com/article">
+                </div>
+            </div>
+            <div class="grid grid-cols-3 gap-3 mb-4">
+                <div>
+                    <label class="block text-xs text-gray-500 mb-1">Questions</label>
+                    <select id="examCount" class="input-field text-sm w-full">
+                        <option value="10">10</option>
+                        <option value="20" selected>20</option>
+                        <option value="30">30</option>
+                        <option value="50">50</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-500 mb-1">Difficulty</label>
+                    <select id="examDifficulty" class="input-field text-sm w-full">
+                        <option value="easy">Easy</option>
+                        <option value="medium" selected>Medium</option>
+                        <option value="hard">Hard</option>
+                    </select>
+                </div>
+                <div class="flex items-end">
+                    <button onclick="startExam()" id="examStartBtn" class="btn btn-primary w-full py-2.5">
+                        <i class="fas fa-play mr-1"></i> Start Exam
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div id="examArea"></div>
+    </div>
+</div>
+
+<!-- ============ 6. BOOK ANALYZER ============ -->
+<div id="ph-book" class="ph-panel">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <div>
+            <div class="ph-card">
+                <h3 class="text-white font-semibold mb-4 flex items-center gap-2"><i class="fas fa-book text-amber-400"></i> Book Analysis & Q&A</h3>
+                <div class="mb-3">
+                    <label class="block text-xs text-gray-500 mb-1">Analysis Mode</label>
+                    <select id="bookMode" class="input-field text-sm w-full">
+                        <option value="analyze">Full Analysis</option>
+                        <option value="summary">Summary Only</option>
+                        <option value="quiz">Generate Quiz</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="block text-xs text-gray-500 mb-1">Source</label>
+                    <select id="bookSource" class="input-field text-sm w-full" onchange="onBookSourceChange()">
+                        <option value="text">Paste Text</option>
+                        <option value="file">Upload File (TXT/PDF)</option>
+                        <option value="url">Web Page URL</option>
+                    </select>
+                </div>
+                <div id="bookTextInput">
+                    <label class="block text-xs text-gray-500 mb-1">Book Title</label>
+                    <input type="text" id="bookTitle" class="input-field text-sm w-full mb-2" placeholder="e.g. The Great Gatsby" value="The Great Gatsby">
+                    <label class="block text-xs text-gray-500 mb-1">Book Content</label>
+                    <textarea id="bookText" class="input-field text-sm w-full font-mono" rows="8" placeholder="Paste book text here...">In my younger and more vulnerable years my father gave me some advice that I've been turning over in my mind ever since. "Whenever you feel like criticizing anyone," he told me, "just remember that all the people in this world haven't had the advantages that you've had."</textarea>
+                </div>
+                <div id="bookFileInput" class="hidden">
+                    <label class="block text-xs text-gray-500 mb-1">Upload Book File</label>
+                    <input type="file" id="bookFile" accept=".txt,.pdf,.md" class="input-field text-sm w-full">
+                    <p class="text-[10px] text-gray-600 mt-1">Supports TXT, PDF (requires poppler-utils), Markdown</p>
+                </div>
+                <div id="bookUrlInput" class="hidden">
+                    <label class="block text-xs text-gray-500 mb-1">Web Page URL</label>
+                    <input type="url" id="bookUrl" class="input-field text-sm w-full" placeholder="https://example.com/article">
+                </div>
+                <button onclick="analyzeBook()" id="bookBtn" class="btn btn-primary w-full py-3 mt-4">
+                    <i class="fas fa-magic mr-2"></i>Analyze Book & Generate Q&A
+                </button>
+            </div>
+        </div>
+        <div>
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-sm text-gray-400 font-medium"><i class="fas fa-scroll mr-1"></i> Analysis Result</span>
+                <span id="bookLatency" class="text-[10px] text-gray-600"></span>
+            </div>
+            <div class="bg-gray-900/60 border border-gray-700/30 rounded-xl p-5 min-h-[400px] text-sm text-gray-300 leading-relaxed overflow-y-auto max-h-[600px]" id="bookOutput">
+                <p class="text-gray-500 italic">Click "Analyze" to get a summary, themes, Q&A, character analysis, and critical thinking questions...</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ============ 7. KIDS CORNER ============ -->
+<div id="ph-kids" class="ph-panel">
+    <div class="kids-card mb-5">
+        <h3 class="text-white font-semibold text-lg mb-2 flex items-center gap-2"><i class="fas fa-child text-purple-400"></i> Kids Programming Corner</h3>
+        <p class="text-sm text-gray-400">Build programs with blocks, edit parameters, and watch your code come alive on the road board!</p>
+    </div>
+    <!-- Example Programs Bar -->
+    <div class="ph-card mb-4">
+        <div class="flex items-center gap-3 flex-wrap">
+            <span class="text-xs text-gray-500 font-bold"><i class="fas fa-book mr-1"></i>Examples:</span>
+            <button onclick="loadKidExample('traffic')" class="px-3 py-1.5 bg-amber-600/20 hover:bg-amber-600/30 rounded-lg text-xs text-amber-400 border border-amber-600/30 transition">Traffic Light</button>
+            <button onclick="loadKidExample('maze')" class="px-3 py-1.5 bg-purple-600/20 hover:bg-purple-600/30 rounded-lg text-xs text-purple-400 border border-purple-600/30 transition">Maze Runner</button>
+            <button onclick="loadKidExample('patrol')" class="px-3 py-1.5 bg-blue-600/20 hover:bg-blue-600/30 rounded-lg text-xs text-blue-400 border border-blue-600/30 transition">Security Patrol</button>
+            <button onclick="loadKidExample('race')" class="px-3 py-1.5 bg-red-600/20 hover:bg-red-600/30 rounded-lg text-xs text-red-400 border border-red-600/30 transition">Race Car</button>
+            <button onclick="loadKidExample('robot')" class="px-3 py-1.5 bg-green-600/20 hover:bg-green-600/30 rounded-lg text-xs text-green-400 border border-green-600/30 transition">Robot Dance</button>
+        </div>
+    </div>
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+        <!-- Left: Block Palette -->
+        <div class="lg:col-span-3">
+            <div class="ph-card">
+                <h4 class="text-white font-semibold mb-3 text-sm"><i class="fas fa-puzzle-piece text-green-400 mr-1"></i> Block Palette</h4>
+                <div class="mb-3">
+                    <p class="text-[10px] text-gray-500 uppercase tracking-wider mb-1.5 font-bold">Events</p>
+                    <div class="space-y-1.5">
+                        <div class="ph-block-item bg-green-600/15 border-green-600/30" onclick="addBlock('when_start')"><span class="text-green-400 font-bold">▶ When Start</span></div>
+                        <div class="ph-block-item bg-green-600/15 border-green-600/30" onclick="addBlock('when_click')"><span class="text-green-400 font-bold">🖱 When Click</span></div>
+                        <div class="ph-block-item bg-green-600/15 border-green-600/30" onclick="addBlock('when_key')"><span class="text-green-400 font-bold">⌨ When Key Press</span></div>
+                        <div class="ph-block-item bg-green-600/15 border-green-600/30" onclick="addBlock('when_obstacle')"><span class="text-green-400 font-bold">🚧 When Obstacle Ahead</span></div>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <p class="text-[10px] text-gray-500 uppercase tracking-wider mb-1.5 font-bold">Motion</p>
+                    <div class="space-y-1.5">
+                        <div class="ph-block-item bg-purple-600/15 border-purple-600/30" onclick="addBlock('move_forward')"><span class="text-purple-400 font-bold">➡ Move Forward</span></div>
+                        <div class="ph-block-item bg-purple-600/15 border-purple-600/30" onclick="addBlock('move_backward')"><span class="text-purple-400 font-bold">⬅ Move Backward</span></div>
+                        <div class="ph-block-item bg-purple-600/15 border-purple-600/30" onclick="addBlock('turn_left')"><span class="text-purple-400 font-bold">↩ Turn Left</span></div>
+                        <div class="ph-block-item bg-purple-600/15 border-purple-600/30" onclick="addBlock('turn_right')"><span class="text-purple-400 font-bold">↪ Turn Right</span></div>
+                        <div class="ph-block-item bg-purple-600/15 border-purple-600/30" onclick="addBlock('set_speed')"><span class="text-purple-400 font-bold">⚡ Set Speed</span></div>
+                        <div class="ph-block-item bg-purple-600/15 border-purple-600/30" onclick="addBlock('stop_car')"><span class="text-purple-400 font-bold">🛑 Stop Car</span></div>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <p class="text-[10px] text-gray-500 uppercase tracking-wider mb-1.5 font-bold">Control</p>
+                    <div class="space-y-1.5">
+                        <div class="ph-block-item bg-cyan-600/15 border-cyan-600/30" onclick="addBlock('repeat')"><span class="text-cyan-400 font-bold">🔄 Repeat N Times</span></div>
+                        <div class="ph-block-item bg-cyan-600/15 border-cyan-600/30" onclick="addBlock('do_while')"><span class="text-cyan-400 font-bold">🔁 Do-While</span></div>
+                        <div class="ph-block-item bg-cyan-600/15 border-cyan-600/30" onclick="addBlock('while_cond')"><span class="text-cyan-400 font-bold">⏳ While Condition</span></div>
+                        <div class="ph-block-item bg-cyan-600/15 border-cyan-600/30" onclick="addBlock('if_else')"><span class="text-cyan-400 font-bold">🔀 If-Else</span></div>
+                        <div class="ph-block-item bg-cyan-600/15 border-cyan-600/30" onclick="addBlock('wait')"><span class="text-cyan-400 font-bold">⏸ Wait</span></div>
+                        <div class="ph-block-item bg-cyan-600/15 border-cyan-600/30" onclick="addBlock('set_var')"><span class="text-cyan-400 font-bold">📦 Set Variable</span></div>
+                        <div class="ph-block-item bg-cyan-600/15 border-cyan-600/30" onclick="addBlock('change_var')"><span class="text-cyan-400 font-bold">➕ Change Variable</span></div>
+                        <div class="ph-block-item bg-cyan-600/15 border-cyan-600/30" onclick="addBlock('compare')"><span class="text-cyan-400 font-bold">⚖ Compare Values</span></div>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <p class="text-[10px] text-gray-500 uppercase tracking-wider mb-1.5 font-bold">Sensors</p>
+                    <div class="space-y-1.5">
+                        <div class="ph-block-item bg-amber-600/15 border-amber-600/30" onclick="addBlock('detect_obstacle')"><span class="text-amber-400 font-bold">🚧 Detect Obstacle</span></div>
+                        <div class="ph-block-item bg-amber-600/15 border-amber-600/30" onclick="addBlock('detect_light')"><span class="text-amber-400 font-bold">🚦 Detect Traffic Light</span></div>
+                        <div class="ph-block-item bg-amber-600/15 border-amber-600/30" onclick="addBlock('detect_line')"><span class="text-amber-400 font-bold">📏 Detect Line</span></div>
+                        <div class="ph-block-item bg-amber-600/15 border-amber-600/30" onclick="addBlock('read_distance')"><span class="text-amber-400 font-bold">📐 Read Distance</span></div>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <p class="text-[10px] text-gray-500 uppercase tracking-wider mb-1.5 font-bold">Arduino</p>
+                    <div class="space-y-1.5">
+                        <div class="ph-block-item bg-red-600/15 border-red-600/30" onclick="addBlock('led_on')"><span class="text-red-400 font-bold">💡 LED On</span></div>
+                        <div class="ph-block-item bg-red-600/15 border-red-600/30" onclick="addBlock('led_off')"><span class="text-red-400 font-bold">⬛ LED Off</span></div>
+                        <div class="ph-block-item bg-red-600/15 border-red-600/30" onclick="addBlock('buzzer')"><span class="text-red-400 font-bold">🔔 Buzzer Beep</span></div>
+                        <div class="ph-block-item bg-red-600/15 border-red-600/30" onclick="addBlock('servo_move')"><span class="text-red-400 font-bold">🦾 Servo Move</span></div>
+                        <div class="ph-block-item bg-red-600/15 border-red-600/30" onclick="addBlock('print_val')"><span class="text-red-400 font-bold">🖨 Print to Serial</span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Center: Workspace + Visual Board -->
+        <div class="lg:col-span-9">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <!-- Program Workspace -->
+                <div class="ph-card">
+                    <div class="flex items-center justify-between mb-3">
+                        <h4 class="text-white font-semibold flex items-center gap-2"><i class="fas fa-play-circle text-blue-400"></i> My Program</h4>
+                        <div class="flex gap-2">
+                            <button onclick="clearBlocks()" class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded-lg text-xs text-white transition">Clear</button>
+                            <button onclick="runBlocks()" class="px-4 py-1.5 bg-green-600 hover:bg-green-500 rounded-lg text-xs text-white font-semibold transition"><i class="fas fa-play mr-1"></i> Run</button>
+                            <select id="boardSelect" class="bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-xs text-white">
+                                <option value="esp32">ESP32</option>
+                                <option value="arduino">Arduino Uno</option>
+                                <option value="esp8266">ESP8266</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div id="blockWorkspace" class="bg-gray-900/60 rounded-xl p-3 min-h-[200px] max-h-[350px] overflow-y-auto border border-dashed border-gray-700">
+                        <p class="text-gray-600 text-sm text-center py-8">Click blocks from the palette to build your program!</p>
+                    </div>
+                    <div id="blockOutput" class="mt-3 hidden">
+                        <p class="text-xs text-gray-500 mb-1">Output:</p>
+                        <div class="output-box text-sm" id="blockOutputText"></div>
+                    </div>
+                </div>
+                <!-- Visual Board Animation -->
+                <div class="ph-card">
+                    <div class="flex items-center justify-between mb-3">
+                        <h4 class="text-white font-semibold flex items-center gap-2"><i class="fas fa-car text-amber-400"></i> Road Board</h4>
+                        <div class="flex gap-2 items-center">
+                            <select id="kidsSceneSelect" class="bg-gray-800 border border-gray-700 rounded-lg px-2 py-1 text-[10px] text-white" onchange="changeKidsScene()">
+                                <option value="road">City Road</option>
+                                <option value="highway">Highway</option>
+                                <option value="parking">Parking Lot</option>
+                            </select>
+                            <button onclick="resetBoard()" class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded-lg text-xs text-white transition"><i class="fas fa-redo mr-1"></i>Reset</button>
+                        </div>
+                    </div>
+                    <canvas id="kidsCanvas" width="480" height="320" class="bg-gray-900 rounded-xl border border-gray-700/50 w-full" style="max-width:480px;"></canvas>
+                    <div class="flex gap-3 mt-2 text-[10px] text-gray-500 flex-wrap">
+                        <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-green-500"></span>Green Light</span>
+                        <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-red-500"></span>Red Light</span>
+                        <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-yellow-400"></span>Yellow Light</span>
+                        <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-orange-500"></span>Obstacle</span>
+                        <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-blue-400"></span>Car</span>
+                    </div>
+                </div>
+            </div>
+            <!-- Arduino Code Output -->
+            <div class="mt-4">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs text-gray-500 font-medium"><i class="fas fa-microchip mr-1"></i> Generated Arduino Code</span>
+                    <button onclick="navigator.clipboard.writeText(document.getElementById('kidsArduinoCode').textContent)" class="px-3 py-1.5 text-xs text-gray-400 hover:text-white transition"><i class="fas fa-copy mr-1"></i>Copy</button>
+                </div>
+                <div class="code-editor">
+                    <div class="code-editor-header">
+                        <span class="text-sm text-gray-400"><i class="fas fa-microchip mr-1"></i> Arduino Sketch</span>
+                        <span class="text-[10px] text-gray-600" id="kidsBlockCount">0 blocks</span>
+                    </div>
+                    <pre id="kidsArduinoCode" class="p-4 text-xs text-green-400 font-mono whitespace-pre-wrap min-h-[100px] max-h-[200px] overflow-y-auto"><span class="text-gray-500">// Add blocks to generate Arduino code...</span></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Block Modal -->
+<div id="editBlockModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden items-center justify-center">
+    <div class="bg-gray-900 border border-gray-700 rounded-2xl p-6 w-full max-w-md shadow-2xl">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-white font-semibold text-lg"><i class="fas fa-edit text-blue-400 mr-2"></i>Edit Block</h3>
+            <button onclick="closeEditBlockModal()" class="text-gray-400 hover:text-white text-xl">&times;</button>
+        </div>
+        <div id="editBlockContent" class="space-y-3"></div>
+        <div class="flex gap-3 mt-5">
+            <button onclick="closeEditBlockModal()" class="flex-1 px-4 py-2.5 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm text-white transition">Cancel</button>
+            <button onclick="saveBlockEdit()" class="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm text-white font-semibold transition">Save</button>
+        </div>
+    </div>
+</div>
+
+<!-- ============ 8. DFD DESIGNER ============ -->
+<div id="ph-dfd" class="ph-panel">
+    <div class="grid grid-cols-1 lg:grid-cols-4 gap-5">
+        <div class="ph-card">
+            <h4 class="text-white font-semibold mb-3 flex items-center gap-2"><i class="fas fa-tools text-blue-400"></i> Toolbox</h4>
+            <div class="space-y-2">
+                <button onclick="addDfdElement('entity')" class="w-full p-3 bg-blue-600/15 border border-blue-600/30 rounded-lg text-left hover:bg-blue-600/25 transition"><span class="text-blue-400 text-sm font-bold">□ External Entity</span><p class="text-[10px] text-gray-500">User, system, or organization</p></button>
+                <button onclick="addDfdElement('process')" class="w-full p-3 bg-green-600/15 border border-green-600/30 rounded-lg text-left hover:bg-green-600/25 transition"><span class="text-green-400 text-sm font-bold">○ Process</span><p class="text-[10px] text-gray-500">Transforms data</p></button>
+                <button onclick="addDfdElement('store')" class="w-full p-3 bg-amber-600/15 border border-amber-600/30 rounded-lg text-left hover:bg-amber-600/25 transition"><span class="text-amber-400 text-sm font-bold">═ Data Store</span><p class="text-[10px] text-gray-500">Database or file</p></button>
+                <button onclick="addDfdElement('flow')" class="w-full p-3 bg-purple-600/15 border border-purple-600/30 rounded-lg text-left hover:bg-purple-600/25 transition"><span class="text-purple-400 text-sm font-bold">→ Data Flow</span><p class="text-[10px] text-gray-500">Arrow showing data movement</p></button>
+            </div>
+            <div class="mt-4 space-y-2">
+                <button onclick="clearDfd()" class="w-full px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-xs text-white transition">Clear All</button>
+                <button onclick="loadDfdExample()" class="w-full px-3 py-2 bg-blue-600/20 hover:bg-blue-600/30 rounded-lg text-xs text-blue-400 transition">Load Example</button>
+                <button onclick="dfdAutoLayout()" class="w-full px-3 py-2 bg-green-600/20 hover:bg-green-600/30 rounded-lg text-xs text-green-400 transition">Auto Layout</button>
+            </div>
+            <div class="mt-4 p-3 bg-gray-800/50 rounded-lg">
+                <h5 class="text-xs text-gray-400 font-semibold mb-2">DFD Rules</h5>
+                <ul class="text-[10px] text-gray-500 space-y-1">
+                    <li>• Entities connect to Processes</li>
+                    <li>• Processes connect to Stores</li>
+                    <li>• Data Flows show direction</li>
+                    <li>• Stores can't connect directly</li>
+                </ul>
+            </div>
+        </div>
+        <div class="lg:col-span-3">
+            <div class="ph-card">
+                <div class="flex items-center justify-between mb-3">
+                    <h4 class="text-white font-semibold flex items-center gap-2"><i class="fas fa-sitemap text-green-400"></i> Data Flow Diagram</h4>
+                    <div class="flex gap-3 text-[10px] text-gray-500">
+                        <span>Drag elements to position</span>
+                        <span>Double-click to rename</span>
+                    </div>
+                </div>
+                <div class="dfd-canvas" id="dfdCanvas">
+                    <svg class="absolute inset-0 w-full h-full pointer-events-none" id="dfdSvg"></svg>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ============ 9. SQL LAB ============ -->
+<div id="ph-sql" class="ph-panel">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <div>
+            <div class="code-editor">
+                <div class="code-editor-header">
+                    <span class="text-sm text-gray-400"><i class="fas fa-database mr-1"></i> SQL Query</span>
+                    <div class="flex gap-2">
+                        <select id="sqlExample" class="bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-gray-400" onchange="loadSqlExample()">
+                            <option value="">Examples...</option>
+                            <option value="select">SELECT basics</option>
+                            <option value="join">JOIN types</option>
+                            <option value="aggregate">Aggregate functions</option>
+                            <option value="subquery">Subqueries</option>
+                            <option value="index">Index usage</option>
+                        </select>
+                        <button onclick="explainSql()" id="sqlExplainBtn" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 rounded-lg text-xs text-white font-semibold transition"><i class="fas fa-brain mr-1"></i> Explain</button>
+                    </div>
+                </div>
+                <textarea id="sqlEditor" spellcheck="false" style="min-height:200px;" placeholder="Write SQL here...">-- Find all users who placed orders in the last 30 days
+SELECT u.name, u.email, COUNT(o.id) as order_count
+FROM users u
+INNER JOIN orders o ON u.id = o.user_id
+WHERE o.created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+GROUP BY u.id
+HAVING COUNT(o.id) > 2
+ORDER BY order_count DESC;</textarea>
+            </div>
+        </div>
+        <div>
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-sm text-gray-400 font-medium"><i class="fas fa-lightbulb mr-1"></i> SQL Explanation</span>
+                <span id="sqlLatency" class="text-[10px] text-gray-600"></span>
+            </div>
+            <div class="bg-gray-900/60 border border-gray-700/30 rounded-xl p-5 min-h-[300px] text-sm text-gray-300 leading-relaxed overflow-y-auto max-h-[500px]" id="sqlOutput">
+                <p class="text-gray-500 italic">Click "Explain" to get a detailed breakdown of your SQL query...</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ============ 10. DB OPTIMIZER ============ -->
+<div id="ph-optimizer" class="ph-panel">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <div>
+            <div class="ph-card">
+                <h3 class="text-white font-semibold mb-4 flex items-center gap-2"><i class="fas fa-gauge-high text-amber-400"></i> Database Query Optimizer</h3>
+                <div class="mb-3">
+                    <label class="block text-xs text-gray-500 mb-1">Paste your SQL query to optimize</label>
+                    <textarea id="optInput" class="input-field text-sm w-full font-mono" rows="6" placeholder="SELECT * FROM users WHERE name LIKE '%john%'...">SELECT * FROM orders
+WHERE DATE(created_at) = '2024-01-15'
+AND status = 'pending'
+ORDER BY created_at DESC
+LIMIT 100;</textarea>
+                </div>
+                <button onclick="optimizeQuery()" id="optBtn" class="btn btn-primary w-full py-3">
+                    <i class="fas fa-magic mr-2"></i>Analyze & Optimize
+                </button>
+            </div>
+        </div>
+        <div>
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-sm text-gray-400 font-medium"><i class="fas fa-chart-line mr-1"></i> Optimization Results</span>
+                <span id="optLatency" class="text-[10px] text-gray-600"></span>
+            </div>
+            <div class="bg-gray-900/60 border border-gray-700/30 rounded-xl p-5 min-h-[300px] text-sm text-gray-300 leading-relaxed overflow-y-auto max-h-[500px]" id="optOutput">
+                <p class="text-gray-500 italic">Click "Analyze & Optimize" to get WHY and HOW explanations...</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Toast -->
+<div id="toast" class="fixed bottom-6 right-6 bg-green-600 text-white px-4 py-2.5 rounded-lg shadow-lg z-50 hidden flex items-center gap-2 text-sm font-medium">
+    <i class="fas fa-check-circle"></i><span id="toastMsg">Done!</span>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+let totalRuns = 0, totalSuccess = 0, totalLatency = 0;
+let algoArray = [], algoOriginal = [], algoStepCount = 0, algoComparisons = 0, algoSwaps = 0;
+let algoStepsHistory = [], algoRunning = false, algoTimer = null;
+let dfdElements = [];
+let dfdDrag = null;
+let quizCorrect = 0, quizTotal = 0;
+let examQuestions = [], examAnswers = {}, examTimer = null;
+
+const AI_MODEL = 'qwen2.5-coder:1.5b';
+let currentAIModel = 'qwen2.5-coder:1.5b';
+
+function changeAIModel() {
+    currentAIModel = document.getElementById('aiModelSelect').value;
+    const statusEl = document.getElementById('modelStatus');
+    if (currentAIModel === 'qwen2.5-coder:1.5b') {
+        statusEl.innerHTML = '<span class="w-2 h-2 rounded-full bg-green-500"></span><span class="text-green-400">Active</span>';
+    } else {
+        statusEl.innerHTML = '<span class="w-2 h-2 rounded-full bg-gray-500"></span><span class="text-gray-400">Standby</span>';
+    }
+    showToast('AI Model: ' + currentAIModel, 'success');
+}
+
+function phTab(tab, el) {
+    document.querySelectorAll('.ph-panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.ph-tab').forEach(b => b.classList.remove('active'));
+    document.getElementById('ph-' + tab).classList.add('active');
+    if (el) el.classList.add('active');
+}
+
+// ============= Code Execution =============
+const EXAMPLES = {
+    python: {
+        hello: 'print("Hello, World!")\nprint("Welcome to Programming Hub!")',
+        fibonacci: 'def fibonacci(n):\n    if n <= 1:\n        return n\n    return fibonacci(n-1) + fibonacci(n-2)\n\nfor i in range(10):\n    print(f"F({i}) = {fibonacci(i)}")',
+        sort: 'def bubble_sort(arr):\n    n = len(arr)\n    for i in range(n):\n        for j in range(0, n-i-1):\n            if arr[j] > arr[j+1]:\n                arr[j], arr[j+1] = arr[j+1], arr[j]\n    return arr\n\ndata = [64, 34, 25, 12, 22, 11, 90]\nprint(f"Original: {data}")\nprint(f"Sorted:   {bubble_sort(data.copy())}")',
+        class: 'class Dog:\n    def __init__(self, name, breed, age):\n        self.name = name\n        self.breed = breed\n        self.age = age\n\n    def bark(self):\n        return f"{self.name} says: Woof!"\n\n    def __str__(self):\n        return f"{self.name} ({self.breed}, {self.age} yrs)"\n\nmy_dog = Dog("Buddy", "Golden Retriever", 3)\nprint(my_dog)\nprint(my_dog.bark())',
+        json: 'import json\n\ndata = {\n    "name": "Alice",\n    "age": 30,\n    "skills": ["Python", "JavaScript", "SQL"]\n}\n\nprint(json.dumps(data, indent=2))\nparsed = json.loads(json.dumps(data))\nprint(f"Name: {parsed[\'name\']}")'
+    },
+    javascript: {
+        hello: 'console.log("Hello, World!");\nconsole.log("Welcome to Programming Hub!");',
+        fibonacci: 'function fibonacci(n) {\n    if (n <= 1) return n;\n    return fibonacci(n-1) + fibonacci(n-2);\n}\nfor (let i = 0; i < 10; i++) console.log(`F(${i}) = ${fibonacci(i)}`);',
+        sort: 'function bubbleSort(arr) {\n    let n = arr.length;\n    for (let i = 0; i < n; i++)\n        for (let j = 0; j < n-i-1; j++)\n            if (arr[j] > arr[j+1]) [arr[j], arr[j+1]] = [arr[j+1], arr[j]];\n    return arr;\n}\nconst data = [64, 34, 25, 12, 22, 11, 90];\nconsole.log("Sorted:", bubbleSort([...data]));',
+        class: 'class Dog {\n    constructor(name, breed, age) {\n        this.name = name; this.breed = breed; this.age = age;\n    }\n    bark() { return `${this.name} says: Woof!`; }\n}\nconst myDog = new Dog("Buddy", "Golden Retriever", 3);\nconsole.log(myDog.bark());',
+        json: 'const data = { name: "Alice", age: 30, skills: ["Python", "JS"] };\nconsole.log(JSON.stringify(data, null, 2));'
+    },
+    bash: {
+        hello: 'echo "Hello, World!"\necho "Welcome to Programming Hub!"',
+        fibonacci: 'fib() {\n    if [ $1 -le 1 ]; then echo $1; return; fi\n    echo $(( $(fib $(($1-1))) + $(fib $(($1-2))) ))\n}\nfor i in $(seq 0 9); do echo "F($i) = $(fib $i)"; done',
+        sort: 'arr=(64 34 25 12 22 11 90)\necho "Original: ${arr[@]}"\nn=7\nfor ((i=0; i<n; i++)); do\n    for ((j=0; j<n-i-1; j++)); do\n        if [ ${arr[$j]} -gt ${arr[$((j+1))]} ]; then\n            temp=${arr[$j]}; arr[$j]=${arr[$((j+1))]}; arr[$((j+1))]=$temp\n        fi\n    done\ndone\necho "Sorted:   ${arr[@]}"',
+        class: 'name="Alice"\nage="30"\necho "Name: $name, Age: $age"',
+        json: 'echo \'{"name":"Alice","age":30}\' | python3 -m json.tool'
+    }
+};
+
+function loadExample() {
+    const lang = document.getElementById('codeLang').value;
+    const ex = document.getElementById('codeExample').value;
+    if (ex && EXAMPLES[lang] && EXAMPLES[lang][ex]) document.getElementById('codeEditor').value = EXAMPLES[lang][ex];
+}
+function clearEditor() { document.getElementById('codeEditor').value = ''; updateLineCount(); }
+
+function updateLineCount() {
+    const editor = document.getElementById('codeEditor');
+    const text = editor.value;
+    const lines = text.split('\n');
+    const pos = editor.selectionStart;
+    const beforeCursor = text.substring(0, pos);
+    const ln = beforeCursor.split('\n').length;
+    const col = pos - beforeCursor.lastIndexOf('\n');
+    document.getElementById('codeLineCount').textContent = `Ln ${ln}, Col ${col} | ${lines.length} lines`;
+}
+
+function saveCode() {
+    const code = document.getElementById('codeEditor').value;
+    const lang = document.getElementById('codeLang').value;
+    if (!code.trim()) { showToast('Nothing to save!', 'error'); return; }
+    const blob = new Blob([code], { type: 'text/plain' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    const exts = { python: 'py', javascript: 'js', bash: 'sh', c: 'c', java: 'java', go: 'go', rust: 'rs', typescript: 'ts' };
+    a.download = `playground.${exts[lang] || 'txt'}`;
+    a.click();
+    showToast('Code saved!', 'success');
+}
+
+function shareCode() {
+    const code = document.getElementById('codeEditor').value;
+    const lang = document.getElementById('codeLang').value;
+    if (!code.trim()) { showToast('Nothing to share!', 'error'); return; }
+    const encoded = btoa(unescape(encodeURIComponent(code)));
+    const url = window.location.origin + window.location.pathname + '?lang=' + lang + '&code=' + encoded.substring(0, 200);
+    navigator.clipboard.writeText(url).then(() => showToast('Share link copied to clipboard!', 'success')).catch(() => showToast('Copy the URL from the address bar', 'error'));
+}
+
+async function runCode() {
+    const code = document.getElementById('codeEditor').value;
+    const lang = document.getElementById('codeLang').value;
+    if (!code.trim()) { showToast('Write some code first!', 'error'); return; }
+    const btn = document.getElementById('runBtn');
+    btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Running...';
+    document.getElementById('codeOutput').innerHTML = '<span class="text-gray-500">Executing...</span>';
+    try {
+        const resp = await fetch('/api/programming/run', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({code, language: lang}) });
+        const data = await resp.json();
+        const out = document.getElementById('codeOutput');
+        totalRuns++; if (data.success) totalSuccess++; totalLatency += data.latency_ms || 0;
+        if (data.success) {
+            out.innerHTML = `<span class="success">✓ Executed (${data.latency_ms}ms)</span>\n\n` + (data.stdout ? `<span class="stdout">${esc(data.stdout)}</span>` : '<span class="text-gray-500">(no output)</span>');
+        } else {
+            out.innerHTML = `<span class="error">✗ Exit: ${data.exit_code}</span>\n\n` + (data.stdout ? `<span class="stdout">${esc(data.stdout)}</span>\n` : '') + (data.stderr ? `<span class="stderr">${esc(data.stderr)}</span>` : '');
+        }
+        document.getElementById('codeLatency').textContent = data.latency_ms + 'ms';
+        document.getElementById('totalRuns').textContent = totalRuns;
+        document.getElementById('totalSuccess').textContent = totalSuccess;
+        document.getElementById('avgLatency').textContent = Math.round(totalLatency / totalRuns) + 'ms';
+    } catch (e) { document.getElementById('codeOutput').innerHTML = `<span class="error">Error: ${e.message}</span>`; }
+    btn.disabled = false; btn.innerHTML = '<i class="fas fa-play mr-1"></i> Run';
+}
+
+// ============= Algorithm Visualizer =============
+const ALGO_INFO = {
+    bubble: { name: 'Bubble Sort', desc: 'Repeatedly compares adjacent elements and swaps them if in wrong order.', time: 'O(n²)', space: 'O(1)', stable: 'Yes', steps: ['Compare adjacent elements', 'Swap if left > right', 'Move to next pair', 'Repeat until no swaps'] },
+    selection: { name: 'Selection Sort', desc: 'Finds minimum element and places it at the beginning.', time: 'O(n²)', space: 'O(1)', stable: 'No', steps: ['Find minimum in unsorted', 'Swap with first unsorted', 'Move boundary right', 'Repeat'] },
+    insertion: { name: 'Insertion Sort', desc: 'Builds sorted array one element at a time.', time: 'O(n²)', space: 'O(1)', stable: 'Yes', steps: ['Take next element', 'Compare with sorted', 'Shift elements right', 'Insert in correct position'] },
+    merge: { name: 'Merge Sort', desc: 'Divides array in half, sorts each, then merges.', time: 'O(n log n)', space: 'O(n)', stable: 'Yes', steps: ['Divide array in half', 'Recursively sort halves', 'Merge sorted halves', 'Return sorted array'] },
+    quick: { name: 'Quick Sort', desc: 'Picks pivot, partitions around it, recurses.', time: 'O(n log n) avg', space: 'O(log n)', stable: 'No', steps: ['Choose pivot', 'Partition around pivot', 'Recurse left partition', 'Recurse right partition'] },
+    binary: { name: 'Binary Search', desc: 'Searches sorted array by halving search space.', time: 'O(log n)', space: 'O(1)', stable: '-', steps: ['Find middle', 'If target == middle, found', 'If target < middle, search left', 'If target > middle, search right'] },
+    linear: { name: 'Linear Search', desc: 'Checks each element sequentially.', time: 'O(n)', space: 'O(1)', stable: 'Yes', steps: ['Start at first element', 'Compare with target', 'If match, return index', 'Move to next element'] }
+};
+
+const ALGO_CODES = {
+    bubble: [
+        'for i = 0 to n-1:',
+        '  for j = 0 to n-i-2:',
+        '    if arr[j] > arr[j+1]:',
+        '      swap(arr[j], arr[j+1])',
+        '  // Pass complete'
+    ],
+    selection: [
+        'for i = 0 to n-1:',
+        '  minIdx = i',
+        '  for j = i+1 to n-1:',
+        '    if arr[j] < arr[minIdx]:',
+        '      minIdx = j',
+        '  swap(arr[i], arr[minIdx])'
+    ],
+    insertion: [
+        'for i = 1 to n-1:',
+        '  key = arr[i]',
+        '  j = i - 1',
+        '  while j >= 0 and arr[j] > key:',
+        '    arr[j+1] = arr[j]',
+        '    j = j - 1',
+        '  arr[j+1] = key'
+    ],
+    merge: [
+        'function mergeSort(arr):',
+        '  if len <= 1: return',
+        '  mid = len / 2',
+        '  left = mergeSort(arr[:mid])',
+        '  right = mergeSort(arr[mid:])',
+        '  merge(left, right)'
+    ],
+    quick: [
+        'function quickSort(arr, lo, hi):',
+        '  if lo < hi:',
+        '    pivot = partition(arr, lo, hi)',
+        '    quickSort(arr, lo, pivot-1)',
+        '    quickSort(arr, pivot+1, hi)'
+    ],
+    binary: [
+        'low = 0, high = len-1',
+        'while low <= high:',
+        '  mid = (low + high) / 2',
+        '  if arr[mid] == target: found',
+        '  elif arr[mid] < target: low = mid+1',
+        '  else: high = mid-1'
+    ],
+    linear: [
+        'for i = 0 to n-1:',
+        '  if arr[i] == target:',
+        '    return i  // found',
+        'return -1  // not found'
+    ]
+};
+
+function initAlgo() {
+    algoStepCount = 0; algoComparisons = 0; algoSwaps = 0; algoStepsHistory = []; algoRunning = false;
+    if (algoTimer) clearInterval(algoTimer);
+    generateData('random');
+    const sel = document.getElementById('algoSelect').value;
+    const info = ALGO_INFO[sel] || ALGO_INFO.bubble;
+    document.getElementById('algoInfo').innerHTML = `<p><strong class="text-white">${info.name}</strong></p><p>${info.desc}</p><div class="mt-3 space-y-1 text-xs"><p>Time: <span class="text-amber-400">${info.time}</span></p><p>Space: <span class="text-green-400">${info.space}</span></p><p>Stable: <span class="text-green-400">${info.stable}</span></p></div>`;
+    document.getElementById('algoComparisons').innerHTML = '<i class="fas fa-exchange-alt mr-1"></i>Comparisons: 0';
+    document.getElementById('algoSwaps').innerHTML = '<i class="fas fa-arrows-alt-h mr-1"></i>Swaps: 0';
+    document.getElementById('algoStatus').textContent = 'Ready';
+    document.getElementById('algoArray').textContent = algoArray.join(', ');
+    document.getElementById('algoLiveData').innerHTML = `<div class="text-xs"><span class="var-name">Array:</span> <span class="var-val">[${algoArray.join(', ')}]</span></div><div class="text-xs mt-1"><span class="var-name">Size:</span> <span class="var-val">${algoArray.length}</span></div>`;
+    document.getElementById('algoStepLog').innerHTML = '<p class="text-xs">No steps yet</p>';
+    renderBars();
+    renderAlgoCode(-1);
+}
+
+function generateData(type) {
+    const n = 15;
+    algoArray = [];
+    for (let i = 0; i < n; i++) algoArray.push(Math.floor(Math.random() * 90) + 10);
+    if (type === 'sorted') algoArray.sort((a, b) => a - b);
+    if (type === 'reversed') algoArray.sort((a, b) => b - a);
+    if (type === 'nearly') { algoArray.sort((a, b) => a - b); for (let i = 0; i < 3; i++) { const j = Math.floor(Math.random() * n); const k = Math.floor(Math.random() * n); [algoArray[j], algoArray[k]] = [algoArray[k], algoArray[j]]; } }
+    algoOriginal = [...algoArray];
+    algoStepCount = 0; algoComparisons = 0; algoSwaps = 0; algoStepsHistory = [];
+    document.getElementById('algoArray').textContent = algoArray.join(', ');
+    document.getElementById('algoStepLog').innerHTML = '<p class="text-xs">No steps yet</p>';
+    renderBars();
+}
+
+function renderBars(highlights = {}) {
+    const container = document.getElementById('algoBars');
+    const max = Math.max(...algoArray);
+    container.innerHTML = algoArray.map((v, i) => {
+        let cls = 'algo-bar';
+        if (highlights.comparing && highlights.comparing.includes(i)) cls += ' comparing';
+        else if (highlights.sorted && highlights.sorted.includes(i)) cls += ' sorted';
+        else if (highlights.pivot !== undefined && highlights.pivot === i) cls += ' pivot';
+        else if (highlights.active && highlights.active.includes(i)) cls += ' active';
+        const h = (v / max) * 220 + 20;
+        return `<div style="height:${h}px; width:32px;" class="${cls}">${v}</div>`;
+    }).join('');
+}
+
+function renderAlgoCode(activeLine) {
+    const sel = document.getElementById('algoSelect').value;
+    const code = ALGO_CODES[sel] || [];
+    const el = document.getElementById('algoCodeBlock');
+    const lineEl = document.getElementById('algoCodeLine');
+    if (code.length === 0) {
+        el.innerHTML = '<span class="text-gray-500">No code preview available.</span>';
+        lineEl.textContent = '-';
+        return;
+    }
+    el.innerHTML = code.map((line, i) => {
+        const isActive = i === activeLine;
+        const bgColor = isActive ? 'background:rgba(59,130,246,0.2);border-left:3px solid #3b82f6;padding-left:8px;' : 'border-left:3px solid transparent;padding-left:8px;';
+        const textColor = isActive ? 'color:#60a5fa;font-weight:700;' : 'color:#94a3b8;';
+        return `<div style="${bgColor}${textColor} white-space:pre;">${escHtml(line)}</div>`;
+    }).join('');
+    lineEl.textContent = activeLine >= 0 ? `Line ${activeLine + 1} / ${code.length}` : '-';
+}
+
+function escHtml(t) { const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
+
+function updateLiveData(msg, vars) {
+    const el = document.getElementById('algoLiveData');
+    let html = `<div class="text-xs mb-2"><span class="var-name">Step ${algoStepCount}:</span> <span class="var-changed">${msg}</span></div>`;
+    html += `<div class="text-xs"><span class="var-name">Array:</span> <span class="var-val">[${algoArray.join(', ')}]</span></div>`;
+    html += `<div class="text-xs"><span class="var-name">Comparisons:</span> <span class="var-val">${algoComparisons}</span></div>`;
+    html += `<div class="text-xs"><span class="var-name">Swaps:</span> <span class="var-val">${algoSwaps}</span></div>`;
+    if (vars) {
+        for (const [k, v] of Object.entries(vars)) {
+            html += `<div class="text-xs"><span class="var-name">${k}:</span> <span class="var-changed">${v}</span></div>`;
+        }
+    }
+    el.innerHTML = html;
+}
+
+function addStepLog(msg, color) {
+    const el = document.getElementById('algoStepLog');
+    if (el.querySelector('p')) el.innerHTML = '';
+    el.innerHTML = `<div class="step-entry current" style="border-left-color:${color || '#3b82f6'}"><span class="text-gray-400">[${algoStepCount}]</span> <span class="text-gray-300">${msg}</span></div>` + el.innerHTML;
+    el.querySelectorAll('.step-entry').forEach((e, i) => { if (i > 0) e.classList.remove('current'); });
+}
+
+function stepAlgo() {
+    const sel = document.getElementById('algoSelect').value;
+    algoStepCount++;
+
+    if (sel === 'bubble') {
+        if (algoStepCount === 1) algoStepsHistory = [...algoArray];
+        const i = (algoStepCount - 1) % (algoArray.length - 1);
+        const j = i;
+        algoComparisons++;
+        if (algoArray[j] > algoArray[j + 1]) {
+            [algoArray[j], algoArray[j + 1]] = [algoArray[j + 1], algoArray[j]];
+            algoSwaps++;
+            addStepLog(`Swapped ${algoArray[j+1]} and ${algoArray[j]}`, '#f59e0b');
+            updateLiveData(`Swapped positions ${j} and ${j+1}`, { 'i': j, 'j': j+1, 'Swap': `${algoArray[j+1]} ↔ ${algoArray[j]}` });
+            renderBars({ comparing: [j, j + 1] });
+            renderAlgoCode(3);
+        } else {
+            addStepLog(`Compared ${algoArray[j]} and ${algoArray[j+1]} - no swap`, '#3b82f6');
+            updateLiveData(`Compared positions ${j} and ${j+1}`, { 'i': j, 'j': j+1, 'Result': 'No swap' });
+            renderBars({ comparing: [j, j + 1] });
+            renderAlgoCode(2);
+        }
+        document.getElementById('algoComparisons').innerHTML = `<i class="fas fa-exchange-alt mr-1"></i>Comparisons: ${algoComparisons}`;
+        document.getElementById('algoSwaps').innerHTML = `<i class="fas fa-arrows-alt-h mr-1"></i>Swaps: ${algoSwaps}`;
+        document.getElementById('algoStatus').textContent = `Step ${algoStepCount}...`;
+        document.getElementById('algoArray').textContent = algoArray.join(', ');
+    } else if (sel === 'selection') {
+        const n = algoArray.length;
+        const pass = Math.floor((algoStepCount - 1) / n);
+        const pos = (algoStepCount - 1) % n;
+        if (pass < n - 1) {
+            let minIdx = pass;
+            for (let k = pass; k < n; k++) {
+                algoComparisons++;
+                if (algoArray[k] < algoArray[minIdx]) minIdx = k;
+            }
+            if (minIdx !== pass) {
+                [algoArray[pass], algoArray[minIdx]] = [algoArray[minIdx], algoArray[pass]];
+                algoSwaps++;
+                addStepLog(`Swapped min ${algoArray[minIdx]} with position ${pass}`, '#f59e0b');
+                updateLiveData(`Pass ${pass+1}: found min ${algoArray[pass]}`, { 'minIndex': minIdx, 'Swapped': true });
+                renderAlgoCode(5);
+            } else {
+                addStepLog(`Position ${pass}: ${algoArray[pass]} already in place`, '#10b981');
+                updateLiveData(`Pass ${pass+1}: ${algoArray[pass]} in place`, { 'minIndex': pass });
+                renderAlgoCode(1);
+            }
+            const sorted = Array.from({length: pass + 1}, (_, i) => i);
+            renderBars({ comparing: [pass, minIdx], sorted });
+        }
+        document.getElementById('algoComparisons').innerHTML = `<i class="fas fa-exchange-alt mr-1"></i>Comparisons: ${algoComparisons}`;
+        document.getElementById('algoSwaps').innerHTML = `<i class="fas fa-arrows-alt-h mr-1"></i>Swaps: ${algoSwaps}`;
+        document.getElementById('algoStatus').textContent = `Pass ${pass + 1}/${n}...`;
+        document.getElementById('algoArray').textContent = algoArray.join(', ');
+    } else if (sel === 'insertion') {
+        const idx = algoStepCount;
+        if (idx < algoArray.length) {
+            const key = algoArray[idx];
+            let j = idx - 1;
+            while (j >= 0 && algoArray[j] > key) {
+                algoArray[j + 1] = algoArray[j];
+                algoSwaps++;
+                algoComparisons++;
+                j--;
+            }
+            algoArray[j + 1] = key;
+            addStepLog(`Inserted ${key} at position ${j + 1}`, '#f59e0b');
+            updateLiveData(`Inserted ${key}`, { 'key': key, 'position': j + 1 });
+            const sorted = Array.from({length: idx + 1}, (_, i) => i);
+            renderBars({ comparing: [j + 1, idx], sorted });
+            renderAlgoCode(6);
+        } else {
+            addStepLog('Array is sorted!', '#10b981');
+            updateLiveData('Done!', {});
+            renderBars({ sorted: algoArray.map((_, i) => i) });
+            renderAlgoCode(-1);
+        }
+        document.getElementById('algoComparisons').innerHTML = `<i class="fas fa-exchange-alt mr-1"></i>Comparisons: ${algoComparisons}`;
+        document.getElementById('algoSwaps').innerHTML = `<i class="fas fa-arrows-alt-h mr-1"></i>Swaps: ${algoSwaps}`;
+        document.getElementById('algoStatus').textContent = `Step ${algoStepCount}...`;
+        document.getElementById('algoArray').textContent = algoArray.join(', ');
+    } else if (sel === 'binary') {
+        const target = algoArray[Math.floor(algoArray.length / 2)];
+        addStepLog(`Searching for middle element: ${target}`, '#8b5cf6');
+        updateLiveData(`Binary search`, { 'target': target, 'low': 0, 'high': algoArray.length - 1 });
+        renderBars({ pivot: Math.floor(algoArray.length / 2) });
+        renderAlgoCode(3);
+        document.getElementById('algoStatus').textContent = 'Searching...';
+    } else {
+        const idx = algoStepCount % algoArray.length;
+        addStepLog(`Checking index ${idx}: ${algoArray[idx]}`, '#8b5cf6');
+        updateLiveData(`Linear search`, { 'index': idx, 'value': algoArray[idx] });
+        renderBars({ comparing: [idx] });
+        renderAlgoCode(1);
+        document.getElementById('algoStatus').textContent = `Checking index ${idx}...`;
+    }
+}
+
+function autoAlgo() {
+    if (algoRunning) { clearInterval(algoTimer); algoRunning = false; document.getElementById('algoAutoBtn').innerHTML = '<i class="fas fa-play mr-1"></i>Auto'; return; }
+    algoRunning = true;
+    document.getElementById('algoAutoBtn').innerHTML = '<i class="fas fa-pause mr-1"></i>Pause';
+    const speed = parseInt(document.getElementById('algoSpeed').value) || 400;
+    algoTimer = setInterval(() => {
+        if (algoStepCount > 50) { clearInterval(algoTimer); algoRunning = false; document.getElementById('algoStatus').textContent = 'Done!'; document.getElementById('algoAutoBtn').innerHTML = '<i class="fas fa-play mr-1"></i>Auto'; addStepLog('Sorting complete!', '#10b981'); renderAlgoCode(-1); return; }
+        stepAlgo();
+    }, speed);
+}
+
+// ============= Code Explainer =============
+async function explainCode() {
+    const code = document.getElementById('explainInput').value;
+    if (!code.trim()) { showToast('Paste some code first!', 'error'); return; }
+    const btn = document.getElementById('explainBtn');
+    btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Explaining...';
+    document.getElementById('explainOutput').innerHTML = '<p class="text-gray-500">AI is analyzing your code and tracing variables...</p>';
+    document.getElementById('explainVars').innerHTML = '<p class="text-gray-500 text-xs">Analyzing variables...</p>';
+    document.getElementById('explainFlow').innerHTML = '<p class="text-gray-500">Building flow diagram...</p>';
+    try {
+        const resp = await fetch('/api/programming/explain', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({code, model: AI_MODEL}) });
+        const data = await resp.json();
+        if (data.success) {
+            document.getElementById('explainOutput').innerHTML = formatMd(data.explanation);
+            document.getElementById('explainLatency').textContent = `${data.latency_ms}ms · ${data.tokens} tokens`;
+            const lines = code.split('\n');
+            let varsHtml = '';
+            const varRegex = /(\w+)\s*=\s*([^,\n]+)/g;
+            let match;
+            const foundVars = new Set();
+            while ((match = varRegex.exec(code)) !== null) {
+                if (!foundVars.has(match[1]) && !['if', 'else', 'for', 'while', 'def', 'class', 'return', 'import', 'from'].includes(match[1])) {
+                    foundVars.add(match[1]);
+                    varsHtml += `<div class="mb-1"><span class="var-name">${match[1]}</span> = <span class="var-val">${match[2].trim()}</span></div>`;
+                }
+            }
+            if (varsHtml) document.getElementById('explainVars').innerHTML = varsHtml;
+            else document.getElementById('explainVars').innerHTML = '<p class="text-gray-500 text-xs">No variables detected</p>';
+            const flowLines = [];
+            flowLines.push('→ Start');
+            lines.forEach((l, i) => {
+                const t = l.trim();
+                if (t.startsWith('def ') || t.startsWith('function ')) flowLines.push(`→ Function: ${t.split('(')[0].replace(/def |function /, '')}`);
+                if (t.startsWith('if ') || t.startsWith('else if')) flowLines.push(`→ Condition: ${t.substring(0, 40)}...`);
+                if (t.startsWith('for ') || t.startsWith('while ')) flowLines.push(`→ Loop: ${t.substring(0, 40)}...`);
+                if (t.startsWith('return ')) flowLines.push(`→ Return: ${t.substring(0, 40)}`);
+            });
+            flowLines.push('→ End');
+            document.getElementById('explainFlow').innerHTML = flowLines.map(l => `<div class="py-0.5 text-gray-400">${l}</div>`).join('');
+        } else {
+            document.getElementById('explainOutput').innerHTML = `<p class="text-red-400">Error: ${data.error}</p>`;
+        }
+    } catch (e) { document.getElementById('explainOutput').innerHTML = `<p class="text-red-400">Error: ${e.message}</p>`; }
+    btn.disabled = false; btn.innerHTML = '<i class="fas fa-brain mr-1"></i> Explain';
+}
+
+// ============= Skill Test =============
+async function generateQuiz() {
+    const topic = document.getElementById('quizTopic').value;
+    const difficulty = document.getElementById('quizDifficulty').value;
+    const count = document.getElementById('quizCount').value;
+    const btn = document.getElementById('quizGenBtn');
+    btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Generating...';
+    document.getElementById('quizArea').innerHTML = '<div class="ph-card text-center py-8"><i class="fas fa-spinner fa-spin text-2xl text-blue-400 mb-3"></i><p class="text-gray-400">Generating quiz questions with AI...</p></div>';
+    quizCorrect = 0; quizTotal = 0;
+    try {
+        const resp = await fetch('/api/programming/skill-test', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({topic, difficulty, model: AI_MODEL}) });
+        const data = await resp.json();
+        if (data.success) {
+            const questions = parseQuizFromText(data.quiz);
+            if (questions.length > 0) {
+                renderQuizQuestions(questions);
+            } else {
+                document.getElementById('quizArea').innerHTML = `<div class="ph-card"><p class="text-sm text-gray-300 leading-relaxed">${formatMd(data.quiz)}</p></div>`;
+            }
+        } else {
+            document.getElementById('quizArea').innerHTML = `<div class="ph-card text-center py-8"><p class="text-red-400">Error: ${data.error}</p></div>`;
+        }
+    } catch (e) { document.getElementById('quizArea').innerHTML = `<div class="ph-card text-center py-8"><p class="text-red-400">${e.message}</p></div>`; }
+    btn.disabled = false; btn.innerHTML = '<i class="fas fa-play mr-1"></i> Generate';
+}
+
+function parseQuizFromText(text) {
+    const questions = [];
+    const parts = text.split(/\n\d+[\.\)]\s*/);
+    parts.forEach((part, i) => {
+        if (i === 0 && !part.match(/^\d/)) return;
+        const lines = part.split('\n').filter(l => l.trim());
+        if (lines.length < 2) return;
+        const q = lines[0].replace(/^\*\*|:?\*\*$/g, '').trim();
+        const opts = [];
+        let answer = '';
+        lines.slice(1).forEach(l => {
+            const m = l.match(/^[\)\*]*\s*([A-D])[\.:\)]\s*(.+)/i);
+            if (m) opts.push({ letter: m[1].toUpperCase(), text: m[2].trim() });
+            if (l.match(/\[CORRECT\]|correct answer|answer:/i) || l.match(/^\*\*Answer/)) {
+                answer = l.replace(/\[CORRECT\]|\*\*|Answer:|answer:/gi, '').trim();
+            }
+        });
+        if (q && opts.length > 0) questions.push({ q, opts, answer: answer || opts[0]?.text || '' });
+    });
+    return questions;
+}
+
+function renderQuizQuestions(questions) {
+    quizTotal = questions.length;
+    const area = document.getElementById('quizArea');
+    area.innerHTML = questions.map((q, i) => `
+        <div class="ph-card" id="quiz-q-${i}">
+            <p class="text-white font-semibold mb-3">${i + 1}. ${esc(q.q)}</p>
+            <div class="space-y-2">
+                ${q.opts.map((o, j) => `
+                    <div class="quiz-option" onclick="checkQuizAnswer(${i}, ${j}, '${esc(o.text)}', '${esc(q.answer)}')">
+                        <span class="text-gray-500 mr-2">${o.letter}.</span> ${esc(o.text)}
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+    `).join('');
+    updateQuizScore();
+}
+
+function checkQuizAnswer(qIdx, optIdx, selected, correct) {
+    const card = document.getElementById(`quiz-q-${qIdx}`);
+    if (card.dataset.answered) return;
+    card.dataset.answered = 'true';
+    const opts = card.querySelectorAll('.quiz-option');
+    opts.forEach((o, i) => {
+        const txt = o.textContent.replace(/^[A-D]\.\s*/, '').trim();
+        if (txt === correct || txt.includes(correct.substring(0, 10))) o.classList.add('correct');
+    });
+    const selectedOpt = opts[optIdx];
+    const isCorrect = selected === correct || selected.includes(correct.substring(0, 10));
+    if (isCorrect) { selectedOpt.classList.add('correct'); quizCorrect++; }
+    else { selectedOpt.classList.add('wrong'); }
+    updateQuizScore();
+}
+
+function updateQuizScore() {
+    document.getElementById('quizScore').textContent = `${quizCorrect}/${quizTotal}`;
+    document.getElementById('quizAccuracy').textContent = quizTotal > 0 ? Math.round((quizCorrect / quizTotal) * 100) + '%' : '0%';
+}
+
+// ============= Exam System =============
+function onExamModeChange() {
+    const mode = document.getElementById('examMode').value;
+    document.getElementById('examTopicDiv').classList.toggle('hidden', mode !== 'topic');
+    document.getElementById('examFileDiv').classList.toggle('hidden', mode !== 'book');
+    document.getElementById('examUrlDiv').classList.toggle('hidden', mode !== 'url');
+}
+
+async function startExam() {
+    const mode = document.getElementById('examMode').value;
+    const count = document.getElementById('examCount').value;
+    const difficulty = document.getElementById('examDifficulty').value;
+    const btn = document.getElementById('examStartBtn');
+    examQuestions = []; examAnswers = {};
+
+    btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Generating...';
+    document.getElementById('examArea').innerHTML = '<div class="ph-card text-center py-8"><i class="fas fa-spinner fa-spin text-2xl text-blue-400 mb-3"></i><p class="text-gray-400">Generating exam with AI...</p></div>';
+
+    let sourceContent = '';
+    let topic = '';
+
+    if (mode === 'topic') {
+        topic = document.getElementById('examTopic').value;
+    } else if (mode === 'book') {
+        const fileInput = document.getElementById('examFile');
+        if (fileInput.files.length === 0) { showToast('Upload a file first!', 'error'); btn.disabled = false; btn.innerHTML = '<i class="fas fa-play mr-1"></i> Start Exam'; return; }
+        const fd = new FormData();
+        fd.append('file', fileInput.files[0]);
+        fd.append('mode', 'quiz');
+        fd.append('model', AI_MODEL);
+        fd.append('book_title', 'Exam Content');
+        try {
+            const resp = await fetch('/api/programming/book-upload', { method: 'POST', body: fd });
+            const data = await resp.json();
+            if (data.success) {
+                document.getElementById('examArea').innerHTML = `<div class="ph-card"><div class="flex items-center justify-between mb-4"><h3 class="text-white font-semibold">Book-Based Exam</h3><div id="examTimer" class="text-sm text-amber-400 font-mono"></div></div><div class="text-sm text-gray-300 leading-relaxed">${formatMd(data.analysis)}</div></div>`;
+                btn.disabled = false; btn.innerHTML = '<i class="fas fa-play mr-1"></i> Start Exam';
+                return;
+            } else { showToast(data.error, 'error'); btn.disabled = false; btn.innerHTML = '<i class="fas fa-play mr-1"></i> Start Exam'; return; }
+        } catch (e) { showToast('Upload failed', 'error'); btn.disabled = false; btn.innerHTML = '<i class="fas fa-play mr-1"></i> Start Exam'; return; }
+    } else if (mode === 'url') {
+        const url = document.getElementById('examUrl').value;
+        if (!url.trim()) { showToast('Enter a URL first!', 'error'); btn.disabled = false; btn.innerHTML = '<i class="fas fa-play mr-1"></i> Start Exam'; return; }
+        const fd = new FormData();
+        fd.append('url', url);
+        fd.append('mode', 'quiz');
+        fd.append('model', AI_MODEL);
+        fd.append('book_title', 'Web Content Exam');
+        try {
+            const resp = await fetch('/api/programming/book-upload', { method: 'POST', body: fd });
+            const data = await resp.json();
+            if (data.success) {
+                document.getElementById('examArea').innerHTML = `<div class="ph-card"><div class="flex items-center justify-between mb-4"><h3 class="text-white font-semibold">Web Content Exam</h3></div><div class="text-sm text-gray-300 leading-relaxed">${formatMd(data.analysis)}</div></div>`;
+                btn.disabled = false; btn.innerHTML = '<i class="fas fa-play mr-1"></i> Start Exam';
+                return;
+            } else { showToast(data.error, 'error'); btn.disabled = false; btn.innerHTML = '<i class="fas fa-play mr-1"></i> Start Exam'; return; }
+        } catch (e) { showToast('Fetch failed', 'error'); btn.disabled = false; btn.innerHTML = '<i class="fas fa-play mr-1"></i> Start Exam'; return; }
+    }
+
+    try {
+        const resp = await fetch('/api/programming/skill-test', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({topic: topic || 'general', difficulty, model: AI_MODEL}) });
+        const data = await resp.json();
+        if (data.success) {
+            const questions = parseQuizFromText(data.quiz);
+            if (questions.length > 0) {
+                examQuestions = questions;
+                let timeLeft = questions.length * 60;
+                document.getElementById('examArea').innerHTML = `
+                    <div class="ph-card">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-white font-semibold">${topic.toUpperCase()} Exam</h3>
+                            <div class="flex items-center gap-4">
+                                <span id="examTimer" class="text-sm text-amber-400 font-mono"><i class="fas fa-clock mr-1"></i>${formatTime(timeLeft)}</span>
+                                <span class="text-xs text-gray-500">Score: <strong class="text-green-400" id="examScore">0/${questions.length}</strong></span>
+                            </div>
+                        </div>
+                        <div class="space-y-4" id="examQuestions">
+                            ${questions.map((q, i) => `
+                                <div class="p-4 bg-gray-800/30 rounded-lg border border-gray-700/30" id="exam-q-${i}">
+                                    <p class="text-white font-semibold mb-3">${i + 1}. ${esc(q.q)}</p>
+                                    <div class="space-y-2">
+                                        ${q.opts.map((o, j) => `
+                                            <div class="quiz-option" onclick="answerExam(${i}, ${j}, '${esc(o.text)}', '${esc(q.answer)}')">
+                                                <span class="text-gray-500 mr-2">${o.letter}.</span> ${esc(o.text)}
+                                            </div>
+                `).join('')}
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                        <div class="mt-4 flex justify-center gap-3">
+                            <button onclick="submitExam()" class="btn btn-primary"><i class="fas fa-check mr-1"></i> Submit Exam</button>
+                            <button onclick="startExam()" class="btn btn-secondary"><i class="fas fa-redo mr-1"></i> New Exam</button>
+                        </div>
+                    </div>
+                `;
+                if (examTimer) clearInterval(examTimer);
+                examTimer = setInterval(() => {
+                    timeLeft--;
+                    const el = document.getElementById('examTimer');
+                    if (el) el.innerHTML = `<i class="fas fa-clock mr-1"></i>${formatTime(timeLeft)}`;
+                    if (timeLeft <= 0) { clearInterval(examTimer); submitExam(); }
+                }, 1000);
+            } else {
+                document.getElementById('examArea').innerHTML = `<div class="ph-card"><div class="text-sm text-gray-300 leading-relaxed">${formatMd(data.quiz)}</div></div>`;
+            }
+        }
+    } catch (e) { document.getElementById('examArea').innerHTML = `<div class="ph-card text-center py-8"><p class="text-red-400">${e.message}</p></div>`; }
+    btn.disabled = false; btn.innerHTML = '<i class="fas fa-play mr-1"></i> Start Exam';
+}
+
+function answerExam(qIdx, optIdx, selected, correct) {
+    examAnswers[qIdx] = { selected, correct, isCorrect: selected === correct || selected.includes(correct.substring(0, 10)) };
+    const card = document.getElementById(`exam-q-${qIdx}`);
+    card.querySelectorAll('.quiz-option').forEach((o, i) => {
+        o.classList.remove('correct', 'wrong');
+        const txt = o.textContent.replace(/^[A-D]\.\s*/, '').trim();
+        if (txt === correct || txt.includes(correct.substring(0, 10))) o.classList.add('correct');
+    });
+    const selectedOpt = card.querySelectorAll('.quiz-option')[optIdx];
+    if (examAnswers[qIdx].isCorrect) selectedOpt.classList.add('correct');
+    else selectedOpt.classList.add('wrong');
+    const score = Object.values(examAnswers).filter(a => a.isCorrect).length;
+    const el = document.getElementById('examScore');
+    if (el) el.textContent = `${score}/${examQuestions.length}`;
+}
+
+function submitExam() {
+    if (examTimer) clearInterval(examTimer);
+    const score = Object.values(examAnswers).filter(a => a.isCorrect).length;
+    const total = examQuestions.length;
+    const pct = total > 0 ? Math.round((score / total) * 100) : 0;
+    let grade = pct >= 90 ? 'A+' : pct >= 80 ? 'A' : pct >= 70 ? 'B' : pct >= 60 ? 'C' : pct >= 50 ? 'D' : 'F';
+    showToast(`Exam submitted! Score: ${score}/${total} (${pct}%) - Grade: ${grade}`, pct >= 60 ? 'success' : 'error');
+}
+
+function formatTime(s) { const m = Math.floor(s / 60); return `${m}:${String(s % 60).padStart(2, '0')}`; }
+
+// ============= Book Analyzer =============
+function onBookSourceChange() {
+    const src = document.getElementById('bookSource').value;
+    document.getElementById('bookTextInput').classList.toggle('hidden', src !== 'text');
+    document.getElementById('bookFileInput').classList.toggle('hidden', src !== 'file');
+    document.getElementById('bookUrlInput').classList.toggle('hidden', src !== 'url');
+}
+
+async function analyzeBook() {
+    const mode = document.getElementById('bookMode').value;
+    const source = document.getElementById('bookSource').value;
+    const btn = document.getElementById('bookBtn');
+    btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Analyzing...';
+    document.getElementById('bookOutput').innerHTML = '<p class="text-gray-500">AI is analyzing the content...</p>';
+
+    if (source === 'text') {
+        const title = document.getElementById('bookTitle').value;
+        const text = document.getElementById('bookText').value;
+        if (!text.trim()) { showToast('Paste book text first!', 'error'); btn.disabled = false; btn.innerHTML = '<i class="fas fa-magic mr-2"></i>Analyze Book & Generate Q&A'; return; }
+        try {
+            const resp = await fetch('/api/programming/book-qa', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({book_title: title, book_text: text, model: AI_MODEL}) });
+            const data = await resp.json();
+            if (data.success) { document.getElementById('bookOutput').innerHTML = formatMd(data.analysis); document.getElementById('bookLatency').textContent = `${data.latency_ms}ms · ${data.tokens} tokens`; }
+            else document.getElementById('bookOutput').innerHTML = `<p class="text-red-400">Error: ${data.error}</p>`;
+        } catch (e) { document.getElementById('bookOutput').innerHTML = `<p class="text-red-400">Error: ${e.message}</p>`; }
+    } else {
+        const fd = new FormData();
+        fd.append('mode', mode);
+        fd.append('model', AI_MODEL);
+        fd.append('book_title', document.getElementById('bookTitle')?.value || 'Book');
+        if (source === 'file') {
+            const fileInput = document.getElementById('bookFile');
+            if (fileInput.files.length === 0) { showToast('Select a file first!', 'error'); btn.disabled = false; btn.innerHTML = '<i class="fas fa-magic mr-2"></i>Analyze Book & Generate Q&A'; return; }
+            fd.append('file', fileInput.files[0]);
+        } else {
+            const url = document.getElementById('bookUrl').value;
+            if (!url.trim()) { showToast('Enter a URL first!', 'error'); btn.disabled = false; btn.innerHTML = '<i class="fas fa-magic mr-2"></i>Analyze Book & Generate Q&A'; return; }
+            fd.append('url', url);
+        }
+        try {
+            const resp = await fetch('/api/programming/book-upload', { method: 'POST', body: fd });
+            const data = await resp.json();
+            if (data.success) { document.getElementById('bookOutput').innerHTML = formatMd(data.analysis); document.getElementById('bookLatency').textContent = `${data.latency_ms}ms · ${data.tokens} tokens`; }
+            else document.getElementById('bookOutput').innerHTML = `<p class="text-red-400">Error: ${data.error}</p>`;
+        } catch (e) { document.getElementById('bookOutput').innerHTML = `<p class="text-red-400">Error: ${e.message}</p>`; }
+    }
+    btn.disabled = false; btn.innerHTML = '<i class="fas fa-magic mr-2"></i>Analyze Book & Generate Q&A';
+}
+
+// ============= Kids Corner =============
+let blocks = [];
+let editingBlockIndex = -1;
+let boardState = { carX: 60, carY: 180, carDir: 0, speed: 3, trafficLight: 'green', obstacles: [], buildings: [], animFrame: null, running: false, pedestrians: [], scene: 'road' };
+
+const KIDS_BLOCK_DEFS = {
+    when_start:      { label: '▶ When Start',            color: 'green',  param: null },
+    when_click:      { label: '🖱 When Click',           color: 'green',  param: null },
+    when_key:        { label: '⌨ When Key Press',       color: 'green',  param: { key: 'Space' } },
+    when_obstacle:   { label: '🚧 When Obstacle Ahead', color: 'green',  param: null },
+    move_forward:    { label: '➡ Move Forward',          color: 'purple', param: { steps: 40 } },
+    move_backward:   { label: '⬅ Move Backward',         color: 'purple', param: { steps: 30 } },
+    turn_left:       { label: '↩ Turn Left',             color: 'purple', param: { degrees: 90 } },
+    turn_right:      { label: '↪ Turn Right',            color: 'purple', param: { degrees: 90 } },
+    set_speed:       { label: '⚡ Set Speed',            color: 'purple', param: { speed: 5 } },
+    stop_car:        { label: '🛑 Stop Car',             color: 'purple', param: null },
+    repeat:          { label: '🔄 Repeat N Times',       color: 'cyan',   param: { count: 3 } },
+    do_while:        { label: '🔁 Do-While',            color: 'cyan',   param: { condition: 'obstacle_ahead' } },
+    while_cond:      { label: '⏳ While Condition',      color: 'cyan',   param: { variable: 'i', op: '<', value: 10 } },
+    if_else:         { label: '🔀 If-Else',             color: 'cyan',   param: { variable: 'i', op: '==', value: 5, then_action: 'led_on', else_action: 'led_off' } },
+    wait:            { label: '⏸ Wait',                  color: 'cyan',   param: { ms: 1000 } },
+    set_var:         { label: '📦 Set Variable',         color: 'cyan',   param: { variable: 'i', value: 0 } },
+    change_var:      { label: '➕ Change Variable',      color: 'cyan',   param: { variable: 'i', operation: '++', amount: 1 } },
+    compare:         { label: '⚖ Compare Values',        color: 'cyan',   param: { left: 'i', op: '==', right: '5' } },
+    detect_obstacle: { label: '🚧 Detect Obstacle',      color: 'amber',  param: null },
+    detect_light:    { label: '🚦 Detect Traffic Light', color: 'amber',  param: null },
+    detect_line:     { label: '📏 Detect Line',          color: 'amber',  param: null },
+    read_distance:   { label: '📐 Read Distance',        color: 'amber',  param: { unit: 'cm' } },
+    led_on:          { label: '💡 LED On',               color: 'red',    param: { pin: 13 } },
+    led_off:         { label: '⬛ LED Off',              color: 'red',    param: { pin: 13 } },
+    buzzer:          { label: '🔔 Buzzer Beep',          color: 'red',    param: { freq: 1000, duration: 200 } },
+    servo_move:      { label: '🦾 Servo Move',           color: 'red',    param: { angle: 90 } },
+    print_val:       { label: '🖨 Print to Serial',      color: 'red',    param: { message: 'Hello' } }
+};
+
+// Edit modal parameter builders
+function buildEditParamsHTML(type, param) {
+    if (!param) return '<p class="text-gray-500 text-sm italic">This block has no editable parameters.</p>';
+    let html = '';
+    for (const [key, val] of Object.entries(param)) {
+        if (key === 'op') {
+            html += `<div><label class="block text-xs text-gray-400 mb-1">${key.toUpperCase()}</label>
+                <select id="editParam_${key}" class="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white w-full">
+                    <option value="==" ${val==='=='?'selected':''}>== (equals)</option>
+                    <option value="!=" ${val==='!='?'selected':''}>!= (not equals)</option>
+                    <option value="<" ${val==='<'?'selected':''}>&lt; (less than)</option>
+                    <option value=">" ${val==='>'?'selected':''}>&gt; (greater than)</option>
+                    <option value="<=" ${val==='<='?'selected':''}>&lt;= (less or equal)</option>
+                    <option value=">=" ${val==='>='?'selected':''}>&gt;= (greater or equal)</option>
+                </select></div>`;
+        } else if (key === 'operation') {
+            html += `<div><label class="block text-xs text-gray-400 mb-1">Operation</label>
+                <select id="editParam_${key}" class="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white w-full">
+                    <option value="++" ${val==='++'?'selected':''}>++ (increment)</option>
+                    <option value="--" ${val==='--'?'selected':''}>-- (decrement)</option>
+                    <option value="+=" ${val==='+='?'selected':''}>+= (add amount)</option>
+                    <option value="-=" ${val==='-='?'selected':''} >-= (subtract amount)</option>
+                    <option value="=" ${val==='='?'selected':''}>= (set to)</option>
+                </select></div>`;
+        } else if (key === 'then_action' || key === 'else_action') {
+            html += `<div><label class="block text-xs text-gray-400 mb-1">${key === 'then_action' ? 'THEN action' : 'ELSE action'}</label>
+                <select id="editParam_${key}" class="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white w-full">
+                    <option value="led_on" ${val==='led_on'?'selected':''}>LED On</option>
+                    <option value="led_off" ${val==='led_off'?'selected':''}>LED Off</option>
+                    <option value="buzzer" ${val==='buzzer'?'selected':''}>Buzzer Beep</option>
+                    <option value="move_forward" ${val==='move_forward'?'selected':''}>Move Forward</option>
+                    <option value="stop" ${val==='stop'?'selected':''}>Stop</option>
+                </select></div>`;
+        } else if (key === 'condition') {
+            html += `<div><label class="block text-xs text-gray-400 mb-1">Loop While</label>
+                <select id="editParam_${key}" class="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white w-full">
+                    <option value="obstacle_ahead" ${val==='obstacle_ahead'?'selected':''}>Obstacle Ahead</option>
+                    <option value="light_green" ${val==='light_green'?'selected':''}>Light is Green</option>
+                    <option value="light_red" ${val==='light_red'?'selected':''}>Light is Red</option>
+                    <option value="line_detected" ${val==='line_detected'?'selected':''}>Line Detected</option>
+                    <option value="distance_short" ${val==='distance_short'?'selected':''}>Distance &lt; 20cm</option>
+                </select></div>`;
+        } else if (key === 'variable') {
+            html += `<div><label class="block text-xs text-gray-400 mb-1">Variable</label>
+                <select id="editParam_${key}" class="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white w-full">
+                    <option value="i" ${val==='i'?'selected':''}>i (counter)</option>
+                    <option value="a" ${val==='a'?'selected':''}>a (speed)</option>
+                    <option value="b" ${val==='b'?'selected':''}>b (distance)</option>
+                    <option value="x" ${val==='x'?'selected':''}>x (position)</option>
+                    <option value="led_state" ${val==='led_state'?'selected':''}>led_state</option>
+                </select></div>`;
+        } else if (typeof val === 'number') {
+            html += `<div><label class="block text-xs text-gray-400 mb-1">${key}</label>
+                <input type="number" id="editParam_${key}" value="${val}" class="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white w-full"></div>`;
+        } else {
+            html += `<div><label class="block text-xs text-gray-400 mb-1">${key}</label>
+                <input type="text" id="editParam_${key}" value="${val}" class="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white w-full"></div>`;
+        }
+    }
+    return html;
+}
+
+function editBlock(index) {
+    editingBlockIndex = index;
+    const b = blocks[index];
+    const def = KIDS_BLOCK_DEFS[b.type];
+    document.getElementById('editBlockContent').innerHTML = `
+        <div class="bg-${def.color}-600/20 border border-${def.color}-600/30 rounded-lg p-3 text-sm text-${def.color}-400 font-semibold">${def.label}</div>
+        ${buildEditParamsHTML(b.type, b.param)}`;
+    document.getElementById('editBlockModal').classList.remove('hidden');
+    document.getElementById('editBlockModal').classList.add('flex');
+}
+
+function closeEditBlockModal() {
+    document.getElementById('editBlockModal').classList.add('hidden');
+    document.getElementById('editBlockModal').classList.remove('flex');
+    editingBlockIndex = -1;
+}
+
+function saveBlockEdit() {
+    if (editingBlockIndex < 0) return;
+    const b = blocks[editingBlockIndex];
+    if (b.param) {
+        for (const key of Object.keys(b.param)) {
+            const el = document.getElementById('editParam_' + key);
+            if (el) {
+                const val = el.value;
+                if (typeof b.param[key] === 'number') b.param[key] = parseInt(val) || 0;
+                else b.param[key] = val;
+            }
+        }
+    }
+    closeEditBlockModal();
+    renderBlocks();
+    updateKidsArduinoCode();
+    showToast('Block updated!', 'success');
+}
+
+function addBlock(type) {
+    const def = KIDS_BLOCK_DEFS[type];
+    blocks.push({ type, label: def.label, color: def.color, param: def.param ? JSON.parse(JSON.stringify(def.param)) : null });
+    renderBlocks();
+    updateKidsArduinoCode();
+}
+
+function renderBlocks() {
+    const ws = document.getElementById('blockWorkspace');
+    if (blocks.length === 0) { ws.innerHTML = '<p class="text-gray-600 text-sm text-center py-8">Click blocks from the palette to build your program!</p>'; document.getElementById('kidsBlockCount').textContent = '0 blocks'; return; }
+    ws.innerHTML = blocks.map((b, i) => {
+        const paramText = b.param ? Object.entries(b.param).map(([k,v]) => `${k}=${v}`).join(', ') : '';
+        const indent = ['repeat','do_while','while_cond','if_else'].includes(b.type);
+        return `<div class="flex items-center gap-2 p-2 mb-1.5 rounded-lg text-xs cursor-pointer hover:bg-white/5 transition ${indent ? 'ml-4 border-l-2 border-cyan-500/50' : ''} bg-${b.color}-600/10 border border-${b.color}-600/20" onclick="editBlock(${i})" title="Click to edit parameters">
+            <span class="text-gray-500 w-4 text-right text-[10px]">${i+1}</span>
+            <span class="text-sm font-bold text-${b.color}-400 flex-1">${b.label}</span>
+            ${paramText ? `<span class="text-[10px] text-gray-500 font-mono">${paramText}</span>` : ''}
+            <button onclick="event.stopPropagation();removeBlock(${i})" class="text-gray-500 hover:text-red-400 text-xs px-1"><i class="fas fa-times"></i></button>
+        </div>`;
+    }).join('');
+    document.getElementById('kidsBlockCount').textContent = blocks.length + ' block' + (blocks.length !== 1 ? 's' : '');
+}
+
+function removeBlock(i) { blocks.splice(i, 1); renderBlocks(); updateKidsArduinoCode(); }
+function clearBlocks() { blocks = []; renderBlocks(); document.getElementById('blockOutput').classList.add('hidden'); updateKidsArduinoCode(); }
+
+// Example programs
+function loadKidExample(name) {
+    clearBlocks();
+    const examples = {
+        traffic: [
+            { type: 'when_start', label: '▶ When Start', color: 'green', param: null },
+            { type: 'set_var', label: '📦 Set Variable', color: 'cyan', param: { variable: 'i', value: 0 } },
+            { type: 'repeat', label: '🔄 Repeat N Times', color: 'cyan', param: { count: 5 } },
+            { type: 'detect_light', label: '🚦 Detect Traffic Light', color: 'amber', param: null },
+            { type: 'if_else', label: '🔀 If-Else', color: 'cyan', param: { variable: 'light', op: '==', value: 'green', then_action: 'move_forward', else_action: 'stop' } },
+            { type: 'move_forward', label: '➡ Move Forward', color: 'purple', param: { steps: 40 } },
+            { type: 'wait', label: '⏸ Wait', color: 'cyan', param: { ms: 500 } },
+            { type: 'change_var', label: '➕ Change Variable', color: 'cyan', param: { variable: 'i', operation: '++', amount: 1 } },
+            { type: 'print_val', label: '🖨 Print to Serial', color: 'red', param: { message: 'Cycle complete' } }
+        ],
+        maze: [
+            { type: 'when_start', label: '▶ When Start', color: 'green', param: null },
+            { type: 'set_var', label: '📦 Set Variable', color: 'cyan', param: { variable: 'i', value: 0 } },
+            { type: 'while_cond', label: '⏳ While Condition', color: 'cyan', param: { variable: 'i', op: '<', value: 10 } },
+            { type: 'detect_obstacle', label: '🚧 Detect Obstacle', color: 'amber', param: null },
+            { type: 'if_else', label: '🔀 If-Else', color: 'cyan', param: { variable: 'obstacle', op: '==', value: 'true', then_action: 'turn_right', else_action: 'move_forward' } },
+            { type: 'move_forward', label: '➡ Move Forward', color: 'purple', param: { steps: 30 } },
+            { type: 'change_var', label: '➕ Change Variable', color: 'cyan', param: { variable: 'i', operation: '++', amount: 1 } },
+            { type: 'led_on', label: '💡 LED On', color: 'red', param: { pin: 13 } },
+            { type: 'buzzer', label: '🔔 Buzzer Beep', color: 'red', param: { freq: 800, duration: 100 } }
+        ],
+        patrol: [
+            { type: 'when_start', label: '▶ When Start', color: 'green', param: null },
+            { type: 'led_on', label: '💡 LED On', color: 'red', param: { pin: 13 } },
+            { type: 'move_forward', label: '➡ Move Forward', color: 'purple', param: { steps: 60 } },
+            { type: 'detect_obstacle', label: '🚧 Detect Obstacle', color: 'amber', param: null },
+            { type: 'if_else', label: '🔀 If-Else', color: 'cyan', param: { variable: 'obstacle', op: '==', value: 'true', then_action: 'buzzer', else_action: 'led_off' } },
+            { type: 'turn_right', label: '↪ Turn Right', color: 'purple', param: { degrees: 90 } },
+            { type: 'move_forward', label: '➡ Move Forward', color: 'purple', param: { steps: 60 } },
+            { type: 'turn_left', label: '↩ Turn Left', color: 'purple', param: { degrees: 90 } }
+        ],
+        race: [
+            { type: 'when_start', label: '▶ When Start', color: 'green', param: null },
+            { type: 'set_speed', label: '⚡ Set Speed', color: 'purple', param: { speed: 8 } },
+            { type: 'set_var', label: '📦 Set Variable', color: 'cyan', param: { variable: 'lap', value: 0 } },
+            { type: 'repeat', label: '🔄 Repeat N Times', color: 'cyan', param: { count: 3 } },
+            { type: 'move_forward', label: '➡ Move Forward', color: 'purple', param: { steps: 80 } },
+            { type: 'turn_right', label: '↪ Turn Right', color: 'purple', param: { degrees: 90 } },
+            { type: 'change_var', label: '➕ Change Variable', color: 'cyan', param: { variable: 'lap', operation: '++', amount: 1 } },
+            { type: 'print_val', label: '🖨 Print to Serial', color: 'red', param: { message: 'Lap complete' } },
+            { type: 'buzzer', label: '🔔 Buzzer Beep', color: 'red', param: { freq: 1200, duration: 300 } }
+        ],
+        robot: [
+            { type: 'when_start', label: '▶ When Start', color: 'green', param: null },
+            { type: 'servo_move', label: '🦾 Servo Move', color: 'red', param: { angle: 0 } },
+            { type: 'wait', label: '⏸ Wait', color: 'cyan', param: { ms: 500 } },
+            { type: 'servo_move', label: '🦾 Servo Move', color: 'red', param: { angle: 90 } },
+            { type: 'wait', label: '⏸ Wait', color: 'cyan', param: { ms: 500 } },
+            { type: 'servo_move', label: '🦾 Servo Move', color: 'red', param: { angle: 180 } },
+            { type: 'led_on', label: '💡 LED On', color: 'red', param: { pin: 13 } },
+            { type: 'buzzer', label: '🔔 Buzzer Beep', color: 'red', param: { freq: 600, duration: 200 } },
+            { type: 'wait', label: '⏸ Wait', color: 'cyan', param: { ms: 300 } },
+            { type: 'led_off', label: '⬛ LED Off', color: 'red', param: { pin: 13 } },
+            { type: 'servo_move', label: '🦾 Servo Move', color: 'red', param: { angle: 0 } }
+        ]
+    };
+    blocks = examples[name] || [];
+    renderBlocks();
+    updateKidsArduinoCode();
+    showToast('Example loaded: ' + name, 'success');
+}
+
+function changeKidsScene() {
+    boardState.scene = document.getElementById('kidsSceneSelect').value;
+    resetBoard();
+}
+
+// Smooth animated run
+function runBlocks() {
+    if (blocks.length === 0) { showToast('Add some blocks first!', 'error'); return; }
+    boardState.running = true;
+    boardState.carX = 60; boardState.carY = 180; boardState.carDir = 0;
+    boardState.obstacles = [{ x: 300, y: 175, w: 20, h: 20 }];
+    boardState.trafficLight = 'green';
+    boardState.pedestrians = [{ x: 200, y: 165, dir: 1, waiting: false }];
+    let idx = 0;
+    function execNext() {
+        if (idx >= blocks.length || !boardState.running) { boardState.running = false; return; }
+        const b = blocks[idx];
+        const p = b.param || {};
+        if (b.type === 'move_forward') { boardState.carX = Math.min(450, boardState.carX + (p.steps || 40)); }
+        else if (b.type === 'move_backward') { boardState.carX = Math.max(30, boardState.carX - (p.steps || 30)); }
+        else if (b.type === 'turn_left') { boardState.carDir = (boardState.carDir - (p.degrees || 90) + 360) % 360; }
+        else if (b.type === 'turn_right') { boardState.carDir = (boardState.carDir + (p.degrees || 90)) % 360; }
+        else if (b.type === 'set_speed') { boardState.speed = Math.min(10, p.speed || 5); }
+        else if (b.type === 'stop_car') { boardState.speed = 0; }
+        else if (b.type === 'wait') { /* setTimeout handles delay */ }
+        else if (b.type === 'set_var') { /* variable tracking */ }
+        else if (b.type === 'change_var') { /* variable tracking */ }
+        else if (b.type === 'detect_light') { boardState.trafficLight = ['green','yellow','red'][Math.floor(Math.random()*3)]; }
+        else if (b.type === 'detect_obstacle') { boardState.obstacles.push({ x: boardState.carX + 80 + Math.random()*100, y: 160 + Math.random()*30, w: 18, h: 18 }); }
+        else if (b.type === 'led_on') { boardState.ledOn = true; }
+        else if (b.type === 'led_off') { boardState.ledOn = false; }
+        else if (b.type === 'buzzer') { showToast('Beep!', 'success'); }
+        else if (b.type === 'servo_move') { boardState.carDir = (boardState.carDir + (p.angle || 45)) % 360; }
+        drawBoard();
+        idx++;
+        setTimeout(execNext, b.type === 'wait' ? (p.ms || 1000) : 600);
+    }
+    execNext();
+    drawBoard();
+}
+
+function resetBoard() {
+    boardState.running = false;
+    if (boardState.animFrame) cancelAnimationFrame(boardState.animFrame);
+    boardState = { carX: 60, carY: 180, carDir: 0, speed: 3, trafficLight: 'green', obstacles: [], buildings: [], animFrame: null, running: false, pedestrians: [{ x: 200, y: 165, dir: 1, waiting: false }], scene: boardState.scene || 'road', ledOn: false };
+    drawBoard();
+}
+
+// Realistic animated board
+let boardAnimFrame;
+function animateBoard() {
+    if (boardState.running) {
+        // Move pedestrians
+        boardState.pedestrians.forEach(ped => {
+            if (boardState.trafficLight === 'red' && Math.abs(ped.x - boardState.carX) < 60) {
+                ped.waiting = true;
+            } else if (boardState.trafficLight === 'green') {
+                ped.waiting = false;
+            }
+            if (!ped.waiting) { ped.x += ped.dir * 1.5; if (ped.x > 460 || ped.x < 20) ped.dir *= -1; }
+        });
+        // Move obstacles slightly
+        boardState.obstacles.forEach(obs => { obs.y += Math.sin(Date.now()/500) * 0.3; });
+    }
+    drawBoard();
+    boardAnimFrame = requestAnimationFrame(animateBoard);
+}
+
+function drawBoard() {
+    const canvas = document.getElementById('kidsCanvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width, H = canvas.height;
+    ctx.clearRect(0, 0, W, H);
+
+    const scene = boardState.scene || 'road';
+
+    // Sky gradient
+    const skyGrad = ctx.createLinearGradient(0, 0, 0, 120);
+    skyGrad.addColorStop(0, '#0f172a');
+    skyGrad.addColorStop(1, '#1e293b');
+    ctx.fillStyle = skyGrad;
+    ctx.fillRect(0, 0, W, 120);
+
+    // Stars
+    ctx.fillStyle = '#ffffff30';
+    for (let sx = 10; sx < W; sx += 35) { ctx.beginPath(); ctx.arc(sx, 15 + (sx%30), 1, 0, Math.PI*2); ctx.fill(); }
+
+    // Grass
+    ctx.fillStyle = '#065f46';
+    ctx.fillRect(0, 120, W, 20);
+    ctx.fillRect(0, 230, W, H - 230);
+    // Grass texture
+    ctx.strokeStyle = '#04785750';
+    ctx.lineWidth = 1;
+    for (let gx = 5; gx < W; gx += 12) { ctx.beginPath(); ctx.moveTo(gx, 135); ctx.lineTo(gx+3, 125); ctx.stroke(); ctx.beginPath(); ctx.moveTo(gx, 235); ctx.lineTo(gx+3, 245); ctx.stroke(); }
+
+    // Sidewalk
+    ctx.fillStyle = '#6b7280';
+    ctx.fillRect(0, 138, W, 6);
+    ctx.fillRect(0, 226, W, 6);
+
+    // Road
+    const roadGrad = ctx.createLinearGradient(0, 144, 0, 226);
+    roadGrad.addColorStop(0, '#374151');
+    roadGrad.addColorStop(0.5, '#4b5563');
+    roadGrad.addColorStop(1, '#374151');
+    ctx.fillStyle = roadGrad;
+    ctx.fillRect(0, 144, W, 82);
+
+    // Road markings - dashed center line
+    ctx.strokeStyle = '#fbbf24';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([16, 10]);
+    ctx.beginPath();
+    ctx.moveTo(0, 185);
+    ctx.lineTo(W, 185);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Road edge lines
+    ctx.strokeStyle = '#ffffff30';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0, 145); ctx.lineTo(W, 145); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, 225); ctx.lineTo(W, 225); ctx.stroke();
+
+    // Buildings (background)
+    const buildingColors = ['#1e3a5f', '#2d1b69', '#1a4731', '#5b2106', '#312e81'];
+    for (let bx = 20; bx < W; bx += 70) {
+        const bh = 40 + (bx * 7 % 30);
+        const bc = buildingColors[bx % buildingColors.length];
+        ctx.fillStyle = bc;
+        ctx.fillRect(bx, 120 - bh, 55, bh);
+        // Windows
+        ctx.fillStyle = '#fbbf2430';
+        for (let wy = 120 - bh + 8; wy < 115; wy += 12) {
+            for (let wx = bx + 8; wx < bx + 50; wx += 14) {
+                ctx.fillRect(wx, wy, 8, 8);
+            }
+        }
+        // Roof detail
+        ctx.fillStyle = '#ffffff10';
+        ctx.fillRect(bx, 120 - bh, 55, 3);
+    }
+
+    // Trees
+    for (let tx = 30; tx < W; tx += 90) {
+        ctx.fillStyle = '#92400e';
+        ctx.fillRect(tx - 3, 112, 6, 16);
+        ctx.fillStyle = '#047857';
+        ctx.beginPath();
+        ctx.arc(tx, 108, 12, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#065f46';
+        ctx.beginPath();
+        ctx.arc(tx - 4, 105, 8, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    // Traffic light
+    const tlX = 380, tlY = 80;
+    ctx.fillStyle = '#1f2937';
+    ctx.fillRect(tlX - 10, tlY - 25, 20, 60);
+    ctx.fillStyle = '#374151';
+    ctx.fillRect(tlX - 8, tlY - 23, 16, 56);
+    ctx.strokeStyle = '#6b7280';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(tlX - 8, tlY - 23, 16, 56);
+    const lightColors = { red: '#ef4444', yellow: '#eab308', green: '#22c55e' };
+    const dimLightColors = { red: '#450a0a', yellow: '#422006', green: '#052e16' };
+    ['red', 'yellow', 'green'].forEach((c, i) => {
+        ctx.fillStyle = boardState.trafficLight === c ? lightColors[c] : dimLightColors[c];
+        ctx.beginPath();
+        ctx.arc(tlX, tlY - 8 + i * 16, 6, 0, Math.PI * 2);
+        ctx.fill();
+        if (boardState.trafficLight === c) {
+            ctx.fillStyle = lightColors[c] + '40';
+            ctx.beginPath();
+            ctx.arc(tlX, tlY - 8 + i * 16, 10, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    });
+    // Light pole
+    ctx.fillStyle = '#4b5563';
+    ctx.fillRect(tlX - 2, tlY + 35, 4, 100);
+
+    // Crosswalk
+    ctx.fillStyle = '#ffffff20';
+    for (let cw = 0; cw < 6; cw++) {
+        ctx.fillRect(340 + cw * 10, 144, 6, 82);
+    }
+
+    // Obstacles
+    boardState.obstacles.forEach(obs => {
+        ctx.fillStyle = '#dc2626';
+        ctx.fillRect(obs.x, obs.y, obs.w, obs.h);
+        ctx.strokeStyle = '#fbbf24';
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(obs.x, obs.y, obs.w, obs.h);
+        ctx.fillStyle = '#fef08a';
+        ctx.font = 'bold 9px sans-serif';
+        ctx.fillText('!', obs.x + 7, obs.y + 13);
+    });
+
+    // Pedestrians
+    boardState.pedestrians.forEach(ped => {
+        ctx.fillStyle = ped.waiting ? '#ef4444' : '#22c55e';
+        ctx.beginPath();
+        ctx.arc(ped.x, ped.y - 8, 5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#e5e7eb';
+        ctx.fillRect(ped.x - 3, ped.y - 3, 6, 12);
+        if (ped.waiting) {
+            ctx.fillStyle = '#ef4444';
+            ctx.font = '10px sans-serif';
+            ctx.fillText('✋', ped.x - 5, ped.y - 15);
+        }
+    });
+
+    // Car (detailed)
+    ctx.save();
+    ctx.translate(boardState.carX, boardState.carY);
+    ctx.rotate(boardState.carDir * Math.PI / 180);
+    // Car body
+    const carGrad = ctx.createLinearGradient(-18, -12, -18, 12);
+    carGrad.addColorStop(0, '#60a5fa');
+    carGrad.addColorStop(0.5, '#3b82f6');
+    carGrad.addColorStop(1, '#2563eb');
+    ctx.fillStyle = carGrad;
+    ctx.beginPath();
+    ctx.roundRect(-18, -12, 36, 24, 4);
+    ctx.fill();
+    // Windshield
+    ctx.fillStyle = '#1e3a5f80';
+    ctx.fillRect(-14, -9, 10, 18);
+    // Rear window
+    ctx.fillStyle = '#1e3a5f60';
+    ctx.fillRect(6, -7, 8, 14);
+    // Headlights
+    ctx.fillStyle = boardState.running ? '#fbbf24' : '#92400e80';
+    ctx.beginPath(); ctx.arc(-18, -6, 3, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(-18, 6, 3, 0, Math.PI*2); ctx.fill();
+    // Tail lights
+    ctx.fillStyle = '#ef4444';
+    ctx.fillRect(16, -8, 3, 5);
+    ctx.fillRect(16, 3, 3, 5);
+    // Wheels
+    ctx.fillStyle = '#1f2937';
+    ctx.fillRect(-16, -14, 8, 4);
+    ctx.fillRect(-16, 10, 8, 4);
+    ctx.fillRect(10, -14, 8, 4);
+    ctx.fillRect(10, 10, 8, 4);
+    // Wheel detail
+    ctx.fillStyle = '#6b7280';
+    ctx.fillRect(-14, -13, 4, 2);
+    ctx.fillRect(-14, 11, 4, 2);
+    ctx.fillRect(12, -13, 4, 2);
+    ctx.fillRect(12, 11, 4, 2);
+    // LED indicator
+    if (boardState.ledOn) {
+        ctx.fillStyle = '#22c55e';
+        ctx.beginPath();
+        ctx.arc(-8, -14, 3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#22c55e40';
+        ctx.beginPath();
+        ctx.arc(-8, -14, 6, 0, Math.PI * 2);
+        ctx.fill();
+    }
+    ctx.restore();
+
+    // Speed indicator
+    ctx.fillStyle = '#9ca3af';
+    ctx.font = '10px monospace';
+    ctx.fillText('Speed: ' + boardState.speed + '  Pos: (' + Math.round(boardState.carX) + ',' + Math.round(boardState.carY) + ')  Dir: ' + boardState.carDir + '°', 10, H - 10);
+    ctx.fillText('Light: ' + boardState.trafficLight.toUpperCase() + (boardState.ledOn ? '  LED: ON' : ''), W - 180, H - 10);
+}
+
+function updateKidsArduinoCode() {
+    const el = document.getElementById('kidsArduinoCode');
+    if (blocks.length === 0) { el.innerHTML = '<span class="text-gray-500">// Add blocks to generate Arduino code...</span>'; return; }
+    let vars = {};
+    let lines = ['#include <Servo.h>', '', 'int ledPin = 13;', 'int buzzerPin = 8;', 'int servoPin = 9;', 'int trigPin = 6;', 'int echoPin = 7;', 'Servo myServo;', '', 'void setup() {', '  Serial.begin(9600);', '  pinMode(ledPin, OUTPUT);', '  pinMode(buzzerPin, OUTPUT);', '  pinMode(trigPin, OUTPUT);', '  pinMode(echoPin, INPUT);', '  myServo.attach(servoPin);', '  Serial.println("Program Start");', '}', '', 'void loop() {'];
+    for (const b of blocks) {
+        const p = b.param || {};
+        switch (b.type) {
+            case 'when_start': lines.push('  // === Program Start ==='); break;
+            case 'when_click': lines.push('  // Button pressed'); break;
+            case 'when_key': lines.push('  // Key: ' + (p.key || 'Space')); break;
+            case 'when_obstacle': lines.push('  if (readDistance() < 20) {'); break;
+            case 'move_forward': lines.push('  delay(' + (p.steps * 12 || 500) + ');  // Forward ' + (p.steps || 40) + ' steps'); break;
+            case 'move_backward': lines.push('  delay(' + (p.steps * 12 || 360) + ');  // Backward'); break;
+            case 'turn_left': lines.push('  myServo.write(0);   // Turn left ' + (p.degrees || 90) + '°'); lines.push('  delay(300);'); break;
+            case 'turn_right': lines.push('  myServo.write(180); // Turn right ' + (p.degrees || 90) + '°'); lines.push('  delay(300);'); break;
+            case 'set_speed': lines.push('  // Speed = ' + (p.speed || 5)); break;
+            case 'stop_car': lines.push('  delay(2000); // STOP'); break;
+            case 'repeat': lines.push('  for (int i = 0; i < ' + (p.count || 3) + '; i++) {'); break;
+            case 'do_while': lines.push('  do {  // while: ' + (p.condition || 'true')); break;
+            case 'while_cond': lines.push('  while (' + (p.variable || 'i') + ' ' + (p.op || '<') + ' ' + (p.value || 10) + ') {'); break;
+            case 'if_else': lines.push('  if (' + (p.variable || 'i') + ' ' + (p.op || '==') + ' ' + (p.value || 5) + ') {'); lines.push('    // THEN: ' + (p.then_action || 'led_on')); lines.push('  } else {'); lines.push('    // ELSE: ' + (p.else_action || 'led_off')); lines.push('  }'); break;
+            case 'set_var': lines.push('  int ' + (p.variable || 'i') + ' = ' + (p.value || 0) + ';'); vars[p.variable || 'i'] = p.value || 0; break;
+            case 'change_var': const vname = p.variable || 'i'; lines.push('  ' + vname + ' ' + (p.operation || '++') + (p.amount !== undefined && p.operation !== '++' && p.operation !== '--' ? ' ' + p.amount : '') + ';  // ' + vname + ' is now ' + (parseInt(vars[vname]||0) + 1)); break;
+            case 'compare': lines.push('  // Compare: ' + (p.left||'a') + ' ' + (p.op||'==') + ' ' + (p.right||'b')); break;
+            case 'detect_obstacle': lines.push('  { long d = readDistance(); if (d < 20) {'); break;
+            case 'detect_light': lines.push('  // Read light sensor (analog A1)'); break;
+            case 'detect_line': lines.push('  // Read line sensor (digital 4)'); break;
+            case 'read_distance': lines.push('  long dist = readDistance(); // cm'); break;
+            case 'led_on': lines.push('  digitalWrite(' + (p.pin || 13) + ', HIGH);  // LED ON'); break;
+            case 'led_off': lines.push('  digitalWrite(' + (p.pin || 13) + ', LOW);   // LED OFF'); break;
+            case 'buzzer': lines.push('  tone(buzzerPin, ' + (p.freq || 1000) + ', ' + (p.duration || 200) + ');'); break;
+            case 'servo_move': lines.push('  myServo.write(' + (p.angle || 90) + ');'); break;
+            case 'print_val': lines.push('  Serial.println("' + (p.message || 'Hello') + '");'); break;
+        }
+    }
+    lines.push('  delay(500);');
+    lines.push('}');
+    lines.push('');
+    lines.push('long readDistance() {');
+    lines.push('  digitalWrite(trigPin, LOW); delayMicroseconds(2);');
+    lines.push('  digitalWrite(trigPin, HIGH); delayMicroseconds(10);');
+    lines.push('  digitalWrite(trigPin, LOW);');
+    lines.push('  return pulseIn(echoPin, HIGH) * 0.034 / 2;');
+    lines.push('}');
+    el.textContent = lines.join('\n');
+}
+
+// Init board
+setTimeout(() => { drawBoard(); animateBoard(); }, 100);
+
+// ============= DFD Designer =============
+let dfdId = 0;
+let dfdConnections = [];
+
+function addDfdElement(type) {
+    const id = 'dfd-' + (++dfdId);
+    const names = { entity: 'Entity ' + dfdId, process: 'Process ' + dfdId, store: 'Store ' + dfdId };
+    const cls = { entity: 'dfd-entity', process: 'dfd-process', store: 'dfd-store' };
+    const el = document.createElement('div');
+    el.className = cls[type];
+    el.id = id;
+    el.textContent = names[type];
+    el.dataset.type = type;
+    el.style.left = (50 + Math.random() * 300) + 'px';
+    el.style.top = (50 + Math.random() * 200) + 'px';
+    el.onmousedown = (e) => { dfdDrag = { el, ox: e.offsetX, oy: e.offsetY }; };
+    el.ondblclick = () => {
+        const name = prompt('Rename element:', el.textContent);
+        if (name) el.textContent = name;
+    };
+    document.getElementById('dfdCanvas').appendChild(el);
+}
+
+document.addEventListener('mousemove', e => {
+    if (!dfdDrag) return;
+    const canvas = document.getElementById('dfdCanvas');
+    const rect = canvas.getBoundingClientRect();
+    dfdDrag.el.style.left = (e.clientX - rect.left - dfdDrag.ox) + 'px';
+    dfdDrag.el.style.top = (e.clientY - rect.top - dfdDrag.oy) + 'px';
+    drawDfdConnections();
+});
+document.addEventListener('mouseup', () => { dfdDrag = null; });
+
+function clearDfd() { document.querySelectorAll('#dfdCanvas .dfd-entity, #dfdCanvas .dfd-process, #dfdCanvas .dfd-store').forEach(el => el.remove()); dfdId = 0; dfdConnections = []; document.getElementById('dfdSvg').innerHTML = ''; }
+
+function dfdAutoLayout() {
+    const entities = document.querySelectorAll('#dfdCanvas .dfd-entity');
+    const processes = document.querySelectorAll('#dfdCanvas .dfd-process');
+    const stores = document.querySelectorAll('#dfdCanvas .dfd-store');
+    entities.forEach((e, i) => { e.style.left = '30px'; e.style.top = (50 + i * 120) + 'px'; });
+    processes.forEach((e, i) => { e.style.left = '250px'; e.style.top = (50 + i * 120) + 'px'; });
+    stores.forEach((e, i) => { e.style.left = '470px'; e.style.top = (50 + i * 120) + 'px'; });
+    drawDfdConnections();
+}
+
+function drawDfdConnections() {
+    const svg = document.getElementById('dfdSvg');
+    svg.innerHTML = '';
+    const canvas = document.getElementById('dfdCanvas');
+    const elements = canvas.querySelectorAll('.dfd-entity, .dfd-process, .dfd-store');
+    const positions = [];
+    elements.forEach(el => {
+        const rect = el.getBoundingClientRect();
+        const canvasRect = canvas.getBoundingClientRect();
+        positions.push({
+            el,
+            cx: rect.left - canvasRect.left + rect.width / 2,
+            cy: rect.top - canvasRect.top + rect.height / 2,
+            type: el.dataset.type
+        });
+    });
+    for (let i = 0; i < positions.length; i++) {
+        for (let j = i + 1; j < positions.length; j++) {
+            const a = positions[i], b = positions[j];
+            if ((a.type === 'entity' && b.type === 'process') || (a.type === 'process' && b.type === 'entity') ||
+                (a.type === 'process' && b.type === 'store') || (a.type === 'store' && b.type === 'process')) {
+                const dist = Math.sqrt((a.cx - b.cx) ** 2 + (a.cy - b.cy) ** 2);
+                if (dist < 300) {
+                    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                    line.setAttribute('x1', a.cx); line.setAttribute('y1', a.cy);
+                    line.setAttribute('x2', b.cx); line.setAttribute('y2', b.cy);
+                    line.setAttribute('stroke', 'rgba(148,163,184,0.3)');
+                    line.setAttribute('stroke-width', '2');
+                    line.setAttribute('stroke-dasharray', '5,5');
+                    svg.appendChild(line);
+                }
+            }
+        }
+    }
+}
+
+function loadDfdExample() {
+    clearDfd();
+    const canvas = document.getElementById('dfdCanvas');
+    const items = [
+        { type: 'entity', name: 'Customer', x: 30, y: 80 },
+        { type: 'entity', name: 'Admin', x: 30, y: 250 },
+        { type: 'process', name: 'Order\nProcess', x: 230, y: 80 },
+        { type: 'process', name: 'Auth\nService', x: 230, y: 250 },
+        { type: 'store', name: 'Orders DB', x: 430, y: 80 },
+        { type: 'store', name: 'Users DB', x: 430, y: 250 }
+    ];
+    items.forEach(item => {
+        const el = document.createElement('div');
+        el.className = 'dfd-' + item.type;
+        el.textContent = item.name;
+        el.dataset.type = item.type;
+        el.style.left = item.x + 'px';
+        el.style.top = item.y + 'px';
+        el.onmousedown = ev => { dfdDrag = {el, ox: ev.offsetX, oy: ev.offsetY}; };
+        el.ondblclick = () => { const n = prompt('Rename:', el.textContent); if (n) el.textContent = n; };
+        canvas.appendChild(el);
+    });
+    setTimeout(drawDfdConnections, 100);
+}
+
+// ============= SQL Explainer =============
+const SQL_EXAMPLES = {
+    select: "-- SELECT basics\nSELECT name, email, created_at\nFROM users\nWHERE is_active = 1\nORDER BY created_at DESC\nLIMIT 10;",
+    join: "-- JOIN types\nSELECT u.name, o.total, o.created_at\nFROM users u\nLEFT JOIN orders o ON u.id = o.user_id\nWHERE o.status = 'completed';",
+    aggregate: "-- Aggregate functions\nSELECT category, COUNT(*) as count,\n       AVG(price) as avg_price\nFROM products\nGROUP BY category\nHAVING COUNT(*) > 5\nORDER BY count DESC;",
+    subquery: "-- Subqueries\nSELECT name, email\nFROM users\nWHERE id IN (\n    SELECT user_id\n    FROM orders\n    WHERE total > 100\n);",
+    index: "-- Index usage\nSELECT * FROM orders\nWHERE user_id = 123\nAND created_at > '2024-01-01'\nORDER BY created_at DESC\nLIMIT 50;"
+};
+
+function loadSqlExample() {
+    const ex = document.getElementById('sqlExample').value;
+    if (ex && SQL_EXAMPLES[ex]) document.getElementById('sqlEditor').value = SQL_EXAMPLES[ex];
+}
+
+async function explainSql() {
+    const code = document.getElementById('sqlEditor').value;
+    if (!code.trim()) { showToast('Write SQL first!', 'error'); return; }
+    const btn = document.getElementById('sqlExplainBtn');
+    btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Analyzing...';
+    document.getElementById('sqlOutput').innerHTML = '<p class="text-gray-500">AI is analyzing your SQL query...</p>';
+    try {
+        const resp = await fetch('/api/programming/sql-explain', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({code, model: AI_MODEL}) });
+        const data = await resp.json();
+        if (data.success) {
+            document.getElementById('sqlOutput').innerHTML = formatMd(data.explanation);
+            document.getElementById('sqlLatency').textContent = `${data.latency_ms}ms · ${data.tokens} tokens`;
+        } else {
+            document.getElementById('sqlOutput').innerHTML = `<p class="text-red-400">Error: ${data.error}</p>`;
+        }
+    } catch (e) { document.getElementById('sqlOutput').innerHTML = `<p class="text-red-400">Error: ${e.message}</p>`; }
+    btn.disabled = false; btn.innerHTML = '<i class="fas fa-brain mr-1"></i> Explain';
+}
+
+// ============= DB Optimizer =============
+async function optimizeQuery() {
+    const code = document.getElementById('optInput').value;
+    if (!code.trim()) { showToast('Write SQL first!', 'error'); return; }
+    const btn = document.getElementById('optBtn');
+    btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Analyzing...';
+    document.getElementById('optOutput').innerHTML = '<p class="text-gray-500">AI is analyzing WHY and HOW to optimize...</p>';
+    try {
+        const resp = await fetch('/api/programming/optimize', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({code, model: AI_MODEL}) });
+        const data = await resp.json();
+        if (data.success) {
+            document.getElementById('optOutput').innerHTML = formatMd(data.optimization);
+            document.getElementById('optLatency').textContent = `${data.latency_ms}ms`;
+        } else {
+            document.getElementById('optOutput').innerHTML = `<p class="text-red-400">Error: ${data.error}</p>`;
+        }
+    } catch (e) { document.getElementById('optOutput').innerHTML = `<p class="text-red-400">Error: ${e.message}</p>`; }
+    btn.disabled = false; btn.innerHTML = '<i class="fas fa-magic mr-2"></i>Analyze & Optimize';
+}
+
+// ============= Utils =============
+function esc(t) { const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
+function formatMd(text) { return text.replace(/\*\*(.*?)\*\*/g, '<strong class="text-white">$1</strong>').replace(/`(.*?)`/g, '<code class="bg-gray-800 px-1.5 py-0.5 rounded text-cyan-400 text-xs">$1</code>').replace(/^### (.*$)/gm, '<h4 class="text-white font-semibold text-base mt-4 mb-2">$1</h4>').replace(/^## (.*$)/gm, '<h3 class="text-white font-semibold text-lg mt-5 mb-2">$1</h3>').replace(/^# (.*$)/gm, '<h2 class="text-white font-bold text-xl mt-5 mb-3">$1</h2>').replace(/^- (.*$)/gm, '<li class="text-gray-300 ml-4">$1</li>').replace(/^\d+\. (.*$)/gm, '<li class="text-gray-300 ml-4">$1</li>').replace(/\n\n/g, '<br><br>').replace(/\n/g, '<br>'); }
+function showToast(msg, type) { const t = document.getElementById('toast'); t.className = 'fixed bottom-6 right-6 text-white px-4 py-2.5 rounded-lg shadow-lg z-50 hidden flex items-center gap-2 text-sm font-medium ' + (type === 'error' ? 'bg-red-600' : 'bg-green-600'); document.getElementById('toastMsg').textContent = msg; t.classList.remove('hidden'); setTimeout(() => t.classList.add('hidden'), 3000); }
+
+// ============= Init =============
+initAlgo();
+</script>
+{% endblock %}

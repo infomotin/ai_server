@@ -216,14 +216,15 @@ class WhatsAppIntegration:
     def __init__(self, config: Dict[str, Any]):
         self.phone_number_id = config.get("phone_number_id", "")
         self.access_token = config.get("access_token", "")
+        self.business_phone = config.get("business_phone", "")
         self.headers = {"Authorization": f"Bearer {self.access_token}", "Content-Type": "application/json"}
 
     def test_connection(self) -> Dict[str, Any]:
         try:
-            resp = httpx.get(f"{self.API_BASE}/{self.phone_number_id}", headers=selfheaders, timeout=10)
+            resp = httpx.get(f"{self.API_BASE}/{self.phone_number_id}", headers=self.headers, timeout=10)
             data = resp.json()
             if "id" in data:
-                return {"success": True, "message": f"Phone: {data.get('display_phone_number', 'unknown')}"}
+                return {"success": True, "message": f"Phone: {data.get('display_phone_number', 'unknown')}", "phone": data.get('display_phone_number', ''), "verified_name": data.get('verified_name', '')}
             return {"success": False, "message": data.get("error", {}).get("message", "Unknown error")}
         except Exception as e:
             return {"success": False, "message": str(e)[:200]}
@@ -241,6 +242,32 @@ class WhatsAppIntegration:
             return {"success": "messages" in data, "message": "Sent" if "messages" in data else data.get("error", {}).get("message", "Failed")}
         except Exception as e:
             return {"success": False, "message": str(e)[:200]}
+
+    def send_template(self, to: str, template_name: str, language: str = "en", params: list = None) -> Dict[str, Any]:
+        try:
+            components = []
+            if params:
+                components.append({"type": "body", "parameters": [{"type": "text", "text": str(p)} for p in params]})
+            payload = {
+                "messaging_product": "whatsapp",
+                "to": to,
+                "type": "template",
+                "template": {"name": template_name, "language": {"code": language}, "components": components}
+            }
+            resp = httpx.post(f"{self.API_BASE}/{self.phone_number_id}/messages", headers=self.headers, json=payload, timeout=10)
+            data = resp.json()
+            return {"success": "messages" in data, "message": "Template sent" if "messages" in data else data.get("error", {}).get("message", "Failed")}
+        except Exception as e:
+            return {"success": False, "message": str(e)[:200]}
+
+    @staticmethod
+    def get_qr_link(business_phone: str, message: str = "") -> str:
+        phone = ''.join(c for c in business_phone if c.isdigit() or c == '+')
+        phone = phone.lstrip('+')
+        if message:
+            import urllib.parse
+            return f"https://wa.me/{phone}?text={urllib.parse.quote(message)}"
+        return f"https://wa.me/{phone}"
 
 
 class FacebookIntegration:
@@ -342,3 +369,41 @@ def get_integration(integration_type: str, config: Dict[str, Any]):
     if cls:
         return cls(config)
     return None
+
+
+class IntegrationsService:
+    def test_integration(self, db, integration_id: str, user_id: int) -> Dict[str, Any]:
+        from src.models.database import AssistantIntegration
+        integration = db.query(AssistantIntegration).filter(AssistantIntegration.id == integration_id).first()
+        if not integration:
+            return {"success": False, "message": "Integration not found"}
+        config = json.loads(integration.config) if integration.config else {}
+        itype = integration.integration_type
+        if itype in ("imap", "smtp", "email"):
+            client = EmailIntegration(config)
+            res = client.test_connection()
+        elif itype == "telegram":
+            client = TelegramIntegration(config)
+            res = client.test_connection()
+        elif itype == "whatsapp_api":
+            return {"success": False, "message": "WhatsApp API test not supported yet"}
+        elif itype == "facebook_api":
+            client = FacebookIntegration(config)
+            res = client.test_connection()
+        elif itype == "slack":
+            return {"success": True, "message": "Slack integration configured (API test requires bot presence)"}
+        elif itype == "github":
+            return {"success": True, "message": "GitHub token saved"}
+        elif itype == "notification":
+            return {"success": True, "message": "Notification integration saved"}
+        else:
+            return {"success": True, "message": f"{itype} integration saved"}
+        if res.get("success"):
+            integration.status = "connected"
+        else:
+            integration.status = "error"
+        db.commit()
+        return res
+
+
+integrations_service = IntegrationsService()

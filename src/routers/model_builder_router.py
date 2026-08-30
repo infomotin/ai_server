@@ -232,3 +232,138 @@ async def create_lightweight_model(
         custom_prompt=data.custom_prompt
     )
     return CustomModelResponse.model_validate(model)
+
+
+class ModelTestRequest(BaseModel):
+    message: str = Field(..., min_length=1, max_length=4000)
+    temperature: Optional[float] = None
+
+
+class ModelCloneRequest(BaseModel):
+    name: str = Field(..., min_length=1, max_length=100)
+
+
+@router.post("/models/{model_id}/test")
+async def test_custom_model(
+    model_id: str,
+    data: ModelTestRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db_session)
+):
+    model = model_builder_service.get_custom_model(db, model_id, current_user.id)
+    if not model:
+        raise HTTPException(status_code=404, detail="Model not found")
+
+    full_prompt = model_builder_service.build_system_prompt_for_model(model)
+    temp = data.temperature if data.temperature is not None else model.temperature
+
+    try:
+        import httpx
+        async with httpx.AsyncClient(timeout=60) as client:
+            resp = await client.post(
+                "http://localhost:11434/api/chat",
+                json={
+                    "model": model.base_model,
+                    "messages": [
+                        {"role": "system", "content": full_prompt},
+                        {"role": "user", "content": data.message}
+                    ],
+                    "stream": False,
+                    "options": {"temperature": temp, "num_predict": model.max_tokens}
+                }
+            )
+            if resp.status_code == 200:
+                result = resp.json()
+                reply = result.get("message", {}).get("content", "No response")
+                return {
+                    "reply": reply,
+                    "model": model.base_model,
+                    "model_name": model.name,
+                    "total_duration": result.get("total_duration", 0),
+                    "eval_count": result.get("eval_count", 0)
+                }
+            else:
+                raise HTTPException(status_code=502, detail=f"Ollama error: {resp.text}")
+    except httpx.ConnectError:
+        raise HTTPException(status_code=503, detail="Ollama server not reachable")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/models/{model_id}/logs")
+async def get_model_logs(
+    model_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db_session)
+):
+    model = model_builder_service.get_custom_model(db, model_id, current_user.id)
+    if not model:
+        raise HTTPException(status_code=404, detail="Model not found")
+    return {
+        "model_id": model.id,
+        "model_name": model.name,
+        "status": model.status,
+        "training_progress": model.training_progress,
+        "training_log": model.training_log or "",
+        "error_message": model.error_message,
+        "total_chars": model.total_chars,
+        "chunk_count": model.chunk_count,
+        "completed_at": model.completed_at.isoformat() if model.completed_at else None
+    }
+
+
+@router.post("/models/{model_id}/clone")
+async def clone_custom_model(
+    model_id: str,
+    data: ModelCloneRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db_session)
+):
+    original = model_builder_service.get_custom_model(db, model_id, current_user.id)
+    if not original:
+        raise HTTPException(status_code=404, detail="Model not found")
+
+    cloned = model_builder_service.clone_model(db, original, current_user.id, data.name)
+    return CustomModelResponse.model_validate(cloned)
+
+
+@router.get("/models/{model_id}/export")
+async def export_custom_model(
+    model_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db_session)
+):
+    model = model_builder_service.get_custom_model(db, model_id, current_user.id)
+    if not model:
+        raise HTTPException(status_code=404, detail="Model not found")
+
+    full_prompt = model_builder_service.build_system_prompt_for_model(model)
+    return {
+        "name": model.name,
+        "description": model.description,
+        "domain": model.domain,
+        "base_model": model.base_model,
+        "system_prompt": model.system_prompt,
+        "full_prompt": full_prompt,
+        "temperature": model.temperature,
+        "max_tokens": model.max_tokens,
+        "restricted_topics": model.restricted_topics or [],
+        "blocked_topics": model.blocked_topics or [],
+        "total_chars": model.total_chars,
+        "chunk_count": model.chunk_count,
+        "knowledge_text": model.knowledge_text[:5000] if model.knowledge_text else None,
+        "modelfile": f"FROM {model.base_model}\nSYSTEM {full_prompt[:4096]}\nPARAMETER temperature {model.temperature}\nPARAMETER num_predict {model.max_tokens}"
+    }
+
+
+@router.put("/models/{model_id}")
+async def update_model_settings(
+    model_id: str,
+    data: CustomModelUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db_session)
+):
+    model = model_builder_service.update_custom_model(db, model_id, current_user.id, data)
+    if not model:
+        raise HTTPException(status_code=404, detail="Model not found")
+    return CustomModelResponse.model_validate(model)

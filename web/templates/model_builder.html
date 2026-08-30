@@ -1,414 +1,480 @@
 {% extends "base.html" %}
 {% block title %}OpenLocalAI - Model Builder{% endblock %}
-{% block header_title %}Custom Model Builder{% endblock %}
+{% block header_title %}Model Builder{% endblock %}
 
 {% block content %}
+<style>
+.mb-builder{position:relative}
+.step-indicator{display:flex;align-items:center;gap:0;margin-bottom:24px}
+.step-dot{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;border:2px solid #334155;color:#64748b;background:#0f172a;transition:all .3s;position:relative;z-index:2}
+.step-dot.active{border-color:#6366f1;color:#fff;background:#6366f1;box-shadow:0 0 20px rgba(99,102,241,.4)}
+.step-dot.done{border-color:#10b981;color:#fff;background:#10b981}
+.step-line{flex:1;height:2px;background:#334155;position:relative;z-index:1}
+.step-line.done{background:#10b981}
+.glass-panel{background:rgba(30,41,59,.6);backdrop-filter:blur(14px);border:1px solid rgba(148,163,184,.12);border-radius:16px;padding:24px}
+.model-card{background:#1e293b;border:1px solid #334155;border-radius:14px;padding:20px;transition:all .3s;cursor:default}
+.model-card:hover{border-color:rgba(99,102,241,.4);box-shadow:0 8px 32px rgba(0,0,0,.3);transform:translateY(-2px)}
+.model-card .actions{opacity:0;transition:opacity .2s}
+.model-card:hover .actions{opacity:1}
+.domain-chip{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:10px;border:1px solid #334155;font-size:13px;color:#94a3b8;cursor:pointer;transition:all .2s;background:#0f172a}
+.domain-chip:hover{border-color:#6366f1;color:#e2e8f0}
+.domain-chip.selected{border-color:#6366f1;background:rgba(99,102,241,.12);color:#c4b5fd}
+.chat-bubble{max-width:80%;padding:10px 14px;border-radius:12px;font-size:13px;line-height:1.5;word-break:break-word}
+.chat-user{background:#6366f1;color:#fff;margin-left:auto;border-bottom-right-radius:4px}
+.chat-ai{background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-bottom-left-radius:4px}
+.log-line{font-family:'JetBrains Mono',monospace;font-size:12px;line-height:1.6;color:#94a3b8;padding:2px 0}
+.log-line.error{color:#f87171}
+.log-line.success{color:#34d399}
+.progress-ring{transform:rotate(-90deg)}
+.progress-ring circle{transition:stroke-dashoffset .6s ease}
+.fade-in{animation:fadeIn .3s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.tab-btn{padding:8px 16px;border-radius:8px;font-size:13px;font-weight:500;color:#94a3b8;cursor:pointer;transition:all .2s;border:none;background:transparent}
+.tab-btn:hover{color:#e2e8f0;background:rgba(51,65,85,.5)}
+.tab-btn.active{color:#fff;background:#6366f1}
+</style>
+
 <!-- Stats Row -->
-<div class="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-6">
-    <div class="stat-card">
+<div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+    <div class="stat-card group">
         <div class="flex items-center justify-between mb-2">
             <span class="text-gray-400 text-sm">Custom Models</span>
-            <div class="w-9 h-9 bg-purple-600/20 rounded-lg flex items-center justify-center"><i class="fas fa-hammer text-purple-400"></i></div>
+            <div class="w-9 h-9 bg-purple-600/20 rounded-lg flex items-center justify-center group-hover:bg-purple-600/30 transition"><i class="fas fa-hammer text-purple-400"></i></div>
         </div>
-        <p class="text-2xl font-bold text-white">{{ stats.total_models|default(0) }}</p>
-        <p class="text-xs text-gray-500 mt-1">Built models</p>
+        <p class="text-2xl font-bold text-white" id="statTotal">{{ stats.total_models|default(0) }}</p>
+        <p class="text-xs text-gray-500 mt-1">Built & ready</p>
     </div>
-    <div class="stat-card">
+    <div class="stat-card group">
         <div class="flex items-center justify-between mb-2">
             <span class="text-gray-400 text-sm">Ready</span>
-            <div class="w-9 h-9 bg-green-600/20 rounded-lg flex items-center justify-center"><i class="fas fa-check-circle text-green-400"></i></div>
+            <div class="w-9 h-9 bg-green-600/20 rounded-lg flex items-center justify-center group-hover:bg-green-600/30 transition"><i class="fas fa-check-circle text-green-400"></i></div>
         </div>
         <p class="text-2xl font-bold text-white">{{ stats.ready_models|default(0) }}</p>
-        <p class="text-xs text-gray-500 mt-1">Ready to use</p>
+        <p class="text-xs text-gray-500 mt-1">Deployable</p>
     </div>
-    <div class="stat-card">
+    <div class="stat-card group">
         <div class="flex items-center justify-between mb-2">
             <span class="text-gray-400 text-sm">Training</span>
-            <div class="w-9 h-9 bg-blue-600/20 rounded-lg flex items-center justify-center"><i class="fas fa-spinner text-blue-400"></i></div>
+            <div class="w-9 h-9 bg-blue-600/20 rounded-lg flex items-center justify-center group-hover:bg-blue-600/30 transition"><i class="fas fa-spinner text-blue-400"></i></div>
         </div>
         <p class="text-2xl font-bold text-white">{{ stats.training_models|default(0) }}</p>
         <p class="text-xs text-gray-500 mt-1">In progress</p>
     </div>
-    <div class="stat-card">
+    <div class="stat-card group">
         <div class="flex items-center justify-between mb-2">
             <span class="text-gray-400 text-sm">Knowledge</span>
-            <div class="w-9 h-9 bg-amber-600/20 rounded-lg flex items-center justify-center"><i class="fas fa-database text-amber-400"></i></div>
+            <div class="w-9 h-9 bg-amber-600/20 rounded-lg flex items-center justify-center group-hover:bg-amber-600/30 transition"><i class="fas fa-database text-amber-400"></i></div>
         </div>
         <p class="text-2xl font-bold text-white">{{ "%.1f"|format(stats.total_knowledge_chars|default(0) / 1000) }}K</p>
-        <p class="text-xs text-gray-500 mt-1">Characters trained</p>
+        <p class="text-xs text-gray-500 mt-1">Chars trained</p>
     </div>
 </div>
 
-<!-- Main Layout -->
-<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+<!-- Main Layout: Builder + Gallery -->
+<div class="grid grid-cols-1 xl:grid-cols-5 gap-6">
 
-    <!-- Left Column: Build New Model -->
-    <div class="lg:col-span-1 space-y-6">
-        <div class="card">
-            <div class="flex items-center gap-3 mb-5">
-                <div class="w-10 h-10 bg-purple-600/20 rounded-xl flex items-center justify-center">
-                    <i class="fas fa-hammer text-purple-400"></i>
-                </div>
-                <div>
-                    <h3 class="text-white font-semibold">Build New Model</h3>
-                    <p class="text-xs text-gray-500">Create a specialized AI model from scratch</p>
-                </div>
+    <!-- Builder (Left 2 cols) -->
+    <div class="xl:col-span-2 space-y-6">
+
+        <!-- Step Wizard -->
+        <div class="glass-panel">
+            <h3 class="text-white font-semibold mb-4 flex items-center gap-2">
+                <i class="fas fa-wand-magic-sparkles text-purple-400"></i> Build New Model
+            </h3>
+
+            <!-- Step Indicators -->
+            <div class="step-indicator mb-6">
+                <div class="step-dot active" id="stepDot1">1</div>
+                <div class="step-line" id="stepLine1"></div>
+                <div class="step-dot" id="stepDot2">2</div>
+                <div class="step-line" id="stepLine2"></div>
+                <div class="step-dot" id="stepDot3">3</div>
             </div>
 
-            <form method="POST" action="/model-builder/create" class="space-y-4" id="buildForm">
-                <!-- Step 1: Choose Domain -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-300 mb-2">1. Choose Domain <span class="text-red-400">*</span></label>
-                    <div class="grid grid-cols-2 gap-2" id="domainGrid">
-                        {% for tmpl in templates %}
-                        <button type="button" onclick="selectDomain('{{ tmpl.domain }}')" 
-                            class="domain-btn p-3 rounded-lg border border-gray-700 text-left transition hover:border-purple-500/50"
-                            data-domain="{{ tmpl.domain }}" data-name="{{ tmpl.name }}" data-desc="{{ tmpl.description }}"
-                            data-prompt="{{ tmpl.default_prompt|e }}" data-topics="{{ tmpl.default_topics|join(', ') }}"
-                            data-model="{{ tmpl.suggested_base_model }}">
-                            <i class="{{ tmpl.icon }} text-{{ tmpl.color }}-400 text-sm mb-1"></i>
-                            <p class="text-xs text-white font-medium">{{ tmpl.name }}</p>
-                            <p class="text-[9px] text-gray-500 leading-tight">{{ tmpl.description[:50] }}...</p>
-                        </button>
-                        {% endfor %}
-                    </div>
-                    <input type="hidden" name="domain" id="selectedDomain" value="custom">
+            <!-- Step 1: Choose Domain -->
+            <div id="step1" class="fade-in">
+                <p class="text-sm text-gray-400 mb-3">Pick a domain template or go custom:</p>
+                <div class="grid grid-cols-2 gap-2 mb-4" id="domainGrid">
+                    {% for tmpl in templates %}
+                    <button type="button" onclick="selectDomain('{{ tmpl.domain }}')" 
+                        class="domain-chip text-left" data-domain="{{ tmpl.domain }}"
+                        data-name="{{ tmpl.name }}" data-desc="{{ tmpl.description }}"
+                        data-prompt="{{ tmpl.default_prompt|e }}" data-topics="{{ tmpl.default_topics|join(', ') }}"
+                        data-model="{{ tmpl.suggested_base_model }}">
+                        <i class="{{ tmpl.icon }} text-{{ tmpl.color }}-400 text-sm"></i>
+                        <span class="truncate text-xs">{{ tmpl.name }}</span>
+                    </button>
+                    {% endfor %}
                 </div>
-
-                <!-- Step 2: Model Details -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-300 mb-1.5">2. Model Name <span class="text-red-400">*</span></label>
-                    <input type="text" name="name" id="modelName" required class="input-field" placeholder="e.g. My PDF Reader">
-                </div>
-
-                <div>
-                    <label class="block text-sm font-medium text-gray-300 mb-1.5">Description</label>
-                    <input type="text" name="description" id="modelDesc" class="input-field" placeholder="What this model does">
-                </div>
-
-                <div>
-                    <label class="block text-sm font-medium text-gray-300 mb-1.5">Base Model</label>
-                    <select name="base_model" id="baseModel" class="input-field">
-                        <option value="qwen2.5:0.5b">Qwen 2.5 0.5B (Lightweight)</option>
-                        <option value="llama3.2:1b" selected>Llama 3.2 1B (Balanced)</option>
-                        <option value="llama3.2:3b">Llama 3.2 3B (Balanced)</option>
-                        <option value="qwen2.5:3b">Qwen 2.5 3B (Balanced)</option>
-                        <option value="phi3:mini">Phi-3 Mini (Balanced)</option>
-                        <option value="codellama:3.5">Code Llama 3.5 (Coding)</option>
-                    </select>
-                </div>
-
-                <div>
-                    <label class="block text-sm font-medium text-gray-300 mb-1.5">3. System Prompt <span class="text-red-400">*</span></label>
-                    <textarea name="system_prompt" id="systemPrompt" rows="6" required class="input-field font-mono text-sm" placeholder="Define how the model should behave..."></textarea>
-                    <span class="text-[10px] text-gray-600" id="promptChars">0 chars</span>
-                </div>
-
-                <div class="grid grid-cols-2 gap-3">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-300 mb-1.5">Temperature</label>
-                        <input type="number" name="temperature" value="0.7" min="0" max="2" step="0.1" class="input-field">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-300 mb-1.5">Max Tokens</label>
-                        <input type="number" name="max_tokens" value="1000" min="1" max="4096" class="input-field">
-                    </div>
-                </div>
-
-                <div>
-                    <label class="block text-sm font-medium text-gray-300 mb-1.5">Allowed Topics (comma-separated)</label>
-                    <input type="text" name="restricted_topics" id="restrictedTopics" class="input-field" placeholder="e.g. pricing, orders, inventory">
-                </div>
-
-                <div>
-                    <label class="block text-sm font-medium text-gray-300 mb-1.5">Blocked Topics (comma-separated)</label>
-                    <input type="text" name="blocked_topics" class="input-field" placeholder="e.g. politics, religion">
-                </div>
-
-                <button type="submit" class="btn btn-primary w-full py-3">
-                    <i class="fas fa-hammer mr-2"></i>Create Model
+                <button onclick="goStep(2)" class="btn btn-primary w-full py-2.5" id="step1Next" disabled>
+                    Next: Configure <i class="fas fa-arrow-right ml-1"></i>
                 </button>
-            </form>
+            </div>
+
+            <!-- Step 2: Configure -->
+            <div id="step2" class="hidden fade-in">
+                <form id="buildForm" action="/model-builder/create" method="POST" class="space-y-4">
+                    <input type="hidden" name="domain" id="selectedDomain" value="custom">
+
+                    <div>
+                        <label class="block text-xs font-medium text-gray-400 mb-1">Model Name <span class="text-red-400">*</span></label>
+                        <input type="text" name="name" id="modelName" required class="input-field text-sm" placeholder="e.g. My PDF Reader">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-medium text-gray-400 mb-1">Description</label>
+                        <input type="text" name="description" id="modelDesc" class="input-field text-sm" placeholder="What this model does">
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-400 mb-1">Base Model</label>
+                            <select name="base_model" id="baseModel" class="input-field text-sm">
+                                <option value="qwen2.5:0.5b">Qwen 2.5 0.5B</option>
+                                <option value="llama3.2:1b" selected>Llama 3.2 1B</option>
+                                <option value="llama3.2:3b">Llama 3.2 3B</option>
+                                <option value="qwen2.5:3b">Qwen 2.5 3B</option>
+                                <option value="phi3:mini">Phi-3 Mini</option>
+                                <option value="codellama:3.5">Code Llama 3.5</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-400 mb-1">Temperature</label>
+                            <input type="number" name="temperature" value="0.7" min="0" max="2" step="0.1" class="input-field text-sm">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-medium text-gray-400 mb-1">System Prompt <span class="text-red-400">*</span></label>
+                        <textarea name="system_prompt" id="systemPrompt" rows="5" required class="input-field text-sm font-mono" placeholder="Define how the model should behave..."></textarea>
+                        <div class="flex justify-between mt-1">
+                            <span class="text-[10px] text-gray-600" id="promptChars">0 chars</span>
+                            <button type="button" onclick="improvePrompt()" class="text-[10px] text-indigo-400 hover:text-indigo-300"><i class="fas fa-magic mr-1"></i>Improve with AI</button>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-medium text-gray-400 mb-1">Max Tokens</label>
+                        <input type="number" name="max_tokens" value="1000" min="1" max="4096" class="input-field text-sm">
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-400 mb-1">Allowed Topics</label>
+                            <input type="text" name="restricted_topics" id="restrictedTopics" class="input-field text-sm" placeholder="pricing, orders">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-400 mb-1">Blocked Topics</label>
+                            <input type="text" name="blocked_topics" class="input-field text-sm" placeholder="politics, religion">
+                        </div>
+                    </div>
+
+                    <div class="flex gap-3">
+                        <button type="button" onclick="goStep(1)" class="btn bg-gray-700 hover:bg-gray-600 text-white py-2.5 flex-1">
+                            <i class="fas fa-arrow-left mr-1"></i> Back
+                        </button>
+                        <button type="button" onclick="goStep(3)" class="btn btn-primary py-2.5 flex-1">
+                            Next: Knowledge <i class="fas fa-arrow-right ml-1"></i>
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Step 3: Knowledge + Create -->
+            <div id="step3" class="hidden fade-in">
+                <div class="space-y-4">
+                    <div class="p-4 bg-gray-800/50 rounded-xl border border-gray-700/50">
+                        <h4 class="text-white text-sm font-semibold mb-3"><i class="fas fa-brain text-purple-400 mr-2"></i>Knowledge Training (Optional)</h4>
+                        <p class="text-xs text-gray-500 mb-3">Add training data now or later. Your model will be created as "ready" and can be trained after.</p>
+
+                        <!-- Training source tabs -->
+                        <div class="flex gap-1 mb-3 bg-gray-900 p-1 rounded-lg">
+                            <button type="button" onclick="showTrainTab('pdf')" class="tab-btn active flex-1 text-xs" id="tTabPdf"><i class="fas fa-file-pdf mr-1"></i>PDF</button>
+                            <button type="button" onclick="showTrainTab('text')" class="tab-btn flex-1 text-xs" id="tTabText"><i class="fas fa-align-left mr-1"></i>Text</button>
+                            <button type="button" onclick="showTrainTab('web')" class="tab-btn flex-1 text-xs" id="tTabWeb"><i class="fas fa-globe mr-1"></i>Web</button>
+                        </div>
+
+                        <div id="tPanelPdf">
+                            <label class="block text-xs text-gray-500 mb-1">Upload PDF</label>
+                            <input type="file" name="train_file" accept=".pdf" class="input-field text-sm">
+                        </div>
+                        <div id="tPanelText" class="hidden">
+                            <label class="block text-xs text-gray-500 mb-1">Paste Text</label>
+                            <textarea name="train_text_pre" rows="4" class="input-field text-sm" placeholder="Paste FAQs, docs, data..."></textarea>
+                        </div>
+                        <div id="tPanelWeb" class="hidden">
+                            <label class="block text-xs text-gray-500 mb-1">Website URL</label>
+                            <input type="url" name="train_url_pre" class="input-field text-sm" placeholder="https://example.com">
+                            <label class="block text-xs text-gray-500 mt-2 mb-1">Max Pages</label>
+                            <input type="number" name="max_pages_pre" value="10" min="1" max="50" class="input-field text-sm">
+                        </div>
+                    </div>
+
+                    <!-- Preview -->
+                    <div class="p-4 bg-gray-900/80 rounded-xl border border-gray-700/50" id="modelPreview">
+                        <h4 class="text-xs text-gray-500 uppercase tracking-wider mb-2"><i class="fas fa-eye mr-1"></i>Preview</h4>
+                        <div class="space-y-2 text-sm">
+                            <div class="flex justify-between"><span class="text-gray-500">Name:</span><span class="text-white" id="prevName">-</span></div>
+                            <div class="flex justify-between"><span class="text-gray-500">Domain:</span><span class="text-white" id="prevDomain">-</span></div>
+                            <div class="flex justify-between"><span class="text-gray-500">Base:</span><span class="text-white" id="prevBase">-</span></div>
+                            <div class="flex justify-between"><span class="text-gray-500">Prompt:</span><span class="text-white truncate max-w-[200px]" id="prevPrompt">-</span></div>
+                        </div>
+                    </div>
+
+                    <div class="flex gap-3">
+                        <button type="button" onclick="goStep(2)" class="btn bg-gray-700 hover:bg-gray-600 text-white py-2.5 flex-1">
+                            <i class="fas fa-arrow-left mr-1"></i> Back
+                        </button>
+                        <button type="button" onclick="submitCreate()" class="btn btn-primary py-2.5 flex-1" id="createBtn">
+                            <i class="fas fa-hammer mr-1"></i> Create Model
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
 
-        <!-- Lightweight Model Creator -->
-        <div class="card">
-            <div class="flex items-center gap-3 mb-5">
-                <div class="w-10 h-10 bg-green-600/20 rounded-xl flex items-center justify-center">
-                    <i class="fas fa-feather-pointed text-green-400"></i>
-                </div>
+        <!-- Quick Lightweight Builder -->
+        <div class="glass-panel">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="w-9 h-9 bg-green-600/20 rounded-lg flex items-center justify-center"><i class="fas fa-feather-pointed text-green-400"></i></div>
                 <div>
-                    <h3 class="text-white font-semibold">Quick Lightweight Model</h3>
-                    <p class="text-xs text-gray-500">Ultra-small models (~30MB) for single tasks</p>
+                    <h3 class="text-white font-semibold text-sm">Quick Lightweight Model</h3>
+                    <p class="text-[10px] text-gray-500">Single-task bots (~30MB)</p>
                 </div>
             </div>
-
-            <form method="POST" action="/model-builder/lightweight/create" class="space-y-4" id="lightweightForm">
-                <div>
-                    <label class="block text-sm font-medium text-gray-300 mb-2">Choose Task Type <span class="text-red-400">*</span></label>
-                    <div class="grid grid-cols-2 gap-2" id="taskGrid">
-                        {% set lw_tasks = [
-                            ("simple_math", "fas fa-calculator", "green", "Simple Math", "Basic arithmetic only"),
-                            ("greeting_bot", "fas fa-hand-wave", "blue", "Greeting Bot", "Hello and pleasantries"),
-                            ("color_sayer", "fas fa-palette", "purple", "Color Expert", "Color names and codes"),
-                            ("yes_no_bot", "fas fa-check-circle", "cyan", "Yes/No Bot", "One-word answers only"),
-                            ("word_counter", "fas fa-font", "amber", "Word Counter", "Count words/chars"),
-                            ("date_helper", "fas fa-calendar", "indigo", "Date Calculator", "Date math only"),
-                            ("garment_specialist", "fas fa-shirt", "purple", "Garment Expert", "Garment/textile only"),
-                            ("account_bot", "fas fa-coins", "green", "Accounting Bot", "Accounting calculations")
-                        ] %}
-                        {% for task_type, icon, color, name, desc in lw_tasks %}
-                        <button type="button" onclick="selectTask('{{ task_type }}', '{{ name }}', '{{ desc }}')" 
-                            class="task-btn p-2 rounded-lg border border-gray-700 text-left transition hover:border-green-500/50"
-                            data-type="{{ task_type }}" data-name="{{ name }}">
-                            <i class="{{ icon }} text-{{ color }}-400 text-xs mb-1"></i>
-                            <p class="text-[10px] text-white font-medium">{{ name }}</p>
-                            <p class="text-[9px] text-gray-500 leading-tight">{{ desc }}</p>
-                        </button>
-                        {% endfor %}
-                    </div>
-                    <input type="hidden" name="task_type" id="selectedTaskType" value="">
+            <form id="lightweightForm" action="/model-builder/lightweight/create" method="POST" class="space-y-3">
+                <div class="grid grid-cols-4 gap-1.5" id="taskGrid">
+                    {% set lw_tasks = [
+                        ("simple_math", "fas fa-calculator", "green", "Math"),
+                        ("greeting_bot", "fas fa-hand-wave", "blue", "Greet"),
+                        ("color_sayer", "fas fa-palette", "purple", "Color"),
+                        ("yes_no_bot", "fas fa-check-circle", "cyan", "Yes/No"),
+                        ("word_counter", "fas fa-font", "amber", "Words"),
+                        ("date_helper", "fas fa-calendar", "indigo", "Dates"),
+                        ("garment_specialist", "fas fa-shirt", "purple", "Garment"),
+                        ("account_bot", "fas fa-coins", "green", "Account")
+                    ] %}
+                    {% for task_type, icon, color, label in lw_tasks %}
+                    <button type="button" onclick="selectTask('{{ task_type }}', '{{ label }}')"
+                        class="p-2 rounded-lg border border-gray-700 text-center transition hover:border-green-500/50 hover:bg-green-600/5 task-btn"
+                        data-type="{{ task_type }}">
+                        <i class="{{ icon }} text-{{ color }}-400 text-xs"></i>
+                        <p class="text-[9px] text-gray-400 mt-0.5">{{ label }}</p>
+                    </button>
+                    {% endfor %}
                 </div>
-
-                <div>
-                    <label class="block text-sm font-medium text-gray-300 mb-1.5">Model Name <span class="text-red-400">*</span></label>
-                    <input type="text" name="name" id="lwModelName" required class="input-field" placeholder="e.g. My Math Bot">
-                </div>
-
-                <div>
-                    <label class="block text-sm font-medium text-gray-300 mb-1.5">Base Model</label>
-                    <select name="base_model" class="input-field">
-                        <option value="qwen2.5:0.5b" selected>Qwen 2.5 0.5B (~397MB)</option>
-                        <option value="llama3.2:1b">Llama 3.2 1B (~1.3GB)</option>
-                    </select>
-                </div>
-
-                <div>
-                    <label class="block text-sm font-medium text-gray-300 mb-1.5">Custom Knowledge (optional)</label>
-                    <textarea name="custom_knowledge" rows="3" class="input-field text-sm" placeholder="Add specific knowledge for this model (FAQs, data, etc.)"></textarea>
-                    <p class="text-[10px] text-gray-600 mt-1">Add domain-specific data the model should know</p>
-                </div>
-
-                <div class="p-3 bg-green-900/20 border border-green-700/50 rounded-lg">
-                    <p class="text-xs text-green-300"><i class="fas fa-info-circle mr-1"></i>Lightweight models use strict system prompts that force the model to ONLY answer questions in its domain. Anything else gets rejected.</p>
-                </div>
-
-                <button type="submit" class="bg-green-600 hover:bg-green-500 text-white w-full py-3 rounded-lg font-medium transition">
-                    <i class="fas fa-feather-pointed mr-2"></i>Create Lightweight Model
+                <input type="hidden" name="task_type" id="selectedTaskType" value="">
+                <input type="text" name="name" id="lwModelName" class="input-field text-sm" placeholder="Model name" required>
+                <select name="base_model" class="input-field text-sm">
+                    <option value="qwen2.5:0.5b" selected>Qwen 2.5 0.5B (~397MB)</option>
+                    <option value="llama3.2:1b">Llama 3.2 1B (~1.3GB)</option>
+                </select>
+                <textarea name="custom_knowledge" rows="2" class="input-field text-sm" placeholder="Optional knowledge..."></textarea>
+                <button type="submit" class="w-full py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg text-sm font-medium transition">
+                    <i class="fas fa-feather-pointed mr-1"></i>Create Quick Model
                 </button>
             </form>
         </div>
     </div>
 
-    <!-- Right Column: Existing Models -->
-    <div class="lg:col-span-2 space-y-6">
+    <!-- Model Gallery (Right 3 cols) -->
+    <div class="xl:col-span-3 space-y-4">
         <div class="flex items-center justify-between">
             <h3 class="text-white font-semibold flex items-center gap-2">
-                <i class="fas fa-list text-gray-400"></i> Your Custom Models
+                <i class="fas fa-layer-group text-gray-400"></i> Your Models
+                <span class="text-xs text-gray-500 font-normal">({{ custom_models|length }})</span>
             </h3>
-            {% if custom_models %}
-            <input type="text" id="modelSearch" class="input-field py-1.5 px-3 text-sm w-48" placeholder="Search models..." onkeyup="filterModels()">
-            {% endif %}
+            <div class="flex items-center gap-2">
+                {% if custom_models %}
+                <input type="text" id="modelSearch" class="input-field py-1.5 px-3 text-xs w-40" placeholder="Search..." onkeyup="filterModels()">
+                {% endif %}
+                <button onclick="refreshModels()" class="p-2 text-gray-500 hover:text-white hover:bg-gray-700 rounded-lg transition" title="Refresh">
+                    <i class="fas fa-sync-alt text-sm"></i>
+                </button>
+            </div>
         </div>
 
         {% if custom_models %}
-        <div class="space-y-4" id="modelsList">
+        <div class="space-y-3" id="modelsList">
             {% for model in custom_models %}
-            <div class="card group hover:border-purple-500/30 transition-all model-card" data-name="{{ model.name|lower }}" data-domain="{{ model.domain }}">
-                <!-- Top Row -->
+            <div class="model-card" data-name="{{ model.name|lower }}" data-domain="{{ model.domain }}" data-id="{{ model.id }}">
                 <div class="flex items-start justify-between mb-3">
                     <div class="flex items-center gap-3 min-w-0">
-                        <div class="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0
-                            {% if model.status == 'ready' %}bg-green-600/20
-                            {% elif model.status == 'training' %}bg-blue-600/20
-                            {% elif model.status == 'failed' %}bg-red-600/20
-                            {% else %}bg-gray-700/50{% endif %}">
-                            {% if model.domain == 'pdf_reader' %}
-                            <i class="fas fa-file-pdf text-red-400"></i>
-                            {% elif model.domain == 'accounting' %}
-                            <i class="fas fa-calculator text-green-400"></i>
-                            {% elif model.domain == 'garments' %}
-                            <i class="fas fa-shirt text-purple-400"></i>
-                            {% elif model.domain == 'medical' %}
-                            <i class="fas fa-heart-pulse text-cyan-400"></i>
-                            {% elif model.domain == 'legal' %}
-                            <i class="fas fa-gavel text-amber-400"></i>
-                            {% elif model.domain == 'education' %}
-                            <i class="fas fa-graduation-cap text-blue-400"></i>
-                            {% elif model.domain == 'coding' %}
-                            <i class="fas fa-code text-indigo-400"></i>
-                            {% elif model.domain == 'customer_support' %}
-                            <i class="fas fa-headset text-teal-400"></i>
-                            {% else %}
-                            <i class="fas fa-hammer text-gray-400"></i>
-                            {% endif %}
+                        <div class="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0
+                            {% if model.status == 'ready' %}bg-green-600/20{% elif model.status == 'training' %}bg-blue-600/20 animate-pulse{% elif model.status == 'failed' %}bg-red-600/20{% else %}bg-gray-700/50{% endif %}">
+                            {% if model.domain == 'pdf_reader' %}<i class="fas fa-file-pdf text-red-400"></i>
+                            {% elif model.domain == 'accounting' %}<i class="fas fa-calculator text-green-400"></i>
+                            {% elif model.domain == 'garments' %}<i class="fas fa-shirt text-purple-400"></i>
+                            {% elif model.domain == 'medical' %}<i class="fas fa-heart-pulse text-cyan-400"></i>
+                            {% elif model.domain == 'legal' %}<i class="fas fa-gavel text-amber-400"></i>
+                            {% elif model.domain == 'education' %}<i class="fas fa-graduation-cap text-blue-400"></i>
+                            {% elif model.domain == 'coding' %}<i class="fas fa-code text-indigo-400"></i>
+                            {% elif model.domain == 'customer_support' %}<i class="fas fa-headset text-teal-400"></i>
+                            {% elif model.domain in ['simple_math','greeting_bot','color_sayer','yes_no_bot','word_counter','date_helper','garment_specialist','account_bot'] %}<i class="fas fa-bolt text-green-400"></i>
+                            {% else %}<i class="fas fa-hammer text-gray-400"></i>{% endif %}
                         </div>
                         <div class="min-w-0">
                             <div class="flex items-center gap-2">
-                                <h4 class="text-white font-semibold truncate">{{ model.name }}</h4>
-                                {% if model.status == 'ready' %}
-                                <span class="badge badge-green text-[10px]">Ready</span>
-                                {% elif model.status == 'training' %}
-                                <span class="badge badge-blue text-[10px]">Training {{ model.training_progress }}%</span>
-                                {% elif model.status == 'failed' %}
-                                <span class="badge badge-red text-[10px]">Failed</span>
-                                {% else %}
-                                <span class="badge bg-gray-700 text-gray-400 text-[10px]">{{ model.status }}</span>
-                                {% endif %}
+                                <h4 class="text-white font-semibold text-sm truncate">{{ model.name }}</h4>
+                                {% if model.status == 'ready' %}<span class="badge badge-green text-[9px]">Ready</span>
+                                {% elif model.status == 'training' %}<span class="badge badge-blue text-[9px]">Training {{ model.training_progress }}%</span>
+                                {% elif model.status == 'failed' %}<span class="badge badge-red text-[9px]">Failed</span>
+                                {% else %}<span class="badge bg-gray-700 text-gray-400 text-[9px]">{{ model.status }}</span>{% endif %}
                             </div>
-                            <p class="text-xs text-gray-500 truncate">{{ model.description or model.domain }}</p>
+                            <p class="text-xs text-gray-500 truncate">{{ model.description or model.domain }} &bull; {{ model.base_model }}</p>
                         </div>
                     </div>
-                    <div class="flex items-center gap-1 flex-shrink-0 ml-2">
-                        <button onclick="showModelDetail('{{ model.id }}')" class="p-2 text-gray-500 hover:text-blue-400 hover:bg-blue-600/10 rounded-lg transition" title="View Details">
-                            <i class="fas fa-eye text-sm"></i>
+
+                    <!-- Action Buttons -->
+                    <div class="actions flex items-center gap-0.5 flex-shrink-0 ml-2">
+                        <button onclick="openTestChat('{{ model.id }}', '{{ model.name|e }}', '{{ model.base_model }}')" class="p-1.5 text-gray-500 hover:text-green-400 hover:bg-green-600/10 rounded-lg transition" title="Test Chat">
+                            <i class="fas fa-comment-dots text-xs"></i>
                         </button>
-                        <form method="POST" action="/model-builder/{{ model.id }}/delete" class="inline" onsubmit="return confirm('Delete model \'{{ model.name }}\'? This cannot be undone.')">
-                            <button type="submit" class="p-2 text-gray-500 hover:text-red-400 hover:bg-red-600/10 rounded-lg transition" title="Delete">
-                                <i class="fas fa-trash text-sm"></i>
+                        <button onclick="showLogs('{{ model.id }}', '{{ model.name|e }}')" class="p-1.5 text-gray-500 hover:text-blue-400 hover:bg-blue-600/10 rounded-lg transition" title="Training Logs">
+                            <i class="fas fa-scroll text-xs"></i>
+                        </button>
+                        <button onclick="showExport('{{ model.id }}', '{{ model.name|e }}')" class="p-1.5 text-gray-500 hover:text-amber-400 hover:bg-amber-600/10 rounded-lg transition" title="Export">
+                            <i class="fas fa-download text-xs"></i>
+                        </button>
+                        <button onclick="cloneModel('{{ model.id }}', '{{ model.name|e }}')" class="p-1.5 text-gray-500 hover:text-purple-400 hover:bg-purple-600/10 rounded-lg transition" title="Clone">
+                            <i class="fas fa-copy text-xs"></i>
+                        </button>
+                        {% if model.status == 'ready' or model.status == 'failed' %}
+                        <button onclick="openTrainModal('{{ model.id }}', '{{ model.name|e }}')" class="p-1.5 text-gray-500 hover:text-indigo-400 hover:bg-indigo-600/10 rounded-lg transition" title="Train">
+                            <i class="fas fa-graduation-cap text-xs"></i>
+                        </button>
+                        {% endif %}
+                        <button onclick="showDetail('{{ model.id }}', '{{ model.name|e }}')" class="p-1.5 text-gray-500 hover:text-white hover:bg-gray-700 rounded-lg transition" title="Details">
+                            <i class="fas fa-expand text-xs"></i>
+                        </button>
+                        <form method="POST" action="/model-builder/{{ model.id }}/delete" class="inline" onsubmit="return confirm('Delete \'{{ model.name }}\'?')">
+                            <button type="submit" class="p-1.5 text-gray-500 hover:text-red-400 hover:bg-red-600/10 rounded-lg transition" title="Delete">
+                                <i class="fas fa-trash text-xs"></i>
                             </button>
                         </form>
                     </div>
                 </div>
 
-                <!-- Model Info Grid -->
-                <div class="grid grid-cols-4 gap-2 mb-3">
-                    <div class="p-2 bg-gray-900/50 rounded-lg text-center">
-                        <p class="text-[10px] text-gray-600">Base</p>
-                        <p class="text-xs text-white font-medium">{{ model.base_model }}</p>
+                <!-- Mini Stats -->
+                <div class="grid grid-cols-4 gap-1.5 mb-3">
+                    <div class="p-1.5 bg-gray-900/50 rounded-lg text-center">
+                        <p class="text-[9px] text-gray-600">Base</p>
+                        <p class="text-[10px] text-white font-medium truncate">{{ model.base_model.split(':')[0] }}</p>
                     </div>
-                    <div class="p-2 bg-gray-900/50 rounded-lg text-center">
-                        <p class="text-[10px] text-gray-600">Domain</p>
-                        <p class="text-xs text-white font-medium">{{ model.domain }}</p>
+                    <div class="p-1.5 bg-gray-900/50 rounded-lg text-center">
+                        <p class="text-[9px] text-gray-600">Domain</p>
+                        <p class="text-[10px] text-white font-medium truncate">{{ model.domain }}</p>
                     </div>
-                    <div class="p-2 bg-gray-900/50 rounded-lg text-center">
-                        <p class="text-[10px] text-gray-600">Knowledge</p>
-                        <p class="text-xs text-white font-medium">{{ "%.1f"|format(model.total_chars / 1000) if model.total_chars else 0 }}K</p>
+                    <div class="p-1.5 bg-gray-900/50 rounded-lg text-center">
+                        <p class="text-[9px] text-gray-600">Knowledge</p>
+                        <p class="text-[10px] text-white font-medium">{{ "%.0f"|format(model.total_chars / 1000) if model.total_chars else 0 }}K</p>
                     </div>
-                    <div class="p-2 bg-gray-900/50 rounded-lg text-center">
-                        <p class="text-[10px] text-gray-600">Chunks</p>
-                        <p class="text-xs text-white font-medium">{{ model.chunk_count }}</p>
+                    <div class="p-1.5 bg-gray-900/50 rounded-lg text-center">
+                        <p class="text-[9px] text-gray-600">Chunks</p>
+                        <p class="text-[10px] text-white font-medium">{{ model.chunk_count }}</p>
                     </div>
                 </div>
 
-                <!-- Training Progress (if training) -->
+                <!-- Training Progress -->
                 {% if model.status == 'training' %}
                 <div class="mb-3">
-                    <div class="w-full bg-gray-700 rounded-full h-2">
-                        <div class="bg-blue-500 h-2 rounded-full transition-all animate-pulse" style="width: {{ model.training_progress }}%"></div>
+                    <div class="w-full bg-gray-700 rounded-full h-1.5">
+                        <div class="bg-blue-500 h-1.5 rounded-full transition-all animate-pulse" style="width: {{ model.training_progress }}%"></div>
                     </div>
-                    <p class="text-[10px] text-gray-500 mt-1">Training in progress... {{ model.training_progress }}%</p>
                 </div>
                 {% endif %}
 
                 <!-- Prompt Preview -->
-                <div class="bg-gray-900/80 rounded-lg p-3 mb-3">
-                    <div class="flex items-center gap-2 mb-1.5">
-                        <i class="fas fa-terminal text-[10px] text-gray-600"></i>
-                        <span class="text-[10px] text-gray-600 uppercase tracking-wider">System Prompt</span>
-                    </div>
-                    <p class="text-sm text-gray-400 leading-relaxed line-clamp-2">{{ model.system_prompt[:200] }}{% if model.system_prompt|length > 200 %}...{% endif %}</p>
-                </div>
-
-                <!-- Training Actions -->
-                <div class="flex items-center justify-between">
-                    <div class="flex items-center gap-2">
-                        <span class="text-[10px] text-gray-600"><i class="fas fa-thermometer-half mr-1"></i>{{ model.temperature }}</span>
-                        <span class="text-[10px] text-gray-600"><i class="fas fa-keyboard mr-1"></i>{{ model.max_tokens }} tokens</span>
-                    </div>
-                    <div class="flex items-center gap-1">
-                        {% if model.status == 'ready' or model.status == 'failed' %}
-                        <button onclick="showTrainModal('{{ model.id }}', '{{ model.name|e }}')" class="text-[10px] bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 px-2 py-1 rounded transition">
-                            <i class="fas fa-graduation-cap mr-1"></i>Train
-                        </button>
-                        {% endif %}
-                        <button onclick="showModelDetail('{{ model.id }}')" class="text-[10px] text-gray-500 hover:text-blue-400 transition px-2 py-1">
-                            <i class="fas fa-code mr-1"></i>API
-                        </button>
-                    </div>
+                <div class="bg-gray-900/60 rounded-lg p-2.5">
+                    <p class="text-[10px] text-gray-600 truncate">{{ model.system_prompt[:120] }}{% if model.system_prompt|length > 120 %}...{% endif %}</p>
                 </div>
             </div>
             {% endfor %}
         </div>
         {% else %}
         <!-- Empty State -->
-        <div class="card text-center py-16">
-            <div class="w-20 h-20 bg-purple-600/10 rounded-2xl flex items-center justify-center mx-auto mb-5">
-                <i class="fas fa-hammer text-purple-400 text-3xl opacity-50"></i>
+        <div class="glass-panel text-center py-14">
+            <div class="w-16 h-16 bg-purple-600/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <i class="fas fa-hammer text-purple-400 text-2xl opacity-50"></i>
             </div>
-            <h3 class="text-white font-semibold text-lg mb-2">No Custom Models Yet</h3>
-            <p class="text-gray-500 text-sm max-w-md mx-auto mb-6">
-                Build your own specialized AI model from scratch. Choose a domain template, upload training data, and create a unique AI assistant.
-            </p>
-            <div class="flex justify-center gap-3">
-                <button onclick="selectDomain('pdf_reader')" class="btn btn-primary text-sm">
-                    <i class="fas fa-file-pdf mr-1"></i> Build PDF Reader
-                </button>
-                <button onclick="selectDomain('accounting')" class="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition">
-                    <i class="fas fa-calculator mr-1"></i> Build Accounting Model
-                </button>
-            </div>
+            <h3 class="text-white font-semibold mb-2">No Models Yet</h3>
+            <p class="text-gray-500 text-sm max-w-sm mx-auto">Build your first specialized AI model. Choose a domain, configure behavior, and start building.</p>
         </div>
         {% endif %}
     </div>
 </div>
 
-<!-- Model Detail Modal -->
-<div id="detailModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
-    <div class="bg-[#1e293b] border border-gray-700 rounded-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden shadow-2xl">
-        <div class="flex items-center justify-between p-5 border-b border-gray-700">
+<!-- ========== MODALS ========== -->
+
+<!-- Test Chat Modal -->
+<div id="testChatModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-[#1e293b] border border-gray-700 rounded-2xl w-full max-w-lg h-[70vh] flex flex-col shadow-2xl">
+        <div class="flex items-center justify-between p-4 border-b border-gray-700">
             <div class="flex items-center gap-3">
-                <div class="w-10 h-10 bg-purple-600/20 rounded-xl flex items-center justify-center">
-                    <i class="fas fa-hammer text-purple-400"></i>
-                </div>
+                <div class="w-9 h-9 bg-green-600/20 rounded-lg flex items-center justify-center"><i class="fas fa-comment-dots text-green-400"></i></div>
                 <div>
-                    <h3 class="text-white font-semibold text-lg" id="detailName">-</h3>
-                    <p class="text-xs text-gray-500" id="detailDomain">-</p>
+                    <h3 class="text-white font-semibold text-sm" id="testChatName">Test Model</h3>
+                    <p class="text-[10px] text-gray-500" id="testChatBase">-</p>
                 </div>
             </div>
-            <button onclick="closeDetailModal()" class="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition">
-                <i class="fas fa-times"></i>
-            </button>
+            <button onclick="closeTestChat()" class="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition"><i class="fas fa-times"></i></button>
         </div>
-        <div class="p-5 overflow-y-auto max-h-[65vh] space-y-4">
-            <div class="grid grid-cols-2 gap-3">
-                <div class="p-3 bg-gray-800/50 rounded-lg">
-                    <p class="text-[10px] text-gray-500 mb-1">Base Model</p>
-                    <p class="text-sm text-white font-medium" id="detailBase">-</p>
-                </div>
-                <div class="p-3 bg-gray-800/50 rounded-lg">
-                    <p class="text-[10px] text-gray-500 mb-1">Status</p>
-                    <p class="text-sm text-white font-medium" id="detailStatus">-</p>
-                </div>
-                <div class="p-3 bg-gray-800/50 rounded-lg">
-                    <p class="text-[10px] text-gray-500 mb-1">Knowledge</p>
-                    <p class="text-sm text-white font-medium" id="detailKnowledge">-</p>
-                </div>
-                <div class="p-3 bg-gray-800/50 rounded-lg">
-                    <p class="text-[10px] text-gray-500 mb-1">Chunks</p>
-                    <p class="text-sm text-white font-medium" id="detailChunks">-</p>
+        <div class="flex-1 overflow-y-auto p-4 space-y-3" id="testChatMessages">
+            <div class="chat-bubble chat-ai">Hi! I'm your custom model. Ask me anything within my domain.</div>
+        </div>
+        <div class="p-3 border-t border-gray-700">
+            <div class="flex gap-2">
+                <input type="text" id="testChatInput" class="input-field text-sm flex-1" placeholder="Type a message..." onkeydown="if(event.key==='Enter')sendTestMsg()">
+                <button onclick="sendTestMsg()" class="btn btn-primary px-4 py-2" id="testChatSend"><i class="fas fa-paper-plane"></i></button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Training Logs Modal -->
+<div id="logsModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-[#1e293b] border border-gray-700 rounded-2xl w-full max-w-2xl max-h-[80vh] flex flex-col shadow-2xl">
+        <div class="flex items-center justify-between p-4 border-b border-gray-700">
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 bg-blue-600/20 rounded-lg flex items-center justify-center"><i class="fas fa-scroll text-blue-400"></i></div>
+                <div>
+                    <h3 class="text-white font-semibold text-sm">Training Logs</h3>
+                    <p class="text-[10px] text-gray-500" id="logsModelName">-</p>
                 </div>
             </div>
-            <div>
-                <div class="flex items-center gap-2 mb-2">
-                    <i class="fas fa-terminal text-[10px] text-gray-600"></i>
-                    <span class="text-[10px] text-gray-600 uppercase tracking-wider">Full System Prompt</span>
-                </div>
-                <div class="bg-gray-900 rounded-lg p-4">
-                    <pre class="text-sm text-gray-300 whitespace-pre-wrap leading-relaxed" id="detailPrompt">-</pre>
+            <button onclick="closeLogs()" class="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="flex-1 overflow-y-auto p-4">
+            <div id="logsContent" class="bg-gray-900 rounded-xl p-4 min-h-[200px]">
+                <p class="text-gray-500 text-sm">Loading logs...</p>
+            </div>
+        </div>
+        <div class="p-3 border-t border-gray-700 flex justify-between items-center">
+            <div class="flex items-center gap-2">
+                <span class="text-xs text-gray-500">Status:</span>
+                <span id="logsStatus" class="badge text-[10px]">-</span>
+            </div>
+            <button onclick="refreshLogs()" class="text-xs text-blue-400 hover:text-blue-300"><i class="fas fa-sync-alt mr-1"></i>Refresh</button>
+        </div>
+    </div>
+</div>
+
+<!-- Export Modal -->
+<div id="exportModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-[#1e293b] border border-gray-700 rounded-2xl w-full max-w-lg max-h-[80vh] flex flex-col shadow-2xl">
+        <div class="flex items-center justify-between p-4 border-b border-gray-700">
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 bg-amber-600/20 rounded-lg flex items-center justify-center"><i class="fas fa-download text-amber-400"></i></div>
+                <div>
+                    <h3 class="text-white font-semibold text-sm">Export Model</h3>
+                    <p class="text-[10px] text-gray-500" id="exportModelName">-</p>
                 </div>
             </div>
-            <div id="detailApiSection" class="hidden">
-                <div class="flex items-center gap-2 mb-2">
-                    <i class="fas fa-code text-[10px] text-gray-600"></i>
-                    <span class="text-[10px] text-gray-600 uppercase tracking-wider">API Usage</span>
-                </div>
-                <div class="bg-gray-900 rounded-lg p-4 overflow-x-auto">
-                    <pre class="text-sm" id="detailApiCode"></pre>
-                </div>
-                <button onclick="copyText(document.getElementById('detailApiCode').textContent)" class="btn btn-primary btn-sm w-full mt-3">
-                    <i class="fas fa-copy mr-1"></i>Copy Code
-                </button>
+            <button onclick="closeExport()" class="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="flex-1 overflow-y-auto p-4">
+            <div id="exportContent" class="space-y-3">
+                <p class="text-gray-500 text-sm">Loading...</p>
             </div>
         </div>
     </div>
@@ -417,88 +483,70 @@
 <!-- Train Modal -->
 <div id="trainModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
     <div class="bg-[#1e293b] border border-gray-700 rounded-2xl w-full max-w-lg shadow-2xl">
-        <div class="flex items-center justify-between p-5 border-b border-gray-700">
+        <div class="flex items-center justify-between p-4 border-b border-gray-700">
             <div class="flex items-center gap-3">
-                <div class="w-10 h-10 bg-blue-600/20 rounded-xl flex items-center justify-center">
-                    <i class="fas fa-graduation-cap text-blue-400"></i>
-                </div>
+                <div class="w-9 h-9 bg-indigo-600/20 rounded-lg flex items-center justify-center"><i class="fas fa-graduation-cap text-indigo-400"></i></div>
                 <div>
-                    <h3 class="text-white font-semibold">Train Model</h3>
-                    <p class="text-xs text-gray-500" id="trainModelName">-</p>
+                    <h3 class="text-white font-semibold text-sm">Train Model</h3>
+                    <p class="text-[10px] text-gray-500" id="trainModelName">-</p>
                 </div>
             </div>
-            <button onclick="closeTrainModal()" class="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition">
-                <i class="fas fa-times"></i>
-            </button>
+            <button onclick="closeTrainModal()" class="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition"><i class="fas fa-times"></i></button>
         </div>
-        <div class="p-5">
-            <!-- Training Tabs -->
+        <div class="p-4">
             <div class="flex gap-1 mb-4 bg-gray-800 p-1 rounded-lg">
-                <button onclick="showTrainTab('pdf')" id="trainTabPdf" class="flex-1 px-3 py-2 rounded-md text-sm font-medium bg-blue-600 text-white transition">
-                    <i class="fas fa-file-pdf mr-1"></i>PDF
-                </button>
-                <button onclick="showTrainTab('text')" id="trainTabText" class="flex-1 px-3 py-2 rounded-md text-sm font-medium text-gray-400 hover:text-white transition">
-                    <i class="fas fa-align-left mr-1"></i>Text
-                </button>
-                <button onclick="showTrainTab('web')" id="trainTabWeb" class="flex-1 px-3 py-2 rounded-md text-sm font-medium text-gray-400 hover:text-white transition">
-                    <i class="fas fa-globe mr-1"></i>Web
-                </button>
+                <button onclick="showModalTrainTab('pdf')" class="tab-btn active flex-1 text-xs" id="mTabPdf"><i class="fas fa-file-pdf mr-1"></i>PDF</button>
+                <button onclick="showModalTrainTab('text')" class="tab-btn flex-1 text-xs" id="mTabText"><i class="fas fa-align-left mr-1"></i>Text</button>
+                <button onclick="showModalTrainTab('web')" class="tab-btn flex-1 text-xs" id="mTabWeb"><i class="fas fa-globe mr-1"></i>Web</button>
             </div>
 
-            <!-- PDF Training -->
-            <div id="trainPanelPdf" class="space-y-4">
-                <form method="POST" enctype="multipart/form-data" id="trainPdfForm">
-                    <div class="space-y-4">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-300 mb-1.5">Upload PDF Document</label>
-                            <input type="file" name="train_file" accept=".pdf" class="input-field" required>
-                            <p class="text-[10px] text-gray-600 mt-1">PDF text will be extracted and indexed for the model</p>
-                        </div>
-                        <button type="submit" class="btn btn-primary w-full">
-                            <i class="fas fa-graduation-cap mr-2"></i>Start PDF Training
-                        </button>
-                    </div>
+            <div id="mPanelPdf" class="space-y-3">
+                <form id="trainPdfForm" enctype="multipart/form-data">
+                    <input type="file" name="train_file" accept=".pdf" class="input-field text-sm" required>
+                    <button type="submit" class="btn btn-primary w-full mt-3 py-2.5"><i class="fas fa-graduation-cap mr-1"></i>Start PDF Training</button>
                 </form>
             </div>
-
-            <!-- Text Training -->
-            <div id="trainPanelText" class="hidden space-y-4">
-                <form method="POST" id="trainTextForm">
-                    <div class="space-y-4">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-300 mb-1.5">Paste Training Text</label>
-                            <textarea name="train_text" rows="8" class="input-field font-mono text-sm" placeholder="Paste your training data here... (FAQs, documentation, database exports, etc.)" required></textarea>
-                            <p class="text-[10px] text-gray-600 mt-1">Text will be chunked and indexed for the model</p>
-                        </div>
-                        <button type="submit" class="btn btn-primary w-full">
-                            <i class="fas fa-graduation-cap mr-2"></i>Start Text Training
-                        </button>
-                    </div>
+            <div id="mPanelText" class="hidden space-y-3">
+                <form id="trainTextForm">
+                    <textarea name="train_text" rows="6" class="input-field text-sm" placeholder="Paste training data..." required></textarea>
+                    <button type="submit" class="btn btn-primary w-full mt-3 py-2.5"><i class="fas fa-graduation-cap mr-1"></i>Start Text Training</button>
                 </form>
             </div>
-
-            <!-- Web Training -->
-            <div id="trainPanelWeb" class="hidden space-y-4">
-                <form method="POST" id="trainWebForm">
-                    <div class="space-y-4">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-300 mb-1.5">Website URL</label>
-                            <input type="url" name="train_url" class="input-field" placeholder="https://example.com" required>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-300 mb-1.5">Max Pages to Crawl</label>
-                            <input type="number" name="max_pages" value="10" min="1" max="50" class="input-field">
-                        </div>
-                        <button type="submit" class="btn btn-primary w-full">
-                            <i class="fas fa-graduation-cap mr-2"></i>Start Web Training
-                        </button>
-                    </div>
+            <div id="mPanelWeb" class="hidden space-y-3">
+                <form id="trainWebForm">
+                    <input type="url" name="train_url" class="input-field text-sm" placeholder="https://example.com" required>
+                    <input type="number" name="max_pages" value="10" min="1" max="50" class="input-field text-sm mt-2">
+                    <button type="submit" class="btn btn-primary w-full mt-3 py-2.5"><i class="fas fa-graduation-cap mr-1"></i>Start Web Training</button>
                 </form>
             </div>
+        </div>
+    </div>
+</div>
 
-            <p class="text-[10px] text-gray-600 text-center mt-4">
-                <i class="fas fa-info-circle mr-1"></i>Training runs in the background with minimal server resource usage
-            </p>
+<!-- Detail Modal -->
+<div id="detailModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-[#1e293b] border border-gray-700 rounded-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden shadow-2xl">
+        <div class="flex items-center justify-between p-4 border-b border-gray-700">
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 bg-purple-600/20 rounded-lg flex items-center justify-center"><i class="fas fa-info-circle text-purple-400"></i></div>
+                <div>
+                    <h3 class="text-white font-semibold text-sm" id="detailName">-</h3>
+                    <p class="text-[10px] text-gray-500" id="detailDomain">-</p>
+                </div>
+            </div>
+            <button onclick="closeDetail()" class="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="p-4 overflow-y-auto max-h-[70vh] space-y-4">
+            <div class="grid grid-cols-2 gap-3" id="detailStats"></div>
+            <div>
+                <p class="text-[10px] text-gray-500 uppercase tracking-wider mb-2">System Prompt</p>
+                <div class="bg-gray-900 rounded-lg p-3"><pre class="text-xs text-gray-300 whitespace-pre-wrap" id="detailPrompt"></pre></div>
+            </div>
+            <div id="detailApiSection" class="hidden">
+                <p class="text-[10px] text-gray-500 uppercase tracking-wider mb-2">API Usage</p>
+                <div class="bg-gray-900 rounded-lg p-3 overflow-x-auto"><pre class="text-xs" id="detailApiCode"></pre></div>
+                <button onclick="copyText(document.getElementById('detailApiCode').textContent)" class="btn btn-primary btn-sm w-full mt-2"><i class="fas fa-copy mr-1"></i>Copy</button>
+            </div>
         </div>
     </div>
 </div>
@@ -506,146 +554,305 @@
 <!-- Toast -->
 <div id="toast" class="fixed bottom-6 right-6 bg-green-600 text-white px-4 py-2.5 rounded-lg shadow-lg z-50 hidden flex items-center gap-2 text-sm font-medium">
     <i class="fas fa-check-circle"></i>
-    <span id="toastMsg">Copied!</span>
+    <span id="toastMsg">Done!</span>
 </div>
 
 {% endblock %}
 
 {% block scripts %}
 <script>
+/* ===== State ===== */
+let currentStep = 1;
 let currentTrainModelId = '';
+let currentTestModelId = '';
+let currentLogsModelId = '';
+let testChatModelName = '';
 
+/* ===== Step Wizard ===== */
+function goStep(n) {
+    currentStep = n;
+    for (let i = 1; i <= 3; i++) {
+        document.getElementById('step' + i).classList.toggle('hidden', i !== n);
+        const dot = document.getElementById('stepDot' + i);
+        dot.classList.toggle('active', i === n);
+        dot.classList.toggle('done', i < n);
+        if (i < 3) document.getElementById('stepLine' + i).classList.toggle('done', i < n);
+    }
+    if (n === 3) updatePreview();
+}
+
+/* ===== Domain Selection ===== */
 function selectDomain(domain) {
     document.getElementById('selectedDomain').value = domain;
-    document.querySelectorAll('.domain-btn').forEach(btn => {
-        btn.classList.remove('border-purple-500', 'bg-purple-600/10');
-        btn.classList.add('border-gray-700');
-    });
-    const selected = document.querySelector(`[data-domain="${domain}"]`);
-    if (selected) {
-        selected.classList.add('border-purple-500', 'bg-purple-600/10');
-        selected.classList.remove('border-gray-700');
-        
-        document.getElementById('modelName').value = selected.dataset.name || '';
-        document.getElementById('modelDesc').value = selected.dataset.desc || '';
-        document.getElementById('systemPrompt').value = selected.dataset.prompt || '';
-        document.getElementById('restrictedTopics').value = selected.dataset.topics || '';
-        
-        const baseModel = selected.dataset.model;
-        if (baseModel) {
-            document.getElementById('baseModel').value = baseModel;
-        }
+    document.querySelectorAll('.domain-chip').forEach(c => c.classList.remove('selected'));
+    const el = document.querySelector(`[data-domain="${domain}"]`);
+    if (el) {
+        el.classList.add('selected');
+        document.getElementById('modelName').value = el.dataset.name || '';
+        document.getElementById('modelDesc').value = el.dataset.desc || '';
+        document.getElementById('systemPrompt').value = el.dataset.prompt || '';
+        document.getElementById('restrictedTopics').value = el.dataset.topics || '';
+        const bm = el.dataset.model;
+        if (bm) document.getElementById('baseModel').value = bm;
         updatePromptChars();
     }
+    document.getElementById('step1Next').disabled = false;
 }
 
-function selectTask(type, name, desc) {
+/* ===== Lightweight Task ===== */
+function selectTask(type, label) {
     document.getElementById('selectedTaskType').value = type;
-    document.querySelectorAll('.task-btn').forEach(btn => {
-        btn.classList.remove('border-green-500', 'bg-green-600/10');
-        btn.classList.add('border-gray-700');
-    });
-    const selected = document.querySelector(`[data-type="${type}"]`);
-    if (selected) {
-        selected.classList.add('border-green-500', 'bg-green-600/10');
-        selected.classList.remove('border-gray-700');
-        document.getElementById('lwModelName').value = name + ' Model';
-    }
+    document.querySelectorAll('.task-btn').forEach(b => { b.classList.remove('border-green-500','bg-green-600/10'); b.classList.add('border-gray-700'); });
+    const el = document.querySelector(`[data-type="${type}"]`);
+    if (el) { el.classList.add('border-green-500','bg-green-600/10'); el.classList.remove('border-gray-700'); }
+    document.getElementById('lwModelName').value = label + ' Model';
 }
 
+/* ===== Prompt Chars ===== */
 document.getElementById('systemPrompt')?.addEventListener('input', updatePromptChars);
 function updatePromptChars() {
     const len = document.getElementById('systemPrompt').value.length;
     document.getElementById('promptChars').textContent = len.toLocaleString() + ' chars';
 }
 
-function filterModels() {
-    const q = document.getElementById('modelSearch').value.toLowerCase();
-    document.querySelectorAll('.model-card').forEach(card => {
-        const name = card.dataset.name || '';
-        const domain = card.dataset.domain || '';
-        card.style.display = (name.includes(q) || domain.includes(q)) ? '' : 'none';
+/* ===== Preview ===== */
+function updatePreview() {
+    document.getElementById('prevName').textContent = document.getElementById('modelName').value || '-';
+    document.getElementById('prevDomain').textContent = document.getElementById('selectedDomain').value;
+    document.getElementById('prevBase').textContent = document.getElementById('baseModel').value;
+    document.getElementById('prevPrompt').textContent = (document.getElementById('systemPrompt').value || '-').substring(0, 60);
+}
+
+/* ===== Submit Create ===== */
+function submitCreate() {
+    const form = document.getElementById('buildForm');
+    const btn = document.getElementById('createBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Creating...';
+    form.submit();
+}
+
+/* ===== Improve Prompt (stub) ===== */
+function improvePrompt() {
+    const ta = document.getElementById('systemPrompt');
+    if (!ta.value.trim()) { showToast('Write a prompt first, then click Improve'); return; }
+    showToast('AI prompt improvement coming soon!');
+}
+
+/* ===== Training Tabs (in step 3) ===== */
+function showTrainTab(tab) {
+    ['pdf','text','web'].forEach(t => {
+        document.getElementById('tPanel' + t.charAt(0).toUpperCase() + t.slice(1)).classList.toggle('hidden', t !== tab);
+        const btn = document.getElementById('tTab' + t.charAt(0).toUpperCase() + t.slice(1));
+        btn.classList.toggle('active', t === tab);
     });
 }
 
-function showModelDetail(modelId) {
-    fetch('/api/model-builder/model/' + modelId)
-        .then(r => r.json())
-        .then(data => {
-            if (data.detail) { alert(data.detail); return; }
-            document.getElementById('detailName').textContent = data.name;
-            document.getElementById('detailDomain').textContent = data.domain + ' | ' + data.description;
-            document.getElementById('detailBase').textContent = data.base_model;
-            document.getElementById('detailStatus').textContent = data.status;
-            document.getElementById('detailKnowledge').textContent = (data.total_chars / 1000).toFixed(1) + 'K chars';
-            document.getElementById('detailChunks').textContent = data.chunk_count;
-            document.getElementById('detailPrompt').textContent = data.system_prompt;
-            
-            const apiCode = `<span class="text-gray-500"># curl example</span>
-curl -X POST http://203.55.176.101:8000/v1/chat/completions \\
-  -H <span class="text-amber-400">"Authorization: Bearer sk-local-..."</span> \\
-  -H <span class="text-amber-400">"Content-Type: application/json"</span> \\
-  -d <span class="text-amber-400">'{
-    "model": "${data.base_model}",
-    "messages": [{"role": "system", "content": "Use the model's system prompt"}, {"role": "user", "content": "..."}],
-    "skill_id": "${data.id}"
-  }'</span>`;
-            document.getElementById('detailApiCode').innerHTML = apiCode;
-            document.getElementById('detailApiSection').classList.remove('hidden');
-            
-            document.getElementById('detailModal').classList.remove('hidden');
-        })
-        .catch(err => alert('Failed to load model details'));
+/* ===== Modal Training Tabs ===== */
+function showModalTrainTab(tab) {
+    ['pdf','text','web'].forEach(t => {
+        document.getElementById('mPanel' + t.charAt(0).toUpperCase() + t.slice(1)).classList.toggle('hidden', t !== tab);
+        const btn = document.getElementById('mTab' + t.charAt(0).toUpperCase() + t.slice(1));
+        btn.classList.toggle('active', t === tab);
+    });
 }
 
-function closeDetailModal() {
-    document.getElementById('detailModal').classList.add('hidden');
-}
-
-function showTrainModal(modelId, modelName) {
+/* ===== Train Modal ===== */
+function openTrainModal(modelId, name) {
     currentTrainModelId = modelId;
-    document.getElementById('trainModelName').textContent = modelName;
-    
+    document.getElementById('trainModelName').textContent = name;
     document.getElementById('trainPdfForm').action = '/model-builder/' + modelId + '/train/pdf';
     document.getElementById('trainTextForm').action = '/model-builder/' + modelId + '/train/text';
     document.getElementById('trainWebForm').action = '/model-builder/' + modelId + '/train/web';
-    
     document.getElementById('trainModal').classList.remove('hidden');
 }
+function closeTrainModal() { document.getElementById('trainModal').classList.add('hidden'); }
 
-function closeTrainModal() {
-    document.getElementById('trainModal').classList.add('hidden');
+/* ===== Test Chat ===== */
+function openTestChat(modelId, name, base) {
+    currentTestModelId = modelId;
+    testChatModelName = name;
+    document.getElementById('testChatName').textContent = name;
+    document.getElementById('testChatBase').textContent = base;
+    document.getElementById('testChatMessages').innerHTML = '<div class="chat-bubble chat-ai">Hi! I\'m <strong>' + escapeHtml(name) + '</strong>. Ask me anything within my domain.</div>';
+    document.getElementById('testChatInput').value = '';
+    document.getElementById('testChatModal').classList.remove('hidden');
+    document.getElementById('testChatInput').focus();
+}
+function closeTestChat() { document.getElementById('testChatModal').classList.add('hidden'); }
+
+async function sendTestMsg() {
+    const input = document.getElementById('testChatInput');
+    const msg = input.value.trim();
+    if (!msg) return;
+    input.value = '';
+
+    const box = document.getElementById('testChatMessages');
+    box.innerHTML += '<div class="chat-bubble chat-user fade-in">' + escapeHtml(msg) + '</div>';
+    box.innerHTML += '<div class="chat-bubble chat-ai fade-in" id="typingIndicator"><i class="fas fa-spinner fa-spin mr-1"></i>Thinking...</div>';
+    box.scrollTop = box.scrollHeight;
+
+    try {
+        const res = await fetch('/api/model-builder/model/' + currentTestModelId + '/test', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({message: msg})
+        });
+        const data = await res.json();
+        const el = document.getElementById('typingIndicator');
+        if (data.reply) {
+            el.innerHTML = escapeHtml(data.reply);
+        } else {
+            el.innerHTML = '<span class="text-red-400">' + escapeHtml(data.error || 'No response') + '</span>';
+        }
+    } catch (e) {
+        document.getElementById('typingIndicator').innerHTML = '<span class="text-red-400">Connection error</span>';
+    }
+    box.scrollTop = box.scrollHeight;
 }
 
-function showTrainTab(tab) {
-    ['pdf', 'text', 'web'].forEach(t => {
-        document.getElementById('trainPanel' + t.charAt(0).toUpperCase() + t.slice(1)).classList.add('hidden');
-        document.getElementById('trainTab' + t.charAt(0).toUpperCase() + t.slice(1)).classList.remove('bg-blue-600', 'text-white');
-        document.getElementById('trainTab' + t.charAt(0).toUpperCase() + t.slice(1)).classList.add('text-gray-400');
+/* ===== Training Logs ===== */
+async function showLogs(modelId, name) {
+    currentLogsModelId = modelId;
+    document.getElementById('logsModelName').textContent = name;
+    document.getElementById('logsContent').innerHTML = '<p class="text-gray-500 text-sm"><i class="fas fa-spinner fa-spin mr-1"></i>Loading...</p>';
+    document.getElementById('logsModal').classList.remove('hidden');
+    await refreshLogs();
+}
+
+async function refreshLogs() {
+    try {
+        const res = await fetch('/api/model-builder/model/' + currentLogsModelId + '/logs');
+        const data = await res.json();
+        const statusEl = document.getElementById('logsStatus');
+        statusEl.textContent = data.status || 'unknown';
+        statusEl.className = 'badge text-[10px] ' + (data.status === 'ready' ? 'badge-green' : data.status === 'training' ? 'badge-blue' : data.status === 'failed' ? 'badge-red' : 'bg-gray-700 text-gray-400');
+
+        const lines = (data.training_log || 'No logs yet.').split('\n').filter(l => l.trim());
+        document.getElementById('logsContent').innerHTML = lines.map(l => {
+            const cls = l.includes('ERROR') ? 'error' : l.includes('complete') || l.includes('Ready') ? 'success' : '';
+            return '<div class="log-line ' + cls + '">' + escapeHtml(l) + '</div>';
+        }).join('');
+        if (data.error_message) {
+            document.getElementById('logsContent').innerHTML += '<div class="log-line error mt-2">ERROR: ' + escapeHtml(data.error_message) + '</div>';
+        }
+    } catch (e) {
+        document.getElementById('logsContent').innerHTML = '<p class="text-red-400 text-sm">Failed to load logs</p>';
+    }
+}
+function closeLogs() { document.getElementById('logsModal').classList.add('hidden'); }
+
+/* ===== Export ===== */
+async function showExport(modelId, name) {
+    document.getElementById('exportModelName').textContent = name;
+    document.getElementById('exportContent').innerHTML = '<p class="text-gray-500 text-sm"><i class="fas fa-spinner fa-spin mr-1"></i>Loading...</p>';
+    document.getElementById('exportModal').classList.remove('hidden');
+    try {
+        const res = await fetch('/api/model-builder/model/' + modelId + '/export');
+        const data = await res.json();
+        if (data.error) { document.getElementById('exportContent').innerHTML = '<p class="text-red-400">' + data.error + '</p>'; return; }
+        document.getElementById('exportContent').innerHTML = `
+            <div class="space-y-3">
+                <div class="p-3 bg-gray-800/50 rounded-lg">
+                    <p class="text-[10px] text-gray-500 mb-1">Model Name</p>
+                    <p class="text-sm text-white font-medium">${escapeHtml(data.name)}</p>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="p-3 bg-gray-800/50 rounded-lg">
+                        <p class="text-[10px] text-gray-500 mb-1">Base Model</p>
+                        <p class="text-sm text-white">${escapeHtml(data.base_model)}</p>
+                    </div>
+                    <div class="p-3 bg-gray-800/50 rounded-lg">
+                        <p class="text-[10px] text-gray-500 mb-1">Temperature</p>
+                        <p class="text-sm text-white">${data.temperature}</p>
+                    </div>
+                </div>
+                <div class="p-3 bg-gray-800/50 rounded-lg">
+                    <p class="text-[10px] text-gray-500 mb-1">Full System Prompt</p>
+                    <pre class="text-xs text-gray-300 whitespace-pre-wrap max-h-32 overflow-y-auto">${escapeHtml(data.full_prompt)}</pre>
+                </div>
+                <div class="p-3 bg-gray-900 rounded-lg">
+                    <p class="text-[10px] text-gray-500 mb-1">Ollama Modelfile</p>
+                    <pre class="text-xs text-green-400 whitespace-pre-wrap font-mono">${escapeHtml(data.modelfile)}</pre>
+                </div>
+                <button onclick="copyText('${escapeHtml(data.modelfile).replace(/'/g, "\\'")}')" class="btn btn-primary w-full py-2"><i class="fas fa-copy mr-1"></i>Copy Modelfile</button>
+                <button onclick="downloadExport(${JSON.stringify(data).replace(/"/g, '&quot;')})" class="btn bg-gray-700 hover:bg-gray-600 text-white w-full py-2"><i class="fas fa-file-download mr-1"></i>Download JSON</button>
+            </div>`;
+    } catch (e) {
+        document.getElementById('exportContent').innerHTML = '<p class="text-red-400 text-sm">Failed to load export data</p>';
+    }
+}
+function closeExport() { document.getElementById('exportModal').classList.add('hidden'); }
+
+function downloadExport(data) {
+    const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = (data.name || 'model') + '.json';
+    a.click();
+}
+
+/* ===== Clone ===== */
+async function cloneModel(modelId, name) {
+    const newName = prompt('Clone name:', name + ' (copy)');
+    if (!newName) return;
+    try {
+        const res = await fetch('/api/model-builder/model/' + modelId + '/clone', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({name: newName})
+        });
+        const data = await res.json();
+        if (data.id) { showToast('Model cloned!'); setTimeout(() => location.reload(), 500); }
+        else { showToast(data.error || 'Clone failed'); }
+    } catch (e) { showToast('Connection error'); }
+}
+
+/* ===== Detail ===== */
+async function showDetail(modelId, name) {
+    try {
+        const res = await fetch('/api/model-builder/model/' + modelId);
+        const data = await res.json();
+        if (data.detail) { showToast(data.detail); return; }
+        document.getElementById('detailName').textContent = data.name;
+        document.getElementById('detailDomain').textContent = data.domain + ' | ' + (data.description || '');
+        document.getElementById('detailStats').innerHTML = `
+            <div class="p-3 bg-gray-800/50 rounded-lg"><p class="text-[10px] text-gray-500 mb-1">Base Model</p><p class="text-sm text-white font-medium">${escapeHtml(data.base_model)}</p></div>
+            <div class="p-3 bg-gray-800/50 rounded-lg"><p class="text-[10px] text-gray-500 mb-1">Status</p><p class="text-sm text-white font-medium">${data.status}</p></div>
+            <div class="p-3 bg-gray-800/50 rounded-lg"><p class="text-[10px] text-gray-500 mb-1">Knowledge</p><p class="text-sm text-white font-medium">${(data.total_chars/1000).toFixed(1)}K chars</p></div>
+            <div class="p-3 bg-gray-800/50 rounded-lg"><p class="text-[10px] text-gray-500 mb-1">Chunks</p><p class="text-sm text-white font-medium">${data.chunk_count}</p></div>`;
+        document.getElementById('detailPrompt').textContent = data.system_prompt;
+        const apiCode = `curl -X POST http://203.55.176.101:8000/v1/chat/completions \\\n  -H "Authorization: Bearer sk-local-..." \\\n  -H "Content-Type: application/json" \\\n  -d '{"model":"${data.base_model}","messages":[{"role":"system","content":"Use model prompt"},{"role":"user","content":"..."}],"skill_id":"${data.id}"}'`;
+        document.getElementById('detailApiCode').textContent = apiCode;
+        document.getElementById('detailApiSection').classList.remove('hidden');
+        document.getElementById('detailModal').classList.remove('hidden');
+    } catch (e) { showToast('Failed to load details'); }
+}
+function closeDetail() { document.getElementById('detailModal').classList.add('hidden'); }
+
+/* ===== Filter ===== */
+function filterModels() {
+    const q = document.getElementById('modelSearch').value.toLowerCase();
+    document.querySelectorAll('#modelsList .model-card').forEach(c => {
+        c.style.display = ((c.dataset.name||'').includes(q) || (c.dataset.domain||'').includes(q)) ? '' : 'none';
     });
-    document.getElementById('trainPanel' + tab.charAt(0).toUpperCase() + tab.slice(1)).classList.remove('hidden');
-    const activeTab = document.getElementById('trainTab' + tab.charAt(0).toUpperCase() + tab.slice(1));
-    activeTab.classList.add('bg-blue-600', 'text-white');
-    activeTab.classList.remove('text-gray-400');
 }
 
-function copyText(text) {
-    navigator.clipboard.writeText(text).then(() => showToast('Copied to clipboard'));
-}
+function refreshModels() { location.reload(); }
 
-function showToast(msg) {
-    const t = document.getElementById('toast');
-    document.getElementById('toastMsg').textContent = msg;
-    t.classList.remove('hidden');
-    setTimeout(() => t.classList.add('hidden'), 2000);
-}
+/* ===== Utils ===== */
+function escapeHtml(t) { const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
+function copyText(t) { navigator.clipboard.writeText(t).then(() => showToast('Copied!')); }
+function showToast(msg) { const t = document.getElementById('toast'); document.getElementById('toastMsg').textContent = msg; t.classList.remove('hidden'); setTimeout(() => t.classList.add('hidden'), 2500); }
 
-document.getElementById('detailModal')?.addEventListener('click', function(e) { if (e.target === this) closeDetailModal(); });
-document.getElementById('trainModal')?.addEventListener('click', function(e) { if (e.target === this) closeTrainModal(); });
+/* Close modals on backdrop click */
+['testChatModal','logsModal','exportModal','trainModal','detailModal'].forEach(id => {
+    document.getElementById(id)?.addEventListener('click', function(e) { if (e.target === this) this.classList.add('hidden'); });
+});
 
-// Auto-select first domain on load
-if (document.querySelector('.domain-btn')) {
-    selectDomain('pdf_reader');
-}
+/* Init */
+document.querySelectorAll('.domain-chip').forEach(c => {
+    c.addEventListener('click', () => selectDomain(c.dataset.domain));
+});
 </script>
 {% endblock %}

@@ -1,50 +1,325 @@
 {% extends "base.html" %}
-{% block title %}OpenLocalAI - Skills & Agents{% endblock %}
-{% block header_title %}Skills & Agents{% endblock %}
+{% block title %}OpenLocalAI - Skills Hub{% endblock %}
+{% block header_title %}Skills Hub{% endblock %}
 
 {% block content %}
-<!-- Stats Row -->
-<div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-    <div class="stat-card">
-        <div class="flex items-center justify-between mb-2">
-            <span class="text-gray-400 text-sm">Total Skills</span>
-            <div class="w-9 h-9 bg-purple-600/20 rounded-lg flex items-center justify-center"><i class="fas fa-wand-magic-sparkles text-purple-400"></i></div>
+<style>
+    .skill-hero { background: linear-gradient(135deg, rgba(139,92,246,0.12) 0%, rgba(6,182,212,0.08) 50%, rgba(245,158,11,0.06) 100%); border: 1px solid rgba(139,92,246,0.15); border-radius: 20px; padding: 32px; margin-bottom: 28px; }
+    .skill-hero h1 { font-size: 28px; font-weight: 800; background: linear-gradient(135deg, #c084fc, #22d3ee); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 6px; }
+    .skill-hero p { color: #94a3b8; font-size: 14px; max-width: 600px; }
+    .tab-bar { display: flex; gap: 4px; background: rgba(30,41,59,0.6); border-radius: 14px; padding: 4px; margin-bottom: 24px; border: 1px solid rgba(71,85,105,0.3); }
+    .tab-btn { flex: 1; padding: 10px 16px; border-radius: 10px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all .2s; border: none; background: transparent; color: #94a3b8; display: flex; align-items: center; justify-content: center; gap: 8px; }
+    .tab-btn.active { background: linear-gradient(135deg, rgba(139,92,246,0.25), rgba(6,182,212,0.15)); color: #e2e8f0; box-shadow: 0 2px 8px rgba(139,92,246,0.15); }
+    .tab-btn:hover:not(.active) { background: rgba(51,65,85,0.3); color: #cbd5e1; }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; animation: fadeIn .3s; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+    .cat-card { background: rgba(30,41,59,0.5); border: 1px solid rgba(71,85,105,0.3); border-radius: 16px; padding: 20px; transition: all .25s; }
+    .cat-card:hover { border-color: rgba(139,92,246,0.4); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.3); }
+    .cat-icon { width: 40px; height: 40px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
+    .skill-chip { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; background: rgba(15,23,42,0.6); border: 1px solid rgba(71,85,105,0.3); border-radius: 10px; font-size: 12px; color: #e2e8f0; cursor: pointer; transition: all .2s; }
+    .skill-chip:hover { border-color: rgba(139,92,246,0.5); background: rgba(139,92,246,0.08); }
+    .skill-chip .dot { width: 6px; height: 6px; border-radius: 50%; }
+    .my-skill-card { background: rgba(30,41,59,0.5); border: 1px solid rgba(71,85,105,0.3); border-radius: 16px; padding: 20px; transition: all .25s; position: relative; overflow: hidden; }
+    .my-skill-card::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, #8b5cf6, #06b6d4); opacity: 0; transition: opacity .2s; }
+    .my-skill-card:hover::before { opacity: 1; }
+    .my-skill-card:hover { border-color: rgba(139,92,246,0.3); }
+    .prompt-box { background: rgba(15,23,42,0.8); border: 1px solid rgba(71,85,105,0.3); border-radius: 10px; padding: 14px; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #94a3b8; line-height: 1.6; max-height: 120px; overflow-y: auto; white-space: pre-wrap; }
+    .test-area { background: rgba(15,23,42,0.6); border: 1px solid rgba(71,85,105,0.3); border-radius: 12px; padding: 16px; }
+    .test-response { background: rgba(15,23,42,0.8); border: 1px solid rgba(71,85,105,0.3); border-radius: 12px; padding: 16px; min-height: 100px; font-size: 13px; color: #e2e8f0; line-height: 1.7; white-space: pre-wrap; }
+    .stat-pill { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; background: rgba(15,23,42,0.6); border-radius: 8px; font-size: 11px; color: #94a3b8; }
+    .example-card { background: rgba(15,23,42,0.5); border: 1px solid rgba(71,85,105,0.2); border-radius: 12px; padding: 16px; transition: all .2s; }
+    .example-card:hover { border-color: rgba(139,92,246,0.3); }
+    .step-num { width: 32px; height: 32px; border-radius: 10px; background: linear-gradient(135deg, #8b5cf6, #6d28d9); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; color: white; flex-shrink: 0; }
+    .flow-line { width: 2px; height: 24px; background: linear-gradient(180deg, #8b5cf6, transparent); margin-left: 15px; }
+    .create-card { background: linear-gradient(135deg, rgba(139,92,246,0.08), rgba(6,182,212,0.05)); border: 1px solid rgba(139,92,246,0.2); border-radius: 16px; padding: 24px; }
+    .loading-dots::after { content: ''; animation: dots 1.5s steps(4,end) infinite; }
+    @keyframes dots { 0% { content: ''; } 25% { content: '.'; } 50% { content: '..'; } 75% { content: '...'; } 100% { content: ''; } }
+</style>
+
+<!-- Hero -->
+<div class="skill-hero">
+    <div class="flex items-start justify-between">
+        <div>
+            <h1>Skills Hub</h1>
+            <p>Teach your AI new abilities. Skills are special instructions that change how your AI thinks and responds — like giving it a new job title.</p>
         </div>
-        <p class="text-2xl font-bold text-white">{{ skills|length }}</p>
-        <p class="text-xs text-gray-500 mt-1">Custom AI behaviors</p>
-    </div>
-    <div class="stat-card">
-        <div class="flex items-center justify-between mb-2">
-            <span class="text-gray-400 text-sm">Active Skills</span>
-            <div class="w-9 h-9 bg-green-600/20 rounded-lg flex items-center justify-center"><i class="fas fa-check-circle text-green-400"></i></div>
+        <div class="flex gap-3 flex-shrink-0 ml-6">
+            <div class="stat-pill"><i class="fas fa-wand-magic-sparkles text-purple-400"></i> {{ skills|length }} Skills</div>
+            <div class="stat-pill"><i class="fas fa-check-circle text-green-400"></i> {{ skills|selectattr('is_active')|list|length }} Active</div>
         </div>
-        <p class="text-2xl font-bold text-white">{{ skills|selectattr('is_active')|list|length }}</p>
-        <p class="text-xs text-gray-500 mt-1">Ready to use in chat</p>
-    </div>
-    <div class="stat-card">
-        <div class="flex items-center justify-between mb-2">
-            <span class="text-gray-400 text-sm">Prompt Length</span>
-            <div class="w-9 h-9 bg-blue-600/20 rounded-lg flex items-center justify-center"><i class="fas fa-align-left text-blue-400"></i></div>
-        </div>
-        <p class="text-2xl font-bold text-white">{{ "%.0f"|format(skills|map(attribute='system_prompt')|map('length')|sum / 1000) if skills else 0 }}K</p>
-        <p class="text-xs text-gray-500 mt-1">Total characters across all prompts</p>
     </div>
 </div>
 
-<!-- Main Layout -->
-<div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
+<!-- Tab Bar -->
+<div class="tab-bar">
+    <button class="tab-btn active" onclick="switchTab('library')"><i class="fas fa-book-open"></i> Pre-Built Skills</button>
+    <button class="tab-btn" onclick="switchTab('mine')"><i class="fas fa-wand-magic-sparkles"></i> My Skills</button>
+    <button class="tab-btn" onclick="switchTab('create')"><i class="fas fa-plus-circle"></i> Create</button>
+    <button class="tab-btn" onclick="switchTab('howitworks')"><i class="fas fa-lightbulb"></i> How It Works</button>
+</div>
 
-    <!-- Left Column: Create Skill + Templates -->
-    <div class="lg:col-span-2 space-y-6">
-        <!-- Create Skill Form -->
-        <div class="card">
+<!-- ============ TAB 1: Pre-Built Skills Library ============ -->
+<div id="tab-library" class="tab-panel active">
+    <p class="text-sm text-gray-400 mb-5">Click any skill to instantly create it in your collection. Each skill comes with a tested, optimized system prompt.</p>
+
+    <!-- Search -->
+    <div class="mb-5">
+        <input type="text" id="libSearch" class="input-field py-2.5 px-4 text-sm w-full max-w-md" placeholder="Search skills by name or description..." oninput="filterLib()">
+    </div>
+
+    <!-- Messaging Category -->
+    <div class="mb-6">
+        <div class="flex items-center gap-2 mb-3">
+            <div class="cat-icon bg-cyan-600/20"><i class="fas fa-comments text-cyan-400"></i></div>
+            <h3 class="text-white font-semibold">Messaging & Communication</h3>
+            <span class="text-xs text-gray-500 ml-2">Email, chat, social media</span>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3" id="lib-messaging">
+            <div class="skill-chip" onclick="quickCreate('Email Responder','Automatically draft professional email replies','You are an expert email assistant. Draft clear, concise, and professional email replies. Match the tone of the original email. Keep responses under 200 words unless detailed explanation is needed. Always include a proper greeting and sign-off.','fas fa-envelope','cyan')">
+                <span class="dot bg-cyan-400"></span> Email Responder
+            </div>
+            <div class="skill-chip" onclick="quickCreate('Social Media Manager','Create engaging social media posts','You are a social media expert. Create engaging posts for Twitter/X, LinkedIn, Instagram, and Facebook. Use appropriate hashtags, emojis, and tone for each platform. Keep posts concise and shareable. Include a call-to-action when relevant.','fas fa-share-nodes','blue')">
+                <span class="dot bg-blue-400"></span> Social Media Manager
+            </div>
+            <div class="skill-chip" onclick="quickCreate('Customer Support Agent','Handle support tickets with empathy','You are a professional customer support agent. Respond to customer inquiries with empathy, clarity, and helpful solutions. Follow company policies, escalate complex issues when needed. Always maintain a positive tone. Aim to resolve issues on first contact.','fas fa-headset','green')">
+                <span class="dot bg-green-400"></span> Customer Support Agent
+            </div>
+            <div class="skill-chip" onclick="quickCreate('Meeting Summarizer','Summarize meeting notes into action items','You are an expert meeting summarizer. Take raw meeting notes and transform them into structured summaries with: key decisions, action items with owners, deadlines, and follow-up questions. Use bullet points and clear language.','fas fa-clipboard-list','amber')">
+                <span class="dot bg-amber-400"></span> Meeting Summarizer
+            </div>
+            <div class="skill-chip" onclick="quickCreate('Translator','Translate text preserving tone and context','You are an expert multilingual translator. Translate text accurately while preserving meaning, tone, and cultural context. Provide natural-sounding translations rather than literal ones. Note any untranslatable terms or cultural references.','fas fa-language','purple')">
+                <span class="dot bg-purple-400"></span> Translator
+            </div>
+        </div>
+    </div>
+
+    <!-- Code & Dev Category -->
+    <div class="mb-6">
+        <div class="flex items-center gap-2 mb-3">
+            <div class="cat-icon bg-blue-600/20"><i class="fas fa-code text-blue-400"></i></div>
+            <h3 class="text-white font-semibold">Code & Development</h3>
+            <span class="text-xs text-gray-500 ml-2">Review, debug, document</span>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3" id="lib-code">
+            <div class="skill-chip" onclick="quickCreate('Code Reviewer','Review code for bugs, security, and best practices','You are an expert code reviewer. Analyze the provided code for bugs, security vulnerabilities, performance issues, and adherence to best practices. Provide specific, actionable feedback with line references. Rate code quality 1-10 and suggest improvements.','fas fa-magnifying-glass','blue')">
+                <span class="dot bg-blue-400"></span> Code Reviewer
+            </div>
+            <div class="skill-chip" onclick="quickCreate('Bug Debugger','Find and fix bugs with explanations','You are an expert debugger. Analyze error messages, stack traces, and code to identify root causes of bugs. Explain why the bug occurs, provide the fix, and suggest how to prevent similar issues. Be specific about line numbers and variable names.','fas fa-bug','red')">
+                <span class="dot bg-red-400"></span> Bug Debugger
+            </div>
+            <div class="skill-chip" onclick="quickCreate('Code Documenter','Write clear documentation for code','You are a technical documentation expert. Write clear, comprehensive documentation for code including: function descriptions, parameter explanations, return values, usage examples, and edge cases. Follow standard documentation formats (JSDoc, docstrings, etc).','fas fa-file-code','green')">
+                <span class="dot bg-green-400"></span> Code Documenter
+            </div>
+            <div class="skill-chip" onclick="quickCreate('SQL Query Builder','Write optimized SQL queries','You are a database expert. Write optimized SQL queries based on natural language requests. Explain the query logic, suggest indexes for performance, and identify potential issues. Support MySQL, PostgreSQL, and SQLite.','fas fa-database','amber')">
+                <span class="dot bg-amber-400"></span> SQL Query Builder
+            </div>
+            <div class="skill-chip" onclick="quickCreate('API Designer','Design RESTful APIs with best practices','You are an API design expert. Design RESTful APIs with proper endpoints, request/response formats, error handling, authentication, and pagination. Follow OpenAPI/Swagger standards. Include example requests and responses.','fas fa-plug','purple')">
+                <span class="dot bg-purple-400"></span> API Designer
+            </div>
+            <div class="skill-chip" onclick="quickCreate('Regex Expert','Write and explain regular expressions','You are a regex expert. Write regular expressions for any pattern matching task. Explain each part of the regex, provide test cases, and warn about edge cases. Support PCRE, JavaScript, and Python regex flavors.','fas fa-asterisk','cyan')">
+                <span class="dot bg-cyan-400"></span> Regex Expert
+            </div>
+        </div>
+    </div>
+
+    <!-- Writing Category -->
+    <div class="mb-6">
+        <div class="flex items-center gap-2 mb-3">
+            <div class="cat-icon bg-purple-600/20"><i class="fas fa-pen-fancy text-purple-400"></i></div>
+            <h3 class="text-white font-semibold">Writing & Content</h3>
+            <span class="text-xs text-gray-500 ml-2">Blog, copy, creative</span>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3" id="lib-writing">
+            <div class="skill-chip" onclick="quickCreate('Blog Writer','Write engaging blog posts','You are a professional blog writer. Create engaging, SEO-friendly blog posts with compelling headlines, clear structure (H2/H3), short paragraphs, and a strong conclusion. Write in a conversational yet authoritative tone. Include relevant examples.','fas fa-pen-nib','purple')">
+                <span class="dot bg-purple-400"></span> Blog Writer
+            </div>
+            <div class="skill-chip" onclick="quickCreate('Copywriter','Write persuasive marketing copy','You are an expert copywriter. Write persuasive marketing copy for ads, landing pages, emails, and product descriptions. Use proven frameworks (AIDA, PAS). Focus on benefits over features. Create urgency and clear CTAs.','fas fa-bullhorn','red')">
+                <span class="dot bg-red-400"></span> Copywriter
+            </div>
+            <div class="skill-chip" onclick="quickCreate('Creative Writer','Write stories, poems, and creative content','You are a talented creative writer. Craft stories, poems, dialogue, and other creative content. Focus on vivid imagery, emotional resonance, compelling characters, and engaging narratives. Adapt style to genre and mood.','fas fa-feather','amber')">
+                <span class="dot bg-amber-400"></span> Creative Writer
+            </div>
+            <div class="skill-chip" onclick="quickCreate('Proofreader','Fix grammar, spelling, and style issues','You are an expert proofreader. Fix grammar, spelling, punctuation, and style issues. Improve sentence structure, clarity, and readability. Preserve the original voice while enhancing quality. Explain each correction.','fas fa-spell-check','green')">
+                <span class="dot bg-green-400"></span> Proofreader
+            </div>
+            <div class="skill-chip" onclick="quickCreate('Headline Generator','Create catchy headlines and titles','You are a headline expert. Generate multiple catchy, clickable headlines for articles, videos, and social media. Use proven formulas (How-to, Numbered, Question, Curiosity). Optimize for engagement and SEO.','fas fa-heading','blue')">
+                <span class="dot bg-blue-400"></span> Headline Generator
+            </div>
+        </div>
+    </div>
+
+    <!-- Analysis Category -->
+    <div class="mb-6">
+        <div class="flex items-center gap-2 mb-3">
+            <div class="cat-icon bg-green-600/20"><i class="fas fa-chart-line text-green-400"></i></div>
+            <h3 class="text-white font-semibold">Analysis & Research</h3>
+            <span class="text-xs text-gray-500 ml-2">Data, documents, strategy</span>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3" id="lib-analysis">
+            <div class="skill-chip" onclick="quickCreate('Data Analyst','Analyze data and create visualizations','You are a skilled data analyst. Help analyze datasets, identify trends, create statistical summaries, suggest visualizations, and provide actionable business insights. Use clear explanations and support conclusions with data.','fas fa-chart-bar','green')">
+                <span class="dot bg-green-400"></span> Data Analyst
+            </div>
+            <div class="skill-chip" onclick="quickCreate('Legal Advisor','Analyze legal documents and provide guidance','You are a knowledgeable legal assistant. Provide general legal information and analysis. Always note this is not formal legal advice. Analyze contracts, explain legal concepts in plain language, and identify potential risks.','fas fa-gavel','red')">
+                <span class="dot bg-red-400"></span> Legal Advisor
+            </div>
+            <div class="skill-chip" onclick="quickCreate('Market Researcher','Research markets and competitors','You are a market research analyst. Analyze market trends, competitor strategies, customer segments, and industry opportunities. Provide data-driven insights with clear recommendations. Use frameworks like SWOT, Porter Five Forces.','fas fa-magnifying-glass-chart','blue')">
+                <span class="dot bg-blue-400"></span> Market Researcher
+            </div>
+            <div class="skill-chip" onclick="quickCreate('Document Summarizer','Summarize long documents into key points','You are a document summarization expert. Read long documents and create concise summaries highlighting key points, decisions, and action items. Preserve critical details while reducing length by 70-80%. Use bullet points.','fas fa-compress-alt','amber')">
+                <span class="dot bg-amber-400"></span> Document Summarizer
+            </div>
+            <div class="skill-chip" onclick="quickCreate('Fact Checker','Verify claims and find sources','You are a fact-checking expert. Analyze claims for accuracy, identify potential biases, and suggest reliable sources. Distinguish between facts, opinions, and speculation. Provide balanced, evidence-based assessments.','fas fa-check-double','cyan')">
+                <span class="dot bg-cyan-400"></span> Fact Checker
+            </div>
+        </div>
+    </div>
+
+    <!-- Business Category -->
+    <div class="mb-6">
+        <div class="flex items-center gap-2 mb-3">
+            <div class="cat-icon bg-amber-600/20"><i class="fas fa-briefcase text-amber-400"></i></div>
+            <h3 class="text-white font-semibold">Business & Productivity</h3>
+            <span class="text-xs text-gray-500 ml-2">Plans, proposals, strategy</span>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3" id="lib-business">
+            <div class="skill-chip" onclick="quickCreate('Business Plan Writer','Create comprehensive business plans','You are a business strategy expert. Create detailed business plans with executive summaries, market analysis, financial projections, and implementation timelines. Use professional language suitable for investors and stakeholders.','fas fa-chart-pie','amber')">
+                <span class="dot bg-amber-400"></span> Business Plan Writer
+            </div>
+            <div class="skill-chip" onclick="quickCreate('Pitch Deck Creator','Design compelling pitch decks','You are a pitch deck expert. Create compelling slide content for startup pitch decks. Structure: Problem, Solution, Market, Product, Traction, Team, Financials, Ask. Keep text minimal, focus on impact and clarity.','fas fa-presentation-screen','purple')">
+                <span class="dot bg-purple-400"></span> Pitch Deck Creator
+            </div>
+            <div class="skill-chip" onclick="quickCreate('Job Description Writer','Write clear job postings','You are an HR expert. Write clear, inclusive job descriptions that attract top talent. Include role summary, responsibilities, requirements, benefits, and company culture. Avoid jargon and biased language. Be specific about must-haves vs nice-to-haves.','fas fa-user-tie','blue')">
+                <span class="dot bg-blue-400"></span> Job Description Writer
+            </div>
+            <div class="skill-chip" onclick="quickCreate('Email Marketer','Create high-converting email campaigns','You are an email marketing expert. Write subject lines, preview text, and email body copy that drives opens and conversions. Use personalization, segmentation logic, and A/B test suggestions. Optimize for mobile.','fas fa-envelope-open-text','green')">
+                <span class="dot bg-green-400"></span> Email Marketer
+            </div>
+            <div class="skill-chip" onclick="quickCreate('Project Planner','Break projects into actionable tasks','You are a project management expert. Break down projects into clear, actionable tasks with owners, deadlines, dependencies, and success criteria. Use frameworks like WBS, Gantt, or Agile sprints. Identify risks and milestones.','fas fa-tasks','red')">
+                <span class="dot bg-red-400"></span> Project Planner
+            </div>
+        </div>
+    </div>
+
+    <!-- Education Category -->
+    <div class="mb-6">
+        <div class="flex items-center gap-2 mb-3">
+            <div class="cat-icon bg-red-600/20"><i class="fas fa-graduation-cap text-red-400"></i></div>
+            <h3 class="text-white font-semibold">Education & Learning</h3>
+            <span class="text-xs text-gray-500 ml-2">Tutor, quiz, explain</span>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3" id="lib-education">
+            <div class="skill-chip" onclick="quickCreate('Study Tutor','Explain concepts step by step','You are a patient tutor. Explain concepts step-by-step using simple language, analogies, and examples. Check understanding with questions. Adapt complexity to the learner level. Encourage curiosity and deeper thinking.','fas fa-chalkboard-teacher','blue')">
+                <span class="dot bg-blue-400"></span> Study Tutor
+            </div>
+            <div class="skill-chip" onclick="quickCreate('Quiz Maker','Generate quizzes and test questions','You are an assessment expert. Create quizzes with multiple choice, true/false, and short answer questions. Vary difficulty levels. Include answer explanations. Align questions with learning objectives.','fas fa-question-circle','green')">
+                <span class="dot bg-green-400"></span> Quiz Maker
+            </div>
+            <div class="skill-chip" onclick="quickCreate('Concept Explainer','Explain complex topics simply','You are a science communicator. Take complex topics and explain them in simple, engaging language. Use analogies, real-world examples, and visual descriptions. Start simple then add depth. Avoid unnecessary jargon.','fas fa-lightbulb','amber')">
+                <span class="dot bg-amber-400"></span> Concept Explainer
+            </div>
+            <div class="skill-chip" onclick="quickCreate('Flashcard Creator','Create study flashcards from content','You are a study aid expert. Create effective flashcards from any content. Use question-answer format, include key terms, mnemonics, and visual cues. Organize by topic and difficulty. Follow spaced repetition principles.','fas fa-clone','purple')">
+                <span class="dot bg-purple-400"></span> Flashcard Creator
+            </div>
+            <div class="skill-chip" onclick="quickCreate('Essay Grader','Grade essays with detailed feedback','You are an experienced educator. Grade essays based on structure, argument strength, evidence use, grammar, and originality. Provide specific, constructive feedback with examples of improvement. Score on a clear rubric.','fas fa-pen-to-square','red')">
+                <span class="dot bg-red-400"></span> Essay Grader
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ============ TAB 2: My Skills ============ -->
+<div id="tab-mine" class="tab-panel">
+    {% if skills %}
+    <!-- Search -->
+    <div class="flex items-center justify-between mb-5">
+        <input type="text" id="mySkillSearch" class="input-field py-2 px-4 text-sm w-64" placeholder="Search your skills..." oninput="filterMySkills()">
+        <span class="text-xs text-gray-500">{{ skills|length }} skill{{ 's' if skills|length != 1 }}</span>
+    </div>
+
+    <div class="space-y-4" id="mySkillsList">
+        {% for skill in skills %}
+        <div class="my-skill-card" data-name="{{ skill.name|lower }}" data-desc="{{ (skill.description or '')|lower }}">
+            <div class="flex items-start justify-between mb-3">
+                <div class="flex items-center gap-3 min-w-0">
+                    <div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0
+                        {% if skill.is_active %}bg-purple-600/20{% else %}bg-gray-700/50{% endif %}">
+                        <i class="fas fa-wand-magic-sparkles
+                            {% if skill.is_active %}text-purple-400{% else %}text-gray-500{% endif %}"></i>
+                    </div>
+                    <div class="min-w-0">
+                        <div class="flex items-center gap-2">
+                            <h4 class="text-white font-semibold truncate">{{ skill.name }}</h4>
+                            {% if skill.is_active %}
+                            <span class="px-2 py-0.5 bg-green-600/20 text-green-400 rounded text-[10px] font-medium">Active</span>
+                            {% endif %}
+                        </div>
+                        <p class="text-xs text-gray-500 truncate">{{ skill.description or 'No description' }}</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-1 flex-shrink-0 ml-3">
+                    <button onclick="openTestModal('{{ skill.id }}', '{{ skill.name|e }}', '{{ skill.system_prompt|e }}')" class="p-2 text-gray-500 hover:text-cyan-400 hover:bg-cyan-600/10 rounded-lg transition" title="Test Skill">
+                        <i class="fas fa-play text-sm"></i>
+                    </button>
+                    <button onclick="showSkillDetail('{{ skill.id }}', '{{ skill.name|e }}', '{{ (skill.description or '')|e }}', '{{ skill.system_prompt|e }}', '{{ skill.created_at }}')" class="p-2 text-gray-500 hover:text-blue-400 hover:bg-blue-600/10 rounded-lg transition" title="View Details">
+                        <i class="fas fa-eye text-sm"></i>
+                    </button>
+                    <button onclick="copySkillPrompt('{{ skill.system_prompt|e }}')" class="p-2 text-gray-500 hover:text-green-400 hover:bg-green-600/10 rounded-lg transition" title="Copy Prompt">
+                        <i class="fas fa-copy text-sm"></i>
+                    </button>
+                    <form method="POST" action="/skills/{{ skill.id }}/delete" class="inline" onsubmit="return confirm('Delete \'{{ skill.name }}\'? This cannot be undone.')">
+                        <button type="submit" class="p-2 text-gray-500 hover:text-red-400 hover:bg-red-600/10 rounded-lg transition" title="Delete">
+                            <i class="fas fa-trash text-sm"></i>
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Prompt Preview -->
+            <div class="prompt-box mb-3">{{ skill.system_prompt[:250] }}{% if skill.system_prompt|length > 250 %}...{% endif %}</div>
+
+            <!-- Footer -->
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3 text-[10px] text-gray-600">
+                    <span><i class="fas fa-calendar mr-1"></i>{{ skill.created_at[:10] }}</span>
+                    <span><i class="fas fa-keyboard mr-1"></i>{{ skill.system_prompt|length }} chars</span>
+                </div>
+                <button onclick="showApiUsage('{{ skill.id }}', '{{ skill.name|e }}')" class="text-[10px] text-gray-500 hover:text-blue-400 transition flex items-center gap-1">
+                    <i class="fas fa-code"></i> API
+                </button>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <!-- Empty State -->
+    <div class="text-center py-16">
+        <div class="w-20 h-20 bg-purple-600/10 rounded-2xl flex items-center justify-center mx-auto mb-5">
+            <i class="fas fa-wand-magic-sparkles text-purple-400 text-3xl opacity-50"></i>
+        </div>
+        <h3 class="text-white font-semibold text-lg mb-2">No Skills Yet</h3>
+        <p class="text-gray-500 text-sm max-w-md mx-auto mb-6">
+            Go to <strong>Pre-Built Skills</strong> to pick from 30+ ready-made skills, or <strong>Create</strong> your own from scratch.
+        </p>
+        <button onclick="switchTab('library')" class="btn btn-primary text-sm">
+            <i class="fas fa-book-open mr-1"></i> Browse Pre-Built Skills
+        </button>
+    </div>
+    {% endif %}
+</div>
+
+<!-- ============ TAB 3: Create ============ -->
+<div id="tab-create" class="tab-panel">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Create Form -->
+        <div class="create-card">
             <div class="flex items-center gap-3 mb-5">
                 <div class="w-10 h-10 bg-purple-600/20 rounded-xl flex items-center justify-center">
                     <i class="fas fa-plus-circle text-purple-400"></i>
                 </div>
                 <div>
-                    <h3 class="text-white font-semibold">Create New Skill</h3>
-                    <p class="text-xs text-gray-500">Define a custom AI behavior</p>
+                    <h3 class="text-white font-semibold">Create Custom Skill</h3>
+                    <p class="text-xs text-gray-500">Define your own AI behavior</p>
                 </div>
             </div>
 
@@ -52,203 +327,272 @@
                 <div>
                     <label class="block text-sm font-medium text-gray-300 mb-1.5">Skill Name <span class="text-red-400">*</span></label>
                     <input type="text" name="name" required class="input-field" placeholder="e.g. Code Reviewer, Legal Advisor" id="skillName">
-                    <p class="text-[10px] text-gray-600 mt-1">A descriptive name for this skill</p>
                 </div>
-
                 <div>
                     <label class="block text-sm font-medium text-gray-300 mb-1.5">Description</label>
-                    <input type="text" name="description" class="input-field" placeholder="Brief description of what this skill does" id="skillDesc">
-                    <p class="text-[10px] text-gray-600 mt-1">Optional short description</p>
+                    <input type="text" name="description" class="input-field" placeholder="What does this skill do?" id="skillDesc">
                 </div>
-
                 <div>
                     <label class="block text-sm font-medium text-gray-300 mb-1.5">System Prompt <span class="text-red-400">*</span></label>
-                    <textarea name="system_prompt" rows="8" required class="input-field font-mono text-sm leading-relaxed" placeholder="You are an expert assistant that..." id="skillPrompt"></textarea>
+                    <textarea name="system_prompt" rows="10" required class="input-field font-mono text-sm leading-relaxed" placeholder="You are an expert assistant that...&#10;&#10;Instructions the AI follows when this skill is active:" id="skillPrompt"></textarea>
                     <div class="flex items-center justify-between mt-1">
-                        <p class="text-[10px] text-gray-600">Instructions the AI follows when this skill is active</p>
+                        <p class="text-[10px] text-gray-600">The AI will follow these instructions when this skill is applied</p>
                         <span class="text-[10px] text-gray-600" id="charCount">0 chars</span>
                     </div>
                 </div>
-
                 <button type="submit" class="btn btn-primary w-full py-3">
                     <i class="fas fa-wand-magic-sparkles mr-2"></i>Create Skill
                 </button>
             </form>
         </div>
 
-        <!-- Quick Templates -->
-        <div class="card">
-            <div class="flex items-center gap-3 mb-4">
-                <div class="w-10 h-10 bg-amber-600/20 rounded-xl flex items-center justify-center">
-                    <i class="fas fa-bolt text-amber-400"></i>
-                </div>
-                <div>
-                    <h3 class="text-white font-semibold">Quick Templates</h3>
-                    <p class="text-xs text-gray-500">Start with a pre-built skill</p>
+        <!-- Tips -->
+        <div class="space-y-5">
+            <div class="cat-card">
+                <h4 class="text-white font-semibold mb-3 flex items-center gap-2"><i class="fas fa-lightbulb text-amber-400"></i> Tips for Great Prompts</h4>
+                <div class="space-y-3">
+                    <div class="example-card">
+                        <p class="text-xs text-amber-400 font-medium mb-1">1. Set the Role</p>
+                        <p class="text-xs text-gray-400">Start with "You are a [role]..." — this gives the AI a clear identity and expertise.</p>
+                    </div>
+                    <div class="example-card">
+                        <p class="text-xs text-cyan-400 font-medium mb-1">2. Define the Task</p>
+                        <p class="text-xs text-gray-400">Clearly state what the AI should do — "Analyze...", "Write...", "Review...", "Explain..."</p>
+                    </div>
+                    <div class="example-card">
+                        <p class="text-xs text-green-400 font-medium mb-1">3. Set Rules</p>
+                        <p class="text-xs text-gray-400">Add constraints — "Keep under 200 words", "Use bullet points", "Be professional".</p>
+                    </div>
+                    <div class="example-card">
+                        <p class="text-xs text-purple-400 font-medium mb-1">4. Give Format</p>
+                        <p class="text-xs text-gray-400">Specify output format — "Return as JSON", "Use markdown tables", "Number the items".</p>
+                    </div>
                 </div>
             </div>
-            <div class="space-y-2" id="templates">
-                {% set templates = [
-                    ("Code Reviewer", "fas fa-code", "blue", "Reviews code for bugs, security issues, and best practices", "You are an expert code reviewer. Analyze the provided code for bugs, security vulnerabilities, performance issues, and adherence to best practices. Provide specific, actionable feedback with line references when applicable. Rate the code quality on a scale of 1-10 and suggest improvements."),
-                    ("Legal Advisor", "fas fa-gavel", "red", "Provides legal information and document analysis", "You are a knowledgeable legal assistant. Provide general legal information and analysis. Always note that this is not formal legal advice. Analyze contracts, explain legal concepts in plain language, and identify potential legal risks. Be precise and cite relevant legal principles when possible."),
-                    ("Data Analyst", "fas fa-chart-bar", "green", "Analyzes data and creates insights", "You are a skilled data analyst. Help analyze datasets, identify trends, create statistical summaries, suggest visualizations, and provide actionable business insights. Use clear explanations and support conclusions with data. Suggest appropriate statistical methods and tools."),
-                    ("Creative Writer", "fas fa-pen-fancy", "purple", "Helps with storytelling and creative content", "You are a talented creative writer. Help craft stories, articles, marketing copy, and other creative content. Focus on engaging narrative, vivid descriptions, proper structure, and matching the desired tone and style. Provide multiple options when appropriate."),
-                    ("Customer Support", "fas fa-headset", "cyan", "Handles customer inquiries professionally", "You are a professional customer support agent. Respond to customer inquiries with empathy, clarity, and helpful solutions. Follow company policies, escalate complex issues when needed, and always maintain a positive, professional tone. Aim to resolve issues on first contact."),
-                    ("Translator", "fas fa-language", "orange", "Translates text between languages accurately", "You are an expert multilingual translator. Translate text accurately while preserving meaning, tone, and cultural context. Provide natural-sounding translations rather than literal ones. Note any untranslatable terms or cultural references. Support all major languages.")
-                ] %}
-                {% for name, icon, color, desc, prompt in templates %}
-                <button type="button" onclick="applyTemplate('{{ name|e }}', '{{ desc|e }}', '{{ prompt|e }}')" class="w-full p-3 bg-gray-800/50 rounded-lg border border-gray-700 hover:border-{{ color }}-500/50 hover:bg-{{ color }}-600/5 transition text-left group">
-                    <div class="flex items-center gap-3">
-                        <div class="w-8 h-8 bg-{{ color }}-600/20 rounded-lg flex items-center justify-center flex-shrink-0 group-hover:bg-{{ color }}-600/30 transition">
-                            <i class="{{ icon }} text-{{ color }}-400 text-sm"></i>
-                        </div>
-                        <div class="min-w-0">
-                            <div class="text-sm text-white font-medium">{{ name }}</div>
-                            <div class="text-[10px] text-gray-500 truncate">{{ desc }}</div>
-                        </div>
-                    </div>
-                </button>
-                {% endfor %}
+
+            <div class="cat-card">
+                <h4 class="text-white font-semibold mb-3 flex items-center gap-2"><i class="fas fa-code text-blue-400"></i> API Usage</h4>
+                <div class="bg-gray-900/80 rounded-lg p-4 overflow-x-auto">
+                    <pre class="text-xs"><code class="text-green-400"><span class="text-gray-500"># Use a skill in your API call</span>
+curl -X POST http://203.55.176.101:8000/v1/chat/completions \
+  -H <span class="text-amber-400">"Authorization: Bearer sk-local-..."</span> \
+  -d '{
+    <span class="text-amber-400">"model"</span>: <span class="text-amber-400">"llama3.2:1b"</span>,
+    <span class="text-amber-400">"messages"</span>: [{"role": "user", "content": "..."}],
+    <span class="text-amber-400">"skill_id"</span>: <span class="text-amber-400">"YOUR_SKILL_ID"</span>
+  }'</code></pre>
+                </div>
             </div>
         </div>
     </div>
+</div>
 
-    <!-- Right Column: Skill List -->
-    <div class="lg:col-span-3 space-y-6">
-        <!-- Header + Search -->
-        <div class="flex items-center justify-between">
-            <h3 class="text-white font-semibold flex items-center gap-2">
-                <i class="fas fa-list text-gray-400"></i> Your Skills
-            </h3>
-            {% if skills %}
-            <div class="flex items-center gap-2">
-                <input type="text" id="skillSearch" class="input-field py-1.5 px-3 text-sm w-48" placeholder="Search skills..." onkeyup="filterSkills()">
+<!-- ============ TAB 4: How It Works ============ -->
+<div id="tab-howitworks" class="tab-panel">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Left: Explanation -->
+        <div class="space-y-5">
+            <div class="cat-card">
+                <h3 class="text-white font-semibold text-lg mb-4 flex items-center gap-2">
+                    <i class="fas fa-brain text-purple-400"></i> What Are Skills?
+                </h3>
+                <p class="text-sm text-gray-400 leading-relaxed mb-4">
+                    <strong class="text-white">Skills are special instructions</strong> that change how your AI assistant thinks and responds. Think of them like giving your AI a new <strong class="text-cyan-400">job title</strong> or <strong class="text-cyan-400">expertise</strong>.
+                </p>
+                <p class="text-sm text-gray-400 leading-relaxed mb-4">
+                    Without a skill, your AI is a general assistant. <strong class="text-white">With a skill</strong>, it becomes a specialist — a code reviewer, a legal advisor, a creative writer, or anything you define.
+                </p>
+                <div class="bg-gray-900/60 rounded-lg p-4 border border-gray-700/30">
+                    <p class="text-xs text-gray-500 mb-2 font-medium">Example:</p>
+                    <p class="text-xs text-gray-400">Without skill: <span class="text-gray-500">"How do I sort a list?"</span> → Generic answer</p>
+                    <p class="text-xs text-cyan-400 mt-1">With "Code Reviewer" skill: <span class="text-gray-500">"How do I sort a list?"</span> → Detailed code review with best practices, complexity analysis, and alternative approaches</p>
+                </div>
             </div>
-            {% endif %}
-        </div>
 
-        <!-- Skills List -->
-        {% if skills %}
-        <div class="space-y-3" id="skillsList">
-            {% for skill in skills %}
-            <div class="card group hover:border-purple-500/30 transition-all duration-200 skill-card" data-name="{{ skill.name|lower }}" data-desc="{{ (skill.description or '')|lower }}">
-                <!-- Top Row: Name + Actions -->
-                <div class="flex items-start justify-between mb-3">
-                    <div class="flex items-center gap-3 min-w-0">
-                        <div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0
-                            {% if skill.is_active %}bg-purple-600/20{% else %}bg-gray-700/50{% endif %}">
-                            <i class="fas fa-wand-magic-sparkles
-                                {% if skill.is_active %}text-purple-400{% else %}text-gray-500{% endif %}"></i>
-                        </div>
-                        <div class="min-w-0">
-                            <div class="flex items-center gap-2">
-                                <h4 class="text-white font-semibold truncate">{{ skill.name }}</h4>
-                                {% if skill.is_active %}
-                                <span class="badge badge-green text-[10px]">Active</span>
-                                {% else %}
-                                <span class="badge bg-gray-700 text-gray-400 text-[10px]">Inactive</span>
-                                {% endif %}
-                            </div>
-                            <p class="text-xs text-gray-500 truncate">{{ skill.description or 'No description' }}</p>
+            <div class="cat-card">
+                <h3 class="text-white font-semibold text-lg mb-4 flex items-center gap-2">
+                    <i class="fas fa-cogs text-cyan-400"></i> How It Works (Step by Step)
+                </h3>
+                <div class="space-y-1">
+                    <div class="flex items-start gap-3">
+                        <div class="step-num">1</div>
+                        <div>
+                            <p class="text-sm text-white font-medium">You Create a Skill</p>
+                            <p class="text-xs text-gray-500">Write a system prompt describing the AI's role, expertise, and rules.</p>
                         </div>
                     </div>
-                    <div class="flex items-center gap-1 flex-shrink-0 ml-2">
-                        <button onclick="showSkillDetail('{{ skill.id }}', '{{ skill.name|e }}', '{{ (skill.description or '')|e }}', '{{ skill.system_prompt|e }}', '{{ skill.created_at }}')" class="p-2 text-gray-500 hover:text-blue-400 hover:bg-blue-600/10 rounded-lg transition" title="View Details">
-                            <i class="fas fa-eye text-sm"></i>
-                        </button>
-                        <button onclick="copySkillPrompt('{{ skill.system_prompt|e }}')" class="p-2 text-gray-500 hover:text-green-400 hover:bg-green-600/10 rounded-lg transition" title="Copy Prompt">
-                            <i class="fas fa-copy text-sm"></i>
-                        </button>
-                        <form method="POST" action="/skills/{{ skill.id }}/delete" class="inline" onsubmit="return confirm('Delete skill \'{{ skill.name }}\'? This cannot be undone.')">
-                            <button type="submit" class="p-2 text-gray-500 hover:text-red-400 hover:bg-red-600/10 rounded-lg transition" title="Delete">
-                                <i class="fas fa-trash text-sm"></i>
-                            </button>
-                        </form>
+                    <div class="flow-line"></div>
+                    <div class="flex items-start gap-3">
+                        <div class="step-num">2</div>
+                        <div>
+                            <p class="text-sm text-white font-medium">Skill is Stored</p>
+                            <p class="text-xs text-gray-500">The skill is saved with a unique ID in your collection.</p>
+                        </div>
+                    </div>
+                    <div class="flow-line"></div>
+                    <div class="flex items-start gap-3">
+                        <div class="step-num">3</div>
+                        <div>
+                            <p class="text-sm text-white font-medium">You Use the Skill</p>
+                            <p class="text-xs text-gray-500">Pass the skill ID when chatting. The AI receives the system prompt automatically.</p>
+                        </div>
+                    </div>
+                    <div class="flow-line"></div>
+                    <div class="flex items-start gap-3">
+                        <div class="step-num">4</div>
+                        <div>
+                            <p class="text-sm text-white font-medium">AI Responds as Specialist</p>
+                            <p class="text-xs text-gray-500">The AI follows the skill's instructions and responds in character.</p>
+                        </div>
                     </div>
                 </div>
-
-                <!-- Prompt Preview -->
-                <div class="bg-gray-900/80 rounded-lg p-3 mb-3">
-                    <div class="flex items-center gap-2 mb-1.5">
-                        <i class="fas fa-terminal text-[10px] text-gray-600"></i>
-                        <span class="text-[10px] text-gray-600 uppercase tracking-wider">System Prompt</span>
-                    </div>
-                    <p class="text-sm text-gray-400 leading-relaxed line-clamp-3">{{ skill.system_prompt[:300] }}{% if skill.system_prompt|length > 300 %}<span class="text-gray-600">...</span>{% endif %}</p>
-                </div>
-
-                <!-- Footer: Meta + API Usage -->
-                <div class="flex items-center justify-between">
-                    <div class="flex items-center gap-4 text-[10px] text-gray-600">
-                        <span><i class="fas fa-calendar mr-1"></i>{{ skill.created_at[:10] }}</span>
-                        <span><i class="fas fa-keyboard mr-1"></i>{{ skill.system_prompt|length }} chars</span>
-                    </div>
-                    <button onclick="showApiUsage('{{ skill.id }}', '{{ skill.name|e }}')" class="text-[10px] text-gray-500 hover:text-blue-400 transition flex items-center gap-1">
-                        <i class="fas fa-code"></i> API Usage
-                    </button>
-                </div>
-            </div>
-            {% endfor %}
-        </div>
-        {% else %}
-        <!-- Empty State -->
-        <div class="card text-center py-16">
-            <div class="w-20 h-20 bg-purple-600/10 rounded-2xl flex items-center justify-center mx-auto mb-5">
-                <i class="fas fa-wand-magic-sparkles text-purple-400 text-3xl opacity-50"></i>
-            </div>
-            <h3 class="text-white font-semibold text-lg mb-2">No Skills Created Yet</h3>
-            <p class="text-gray-500 text-sm max-w-md mx-auto mb-6">
-                Skills let you customize AI behavior for specific tasks. Create your first skill using the form on the left, or start with a quick template.
-            </p>
-            <div class="flex justify-center gap-3">
-                <button onclick="applyTemplate('Code Reviewer', 'Reviews code for bugs and best practices', 'You are an expert code reviewer. Analyze the provided code for bugs, security vulnerabilities, performance issues, and adherence to best practices. Provide specific, actionable feedback with line references when applicable.')" class="btn btn-primary text-sm">
-                    <i class="fas fa-code mr-1"></i> Create Code Reviewer
-                </button>
-                <button onclick="document.getElementById('skillName').focus()" class="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition">
-                    <i class="fas fa-plus mr-1"></i> Start from Scratch
-                </button>
             </div>
         </div>
-        {% endif %}
 
-        <!-- API Usage Reference -->
-        {% if skills %}
-        <div class="card">
-            <div class="flex items-center gap-3 mb-4">
-                <div class="w-10 h-10 bg-blue-600/20 rounded-xl flex items-center justify-center">
-                    <i class="fas fa-code text-blue-400"></i>
+        <!-- Right: Visual Examples -->
+        <div class="space-y-5">
+            <div class="cat-card">
+                <h3 class="text-white font-semibold text-lg mb-4 flex items-center gap-2">
+                    <i class="fas fa-eye text-green-400"></i> Before vs After Skills
+                </h3>
+                <div class="space-y-4">
+                    <!-- Before -->
+                    <div class="example-card border-red-500/20">
+                        <div class="flex items-center gap-2 mb-2">
+                            <span class="px-2 py-0.5 bg-red-600/20 text-red-400 rounded text-[10px] font-bold">WITHOUT SKILL</span>
+                        </div>
+                        <p class="text-xs text-gray-500 mb-1">User: "Review this Python code"</p>
+                        <p class="text-xs text-gray-400 italic">"Sure! Here's a review of your code..."</p>
+                        <p class="text-[10px] text-red-400/60 mt-2">Generic, no structure, misses security issues</p>
+                    </div>
+                    <!-- After -->
+                    <div class="example-card border-green-500/20">
+                        <div class="flex items-center gap-2 mb-2">
+                            <span class="px-2 py-0.5 bg-green-600/20 text-green-400 rounded text-[10px] font-bold">WITH "Code Reviewer" SKILL</span>
+                        </div>
+                        <p class="text-xs text-gray-500 mb-1">User: "Review this Python code"</p>
+                        <p class="text-xs text-gray-400 italic">"## Code Review<br>**Quality Score: 7/10**<br>### Issues Found:<br>1. Line 15: SQL injection vulnerability...<br>2. Line 23: Missing error handling...<br>### Suggestions:<br>..."</p>
+                        <p class="text-[10px] text-green-400/60 mt-2">Structured, detailed, catches security bugs, gives actionable feedback</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="cat-card">
+                <h3 class="text-white font-semibold text-lg mb-4 flex items-center gap-2">
+                    <i class="fas fa-question-circle text-amber-400"></i> Why Use Skills?
+                </h3>
+                <div class="space-y-3">
+                    <div class="flex items-start gap-3">
+                        <div class="w-8 h-8 bg-purple-600/20 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5"><i class="fas fa-bolt text-purple-400 text-xs"></i></div>
+                        <div>
+                            <p class="text-sm text-white font-medium">Consistency</p>
+                            <p class="text-xs text-gray-500">Get the same quality and format every time, not random outputs.</p>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <div class="w-8 h-8 bg-cyan-600/20 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5"><i class="fas fa-shield text-cyan-400 text-xs"></i></div>
+                        <div>
+                            <p class="text-sm text-white font-medium">Expertise</p>
+                            <p class="text-xs text-gray-500">Turn a general AI into a domain specialist with one prompt.</p>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <div class="w-8 h-8 bg-green-600/20 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5"><i class="fas fa-clock text-green-400 text-xs"></i></div>
+                        <div>
+                            <p class="text-sm text-white font-medium">Time Saving</p>
+                            <p class="text-xs text-gray-500">No need to explain context every time — the skill remembers.</p>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <div class="w-8 h-8 bg-amber-600/20 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5"><i class="fas fa-share text-amber-400 text-xs"></i></div>
+                        <div>
+                            <p class="text-sm text-white font-medium">Shareable</p>
+                            <p class="text-xs text-gray-500">Share skills with your team via API — everyone gets the same AI behavior.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="cat-card">
+                <h3 class="text-white font-semibold mb-3 flex items-center gap-2">
+                    <i class="fas fa-layer-group text-blue-400"></i> Skill Anatomy
+                </h3>
+                <div class="bg-gray-900/60 rounded-lg p-4 space-y-2">
+                    <div class="flex items-center gap-2">
+                        <span class="px-2 py-0.5 bg-purple-600/30 text-purple-300 rounded text-[10px] font-bold w-20 text-center">ROLE</span>
+                        <span class="text-xs text-gray-400">"You are a code reviewer..."</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="px-2 py-0.5 bg-cyan-600/30 text-cyan-300 rounded text-[10px] font-bold w-20 text-center">TASK</span>
+                        <span class="text-xs text-gray-400">"Analyze code for bugs..."</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="px-2 py-0.5 bg-green-600/30 text-green-300 rounded text-[10px] font-bold w-20 text-center">RULES</span>
+                        <span class="text-xs text-gray-400">"Be specific, use line refs..."</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="px-2 py-0.5 bg-amber-600/30 text-amber-300 rounded text-[10px] font-bold w-20 text-center">FORMAT</span>
+                        <span class="text-xs text-gray-400">"Return as structured report..."</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ============ MODALS ============ -->
+
+<!-- Test Skill Modal -->
+<div id="testModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-[#1e293b] border border-gray-700 rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden shadow-2xl">
+        <div class="flex items-center justify-between p-5 border-b border-gray-700">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-cyan-600/20 rounded-xl flex items-center justify-center">
+                    <i class="fas fa-play text-cyan-400"></i>
                 </div>
                 <div>
-                    <h3 class="text-white font-semibold">Using Skills via API</h3>
-                    <p class="text-xs text-gray-500">Reference for integrating skills into your applications</p>
+                    <h3 class="text-white font-semibold">Test Skill</h3>
+                    <p class="text-xs text-gray-500" id="testSkillName">-</p>
                 </div>
             </div>
-            <div class="bg-gray-900 rounded-lg p-4 overflow-x-auto">
-                <pre class="text-sm"><code class="text-green-400"><span class="text-gray-500"># Python - using OpenAI SDK</span>
-<span class="text-purple-400">import</span> openai
+            <button onclick="closeTestModal()" class="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="p-5 overflow-y-auto max-h-[70vh]">
+            <!-- System Prompt Preview -->
+            <div class="mb-4">
+                <p class="text-xs text-gray-500 mb-1.5 font-medium">System Prompt (what the AI will follow):</p>
+                <div class="prompt-box text-[11px]" id="testSystemPrompt" style="max-height:80px;"></div>
+            </div>
 
-openai.api_key = <span class="text-amber-400">"sk-local-your-key"</span>
-openai.api_base = <span class="text-amber-400">"http://203.55.176.101:8000/v1"</span>
+            <!-- Test Input -->
+            <div class="mb-4">
+                <label class="block text-xs text-gray-500 mb-1.5 font-medium">Your Test Message:</label>
+                <textarea id="testInput" class="input-field text-sm" rows="3" placeholder="Type a message to test this skill... e.g. 'Review this code: def add(a,b): return a+b'"></textarea>
+            </div>
 
-<span class="text-gray-500"># Use a skill by ID in chat completions</span>
-response = openai.ChatCompletion.create(
-    model=<span class="text-amber-400">"llama3.2:1b"</span>,
-    messages=[{<span class="text-amber-400">"role"</span>: <span class="text-amber-400">"user"</span>, <span class="text-amber-400">"content"</span>: <span class="text-amber-400">"Review this code..."</span>}],
-    extra_body={<span class="text-amber-400">"skill_id"</span>: <span class="text-amber-400">"YOUR_SKILL_ID"</span>}
-)
+            <!-- Quick Test Buttons -->
+            <div class="flex flex-wrap gap-2 mb-4">
+                <button onclick="setTestInput('Review this Python code: def fibonacci(n):\\n    if n <= 1: return n\\n    return fibonacci(n-1) + fibonacci(n-2)')" class="text-[11px] px-3 py-1.5 bg-gray-800/60 border border-gray-700/50 rounded-lg text-gray-400 hover:text-white hover:border-cyan-500/50 transition">Test: Fibonacci Code</button>
+                <button onclick="setTestInput('Write a professional email to a client about a project delay of 2 weeks due to technical issues.')" class="text-[11px] px-3 py-1.5 bg-gray-800/60 border border-gray-700/50 rounded-lg text-gray-400 hover:text-white hover:border-cyan-500/50 transition">Test: Client Email</button>
+                <button onclick="setTestInput('Explain quantum computing to a 10 year old in simple terms.')" class="text-[11px] px-3 py-1.5 bg-gray-800/60 border border-gray-700/50 rounded-lg text-gray-400 hover:text-white hover:border-cyan-500/50 transition">Test: Simple Explanation</button>
+            </div>
 
-<span class="text-gray-500"># Or use the skill-enhanced endpoint directly</span>
-response = requests.post(
-    <span class="text-amber-400">"http://203.55.176.101:8000/v1/chat/completions/skill"</span>,
-    json={
-        <span class="text-amber-400">"model"</span>: <span class="text-amber-400">"llama3.2:1b"</span>,
-        <span class="text-amber-400">"messages"</span>: [{<span class="text-amber-400">"role"</span>: <span class="text-amber-400">"user"</span>, <span class="text-amber-400">"content"</span>: <span class="text-amber-400">"..."</span>}],
-        <span class="text-amber-400">"skill_name"</span>: <span class="text-amber-400">"Code Reviewer"</span>
-    },
-    headers={<span class="text-amber-400">"Authorization"</span>: <span class="text-amber-400">"Bearer sk-local-..."</span>}
-)</code></pre>
+            <!-- Run Button -->
+            <button onclick="runSkillTest()" id="testRunBtn" class="btn btn-primary w-full py-3 mb-4">
+                <i class="fas fa-play mr-2"></i>Run Test
+            </button>
+
+            <!-- Response -->
+            <div id="testResultArea" class="hidden">
+                <div class="flex items-center justify-between mb-2">
+                    <p class="text-xs text-gray-500 font-medium">AI Response:</p>
+                    <div class="flex gap-2" id="testStats"></div>
+                </div>
+                <div class="test-response" id="testResponse"></div>
             </div>
         </div>
-        {% endif %}
     </div>
 </div>
 
@@ -265,16 +609,13 @@ response = requests.post(
                     <p class="text-xs text-gray-500" id="modalDesc">-</p>
                 </div>
             </div>
-            <button onclick="closeModal()" class="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition">
+            <button onclick="closeDetailModal()" class="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition">
                 <i class="fas fa-times"></i>
             </button>
         </div>
         <div class="p-5 overflow-y-auto max-h-[60vh]">
             <div class="mb-4">
-                <div class="flex items-center gap-2 mb-2">
-                    <i class="fas fa-terminal text-[10px] text-gray-600"></i>
-                    <span class="text-[10px] text-gray-600 uppercase tracking-wider">Full System Prompt</span>
-                </div>
+                <p class="text-[10px] text-gray-600 uppercase tracking-wider mb-2">Full System Prompt</p>
                 <div class="bg-gray-900 rounded-lg p-4">
                     <pre class="text-sm text-gray-300 whitespace-pre-wrap leading-relaxed" id="modalPrompt">-</pre>
                 </div>
@@ -286,9 +627,9 @@ response = requests.post(
         </div>
         <div class="flex items-center justify-end gap-3 p-5 border-t border-gray-700">
             <button onclick="copySkillPrompt(document.getElementById('modalPrompt').textContent)" class="btn btn-primary btn-sm">
-                <i class="fas fa-copy mr-1"></i>Copy Prompt
+                <i class="fas fa-copy mr-1"></i>Copy
             </button>
-            <button onclick="closeModal()" class="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition">Close</button>
+            <button onclick="closeDetailModal()" class="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition">Close</button>
         </div>
     </div>
 </div>
@@ -331,40 +672,114 @@ response = requests.post(
 <!-- Toast -->
 <div id="toast" class="fixed bottom-6 right-6 bg-green-600 text-white px-4 py-2.5 rounded-lg shadow-lg z-50 hidden flex items-center gap-2 text-sm font-medium">
     <i class="fas fa-check-circle"></i>
-    <span id="toastMsg">Copied!</span>
+    <span id="toastMsg">Done!</span>
 </div>
 
 {% endblock %}
 
 {% block scripts %}
 <script>
-function applyTemplate(name, desc, prompt) {
-    document.getElementById('skillName').value = name;
-    document.getElementById('skillDesc').value = desc;
-    document.getElementById('skillPrompt').value = prompt;
-    updateCharCount();
-    document.getElementById('skillName').focus();
-    document.getElementById('skillPrompt').scrollIntoView({ behavior: 'smooth', block: 'center' });
+let currentTestSkillId = null;
+
+// ============= Tab Switching =============
+function switchTab(tab) {
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('tab-' + tab).classList.add('active');
+    event.currentTarget.classList.add('active');
 }
 
-function updateCharCount() {
-    const el = document.getElementById('charCount');
-    const len = document.getElementById('skillPrompt').value.length;
-    el.textContent = len.toLocaleString() + ' chars';
+// ============= Library Search =============
+function filterLib() {
+    const q = document.getElementById('libSearch').value.toLowerCase();
+    document.querySelectorAll('#tab-library .skill-chip').forEach(chip => {
+        const text = chip.textContent.toLowerCase();
+        chip.style.display = text.includes(q) ? '' : 'none';
+    });
 }
 
-document.getElementById('skillPrompt')?.addEventListener('input', updateCharCount);
-updateCharCount();
-
-function filterSkills() {
-    const q = document.getElementById('skillSearch').value.toLowerCase();
-    document.querySelectorAll('.skill-card').forEach(card => {
+// ============= My Skills Search =============
+function filterMySkills() {
+    const q = document.getElementById('mySkillSearch').value.toLowerCase();
+    document.querySelectorAll('#mySkillsList .my-skill-card').forEach(card => {
         const name = card.dataset.name || '';
         const desc = card.dataset.desc || '';
         card.style.display = (name.includes(q) || desc.includes(q)) ? '' : 'none';
     });
 }
 
+// ============= Quick Create =============
+function quickCreate(name, desc, prompt, icon, color) {
+    if (!confirm('Create skill "' + name + '"?')) return;
+    fetch('/skills/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ name, description: desc, system_prompt: prompt })
+    }).then(r => {
+        if (r.redirected || r.ok) {
+            showToast('Skill "' + name + '" created!');
+            setTimeout(() => location.reload(), 600);
+        } else {
+            r.text().then(t => { if (t.includes('already exists')) showToast('Skill already exists!', 'error'); else showToast('Failed to create', 'error'); });
+        }
+    }).catch(() => showToast('Connection error', 'error'));
+}
+
+// ============= Test Skill =============
+function openTestModal(id, name, prompt) {
+    currentTestSkillId = id;
+    document.getElementById('testSkillName').textContent = name;
+    document.getElementById('testSystemPrompt').textContent = prompt;
+    document.getElementById('testInput').value = '';
+    document.getElementById('testResultArea').classList.add('hidden');
+    document.getElementById('testRunBtn').disabled = false;
+    document.getElementById('testRunBtn').innerHTML = '<i class="fas fa-play mr-2"></i>Run Test';
+    document.getElementById('testModal').classList.remove('hidden');
+}
+
+function closeTestModal() { document.getElementById('testModal').classList.add('hidden'); }
+
+function setTestInput(text) { document.getElementById('testInput').value = text; }
+
+async function runSkillTest() {
+    const input = document.getElementById('testInput').value.trim();
+    if (!input) { showToast('Enter a test message first', 'error'); return; }
+    if (!currentTestSkillId) { showToast('No skill selected', 'error'); return; }
+
+    const btn = document.getElementById('testRunBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Running...';
+
+    try {
+        const resp = await fetch('/api/skills/' + currentTestSkillId + '/test', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ test_input: input, model: 'llama3.2:1b' })
+        });
+        const data = await resp.json();
+
+        document.getElementById('testResultArea').classList.remove('hidden');
+
+        if (data.success) {
+            document.getElementById('testResponse').textContent = data.response;
+            document.getElementById('testStats').innerHTML =
+                '<span class="stat-pill"><i class="fas fa-bolt text-cyan-400"></i> ' + data.latency_ms + 'ms</span>' +
+                '<span class="stat-pill"><i class="fas fa-coins text-amber-400"></i> ' + data.tokens + ' tokens</span>' +
+                '<span class="stat-pill"><i class="fas fa-robot text-purple-400"></i> ' + data.model + '</span>';
+        } else {
+            document.getElementById('testResponse').innerHTML = '<span class="text-red-400">Error: ' + (data.error || 'Unknown error') + '</span>';
+            document.getElementById('testStats').innerHTML = '<span class="stat-pill"><i class="fas fa-clock text-gray-400"></i> ' + data.latency_ms + 'ms</span>';
+        }
+    } catch (e) {
+        document.getElementById('testResultArea').classList.remove('hidden');
+        document.getElementById('testResponse').innerHTML = '<span class="text-red-400">Connection error: ' + e.message + '</span>';
+    }
+
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-play mr-2"></i>Run Test';
+}
+
+// ============= Detail Modal =============
 function showSkillDetail(id, name, desc, prompt, date) {
     document.getElementById('modalTitle').textContent = name;
     document.getElementById('modalDesc').textContent = desc || 'No description';
@@ -373,11 +788,9 @@ function showSkillDetail(id, name, desc, prompt, date) {
     document.getElementById('modalLength').innerHTML = '<i class="fas fa-keyboard mr-1"></i>' + prompt.length.toLocaleString() + ' characters';
     document.getElementById('skillModal').classList.remove('hidden');
 }
+function closeDetailModal() { document.getElementById('skillModal').classList.add('hidden'); }
 
-function closeModal() {
-    document.getElementById('skillModal').classList.add('hidden');
-}
-
+// ============= API Modal =============
 function showApiUsage(id, name) {
     document.getElementById('apiSkillName').textContent = name;
     document.getElementById('apiSkillId').value = id;
@@ -393,31 +806,36 @@ function showApiUsage(id, name) {
         '  }\'</span>';
     document.getElementById('apiModal').classList.remove('hidden');
 }
+function closeApiModal() { document.getElementById('apiModal').classList.add('hidden'); }
 
-function closeApiModal() {
-    document.getElementById('apiModal').classList.add('hidden');
+// ============= Char Count =============
+function updateCharCount() {
+    const el = document.getElementById('charCount');
+    if (el) {
+        const len = (document.getElementById('skillPrompt')?.value || '').length;
+        el.textContent = len.toLocaleString() + ' chars';
+    }
 }
+document.getElementById('skillPrompt')?.addEventListener('input', updateCharCount);
+updateCharCount();
 
-function copySkillPrompt(prompt) {
-    navigator.clipboard.writeText(prompt).then(() => showToast('Prompt copied to clipboard'));
-}
+// ============= Copy =============
+function copySkillPrompt(prompt) { navigator.clipboard.writeText(prompt).then(() => showToast('Copied to clipboard')); }
+function copyText(text) { navigator.clipboard.writeText(text).then(() => showToast('Copied')); }
 
-function copyText(text) {
-    navigator.clipboard.writeText(text).then(() => showToast('Copied to clipboard'));
-}
-
-function showToast(msg) {
+// ============= Toast =============
+function showToast(msg, type) {
     const t = document.getElementById('toast');
+    t.className = 'fixed bottom-6 right-6 text-white px-4 py-2.5 rounded-lg shadow-lg z-50 hidden flex items-center gap-2 text-sm font-medium ' + (type === 'error' ? 'bg-red-600' : 'bg-green-600');
     document.getElementById('toastMsg').textContent = msg;
     t.classList.remove('hidden');
-    setTimeout(() => t.classList.add('hidden'), 2000);
+    setTimeout(() => t.classList.add('hidden'), 2500);
 }
 
-document.getElementById('skillModal')?.addEventListener('click', function(e) {
-    if (e.target === this) closeModal();
-});
-document.getElementById('apiModal')?.addEventListener('click', function(e) {
-    if (e.target === this) closeApiModal();
+// ============= Modal Overlay Click =============
+['testModal', 'skillModal', 'apiModal'].forEach(id => {
+    const m = document.getElementById(id);
+    if (m) m.addEventListener('click', e => { if (e.target === m) m.classList.add('hidden'); });
 });
 </script>
 {% endblock %}

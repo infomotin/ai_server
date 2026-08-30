@@ -3,101 +3,283 @@
 {% block header_title %}AI Assistants{% endblock %}
 
 {% block content %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/atom-one-dark.min.css">
+<script src="https://cdn.jsdelivr.net/npm/marked@13.0.3/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/core.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/languages/python.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/languages/javascript.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/languages/bash.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/languages/json.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/languages/xml.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/languages/css.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+
+<style>
+:root {
+    --bg-primary: #0a0e1a;
+    --bg-secondary: #0f172a;
+    --bg-tertiary: #1e293b;
+    --glass-bg: rgba(30, 41, 59, 0.55);
+    --glass-border: rgba(148, 163, 184, 0.15);
+    --glass-border-strong: rgba(148, 163, 184, 0.28);
+    --accent: #8b5cf6;
+    --accent-2: #06b6d4;
+    --accent-3: #f59e0b;
+    --success: #10b981;
+    --danger: #ef4444;
+    --warning: #f59e0b;
+    --text-primary: #e2e8f0;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
+}
+
+body { background: radial-gradient(ellipse at top left, #1e1b4b 0%, #0a0e1a 50%, #020617 100%); background-attachment: fixed; }
+
+.glass { background: var(--glass-bg); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); border: 1px solid var(--glass-border); border-radius: 16px; }
+.glass-strong { background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(22px); -webkit-backdrop-filter: blur(22px); border: 1px solid var(--glass-border-strong); border-radius: 16px; }
+
+.stat-card { background: linear-gradient(135deg, rgba(139, 92, 246, 0.08), rgba(6, 182, 212, 0.05)); border: 1px solid var(--glass-border); border-radius: 16px; padding: 18px; transition: transform .2s, border-color .2s; }
+.stat-card:hover { transform: translateY(-2px); border-color: rgba(139, 92, 246, 0.4); }
+
+.gradient-text { background: linear-gradient(135deg, #c4b5fd 0%, #67e8f9 50%, #fde68a 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.gradient-border { position: relative; }
+.gradient-border::before { content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1px; background: linear-gradient(135deg, #8b5cf6, #06b6d4, #f59e0b); -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0); mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0); -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none; }
+
+.btn { padding: 9px 16px; border-radius: 10px; font-size: 13px; font-weight: 500; cursor: pointer; transition: all .2s; border: none; display: inline-flex; align-items: center; gap: 6px; }
+.btn-primary { background: linear-gradient(135deg, #8b5cf6, #6366f1); color: white; box-shadow: 0 4px 14px rgba(139, 92, 246, 0.35); }
+.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(139, 92, 246, 0.5); }
+.btn-secondary { background: rgba(51, 65, 85, 0.6); color: var(--text-primary); border: 1px solid var(--glass-border-strong); }
+.btn-secondary:hover { background: rgba(71, 85, 105, 0.7); }
+.btn-ghost { background: transparent; color: var(--text-secondary); }
+.btn-ghost:hover { background: rgba(51, 65, 85, 0.4); color: var(--text-primary); }
+.btn-danger { background: linear-gradient(135deg, #ef4444, #dc2626); color: white; }
+.btn-icon { padding: 8px; border-radius: 10px; }
+
+.input-field { width: 100%; padding: 10px 14px; background: rgba(15, 23, 42, 0.7); border: 1px solid var(--glass-border-strong); border-radius: 10px; color: var(--text-primary); font-size: 13px; outline: none; transition: border-color .2s, box-shadow .2s; }
+.input-field:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.15); }
+
+.template-card { padding: 14px 8px; border-radius: 12px; border: 1px solid var(--glass-border); background: rgba(15, 23, 42, 0.5); cursor: pointer; transition: all .2s; text-align: center; }
+.template-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+.template-card.active { border-color: var(--accent); background: rgba(139, 92, 246, 0.12); box-shadow: 0 0 0 1px var(--accent); }
+
+.assistant-card { padding: 18px; border-radius: 16px; background: var(--glass-bg); backdrop-filter: blur(14px); border: 1px solid var(--glass-border); cursor: pointer; transition: all .25s; position: relative; overflow: hidden; }
+.assistant-card:hover { border-color: rgba(139, 92, 246, 0.5); transform: translateY(-3px); box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4); }
+.assistant-card::after { content: ""; position: absolute; inset: 0; border-radius: inherit; opacity: 0; transition: opacity .2s; background: linear-gradient(135deg, transparent, rgba(139, 92, 246, 0.05)); pointer-events: none; }
+.assistant-card:hover::after { opacity: 1; }
+
+.badge { padding: 3px 9px; border-radius: 999px; font-size: 10px; font-weight: 600; letter-spacing: 0.3px; }
+.badge-active { background: rgba(16, 185, 129, 0.18); color: #6ee7b7; border: 1px solid rgba(16, 185, 129, 0.3); }
+.badge-inactive { background: rgba(100, 116, 139, 0.18); color: #94a3b8; border: 1px solid rgba(100, 116, 139, 0.3); }
+.badge-tag { background: rgba(139, 92, 246, 0.15); color: #c4b5fd; border: 1px solid rgba(139, 92, 246, 0.3); }
+
+.modal-overlay { position: fixed; inset: 0; background: rgba(2, 6, 23, 0.7); backdrop-filter: blur(8px); z-index: 60; display: flex; align-items: center; justify-content: center; padding: 16px; animation: fadeIn .2s; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+.modal-content { animation: slideUp .3s; }
+
+.chat-bubble { max-width: 85%; padding: 12px 16px; border-radius: 16px; line-height: 1.55; font-size: 14px; word-wrap: break-word; }
+.chat-bubble.user { background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white; border-bottom-right-radius: 4px; }
+.chat-bubble.assistant { background: rgba(30, 41, 59, 0.7); color: var(--text-primary); border: 1px solid var(--glass-border); border-bottom-left-radius: 4px; }
+.chat-bubble pre { background: #0a0e1a !important; border-radius: 10px; padding: 12px; overflow-x: auto; margin: 8px 0; font-size: 12.5px; }
+.chat-bubble code { font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 12.5px; }
+.chat-bubble p { margin: 6px 0; }
+.chat-bubble p:first-child { margin-top: 0; } .chat-bubble p:last-child { margin-bottom: 0; }
+.chat-bubble ul, .chat-bubble ol { margin: 6px 0 6px 20px; }
+.chat-bubble table { border-collapse: collapse; margin: 8px 0; font-size: 13px; }
+.chat-bubble th, .chat-bubble td { border: 1px solid rgba(148, 163, 184, 0.25); padding: 6px 10px; }
+.chat-bubble th { background: rgba(30, 41, 59, 0.6); }
+.chat-bubble a { color: #67e8f9; text-decoration: underline; }
+.chat-bubble blockquote { border-left: 3px solid var(--accent); padding-left: 12px; color: var(--text-secondary); margin: 6px 0; }
+
+.typing-dots span { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--text-secondary); margin: 0 2px; animation: bounce 1.2s infinite; }
+.typing-dots span:nth-child(2) { animation-delay: .15s; }
+.typing-dots span:nth-child(3) { animation-delay: .3s; }
+@keyframes bounce { 0%, 60%, 100% { transform: translateY(0); opacity: .5; } 30% { transform: translateY(-6px); opacity: 1; } }
+
+.sidebar-list { max-height: 100%; overflow-y: auto; }
+.sidebar-list::-webkit-scrollbar, .chat-scroll::-webkit-scrollbar { width: 6px; }
+.sidebar-list::-webkit-scrollbar-track, .chat-scroll::-webkit-scrollbar-track { background: transparent; }
+.sidebar-list::-webkit-scrollbar-thumb, .chat-scroll::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.25); border-radius: 3px; }
+
+.pulse-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.6); animation: pulse 2s infinite; }
+@keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.6); } 70% { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); } 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); } }
+
+.tab-btn { padding: 8px 14px; border-radius: 10px; font-size: 13px; color: var(--text-secondary); cursor: pointer; transition: all .2s; }
+.tab-btn:hover { color: var(--text-primary); }
+.tab-btn.active { background: rgba(139, 92, 246, 0.15); color: #c4b5fd; border: 1px solid rgba(139, 92, 246, 0.3); }
+
+.copy-btn { opacity: 0; transition: opacity .2s; }
+.chat-message:hover .copy-btn { opacity: 1; }
+
+.empty-state { padding: 60px 20px; text-align: center; color: var(--text-muted); }
+
+.toast { position: fixed; bottom: 24px; right: 24px; padding: 12px 18px; border-radius: 12px; background: rgba(16, 185, 129, 0.95); color: white; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4); z-index: 100; animation: slideUp .3s; }
+.toast.error { background: rgba(239, 68, 68, 0.95); }
+.toast.info { background: rgba(6, 182, 212, 0.95); }
+
+.range-slider { -webkit-appearance: none; width: 100%; height: 4px; background: rgba(51, 65, 85, 0.6); border-radius: 2px; outline: none; }
+.range-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; background: var(--accent); border-radius: 50%; cursor: pointer; box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.2); }
+.range-slider::-moz-range-thumb { width: 16px; height: 16px; background: var(--accent); border-radius: 50%; cursor: pointer; border: none; }
+
+.view-toggle { display: inline-flex; background: rgba(15, 23, 42, 0.6); border-radius: 10px; padding: 3px; border: 1px solid var(--glass-border-strong); }
+.view-toggle button { padding: 6px 10px; border-radius: 8px; border: none; background: transparent; color: var(--text-secondary); cursor: pointer; transition: all .2s; }
+.view-toggle button.active { background: rgba(139, 92, 246, 0.2); color: #c4b5fd; }
+
+.search-input { position: relative; }
+.search-input i { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); }
+.search-input input { padding-left: 36px; }
+
+.list-view .assistant-card { display: flex; align-items: center; gap: 16px; padding: 12px 16px; }
+.list-view .assistant-card .meta-row { display: flex; gap: 16px; flex: 1; }
+
+@media (max-width: 768px) {
+    .stats-row { grid-template-columns: repeat(2, 1fr) !important; }
+    .assistant-grid { grid-template-columns: 1fr !important; }
+}
+</style>
+
 <!-- Stats Row -->
-<div class="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-6">
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 stats-row">
     <div class="stat-card">
         <div class="flex items-center justify-between mb-2">
-            <span class="text-gray-400 text-sm">Assistants</span>
-            <div class="w-9 h-9 bg-purple-600/20 rounded-lg flex items-center justify-center"><i class="fas fa-robot text-purple-400"></i></div>
+            <span class="text-gray-400 text-xs uppercase tracking-wider">Assistants</span>
+            <div class="w-8 h-8 bg-purple-600/20 rounded-lg flex items-center justify-center"><i class="fas fa-robot text-purple-400 text-sm"></i></div>
         </div>
-        <p class="text-2xl font-bold text-white">{{ stats.total_assistants }}</p>
-        <p class="text-xs text-gray-500 mt-1">Total assistants</p>
+        <p class="text-2xl font-bold text-white">{{ stats.total_assistants or 0 }}</p>
+        <p class="text-xs text-gray-500 mt-1"><span class="text-green-400">{{ stats.active_assistants or 0 }}</span> active</p>
     </div>
     <div class="stat-card">
         <div class="flex items-center justify-between mb-2">
-            <span class="text-gray-400 text-sm">Active</span>
-            <div class="w-9 h-9 bg-green-600/20 rounded-lg flex items-center justify-center"><i class="fas fa-check-circle text-green-400"></i></div>
+            <span class="text-gray-400 text-xs uppercase tracking-wider">Tasks</span>
+            <div class="w-8 h-8 bg-cyan-600/20 rounded-lg flex items-center justify-center"><i class="fas fa-bolt text-cyan-400 text-sm"></i></div>
         </div>
-        <p class="text-2xl font-bold text-white">{{ stats.active_assistants }}</p>
-        <p class="text-xs text-gray-500 mt-1">Running</p>
+        <p class="text-2xl font-bold text-white">{{ stats.total_tasks or 0 }}</p>
+        <p class="text-xs text-gray-500 mt-1">automated tasks</p>
     </div>
     <div class="stat-card">
         <div class="flex items-center justify-between mb-2">
-            <span class="text-gray-400 text-sm">Tasks</span>
-            <div class="w-9 h-9 bg-blue-600/20 rounded-lg flex items-center justify-center"><i class="fas fa-tasks text-blue-400"></i></div>
+            <span class="text-gray-400 text-xs uppercase tracking-wider">Messages</span>
+            <div class="w-8 h-8 bg-pink-600/20 rounded-lg flex items-center justify-center"><i class="fas fa-comments text-pink-400 text-sm"></i></div>
         </div>
-        <p class="text-2xl font-bold text-white">{{ stats.total_tasks }}</p>
-        <p class="text-xs text-gray-500 mt-1">Configured tasks</p>
+        <p class="text-2xl font-bold text-white">{{ stats.total_messages or 0 }}</p>
+        <p class="text-xs text-gray-500 mt-1">chat messages</p>
     </div>
     <div class="stat-card">
         <div class="flex items-center justify-between mb-2">
-            <span class="text-gray-400 text-sm">Actions</span>
-            <div class="w-9 h-9 bg-amber-600/20 rounded-lg flex items-center justify-center"><i class="fas fa-history text-amber-400"></i></div>
+            <span class="text-gray-400 text-xs uppercase tracking-wider">Tokens</span>
+            <div class="w-8 h-8 bg-amber-600/20 rounded-lg flex items-center justify-center"><i class="fas fa-coins text-amber-400 text-sm"></i></div>
         </div>
-        <p class="text-2xl font-bold text-white">{{ stats.total_logs }}</p>
-        <p class="text-xs text-gray-500 mt-1">Total actions</p>
+        <p class="text-2xl font-bold text-white">{{ "{:,}".format(stats.total_tokens or 0) }}</p>
+        <p class="text-xs text-gray-500 mt-1">total tokens used</p>
     </div>
 </div>
 
-<!-- Main Layout -->
-<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+<!-- Header Bar -->
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+    <div>
+        <h2 class="text-2xl font-bold gradient-text">Your AI Workforce</h2>
+        <p class="text-sm text-gray-400 mt-1">Create, customize, and converse with intelligent assistants</p>
+    </div>
+    <div class="flex items-center gap-3">
+        <div class="search-input">
+            <i class="fas fa-search"></i>
+            <input type="text" id="searchInput" class="input-field" placeholder="Search assistants..." onkeyup="filterAssistants()">
+        </div>
+        <div class="view-toggle">
+            <button id="gridViewBtn" class="active" onclick="setView('grid')" title="Grid view"><i class="fas fa-th-large"></i></button>
+            <button id="listViewBtn" onclick="setView('list')" title="List view"><i class="fas fa-list"></i></button>
+        </div>
+        <button onclick="openCreateModal()" class="btn btn-primary">
+            <i class="fas fa-plus"></i> New
+        </button>
+    </div>
+</div>
 
-    <!-- Left Column: Templates & Create -->
-    <div class="lg:col-span-1 space-y-6">
-        <div class="card">
-            <div class="flex items-center gap-3 mb-5">
-                <div class="w-10 h-10 bg-purple-600/20 rounded-xl flex items-center justify-center">
-                    <i class="fas fa-wand-magic-sparkles text-purple-400"></i>
+<!-- Assistant Grid/List -->
+{% if assistants %}
+<div id="assistantsContainer" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 assistant-grid">
+    {% for a in assistants %}
+    <div class="assistant-card" data-name="{{ a.name|lower }}" data-model="{{ a.model_id }}" data-status="{{ 'active' if a.is_active else 'inactive' }}" onclick="openAssistant('{{ a.id }}')">
+        <div class="flex items-start justify-between mb-3">
+            <div class="flex items-center gap-3 min-w-0">
+                <div class="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0
+                    {% if a.is_active %}bg-gradient-to-br from-purple-600/30 to-cyan-600/30 border border-purple-500/30{% else %}bg-gray-700/40 border border-gray-600/30{% endif %}">
+                    <i class="{{ a.avatar or 'fas fa-robot' }} text-xl
+                        {% if a.is_active %}text-purple-300{% else %}text-gray-500{% endif %}"></i>
+                </div>
+                <div class="min-w-0">
+                    <div class="flex items-center gap-2">
+                        <h4 class="text-white font-semibold truncate">{{ a.name }}</h4>
+                        {% if a.is_active %}
+                        <span class="flex items-center gap-1 text-[10px] text-green-400"><span class="pulse-dot"></span></span>
+                        {% endif %}
+                    </div>
+                    <p class="text-xs text-gray-500 truncate">{{ a.description }}</p>
+                </div>
+            </div>
+            <button onclick="event.stopPropagation(); quickDelete('{{ a.id }}', '{{ a.name|e }}')" class="btn-icon btn-ghost text-gray-500 hover:text-red-400 hover:bg-red-500/10" title="Delete">
+                <i class="fas fa-trash text-xs"></i>
+            </button>
+        </div>
+        <div class="flex items-center flex-wrap gap-2 text-xs text-gray-400">
+            <span class="flex items-center gap-1.5 px-2 py-1 bg-gray-800/50 rounded-md"><i class="fas fa-cube text-purple-400"></i>{{ a.model_id }}</span>
+            <span class="flex items-center gap-1.5 px-2 py-1 bg-gray-800/50 rounded-md"><i class="fas fa-user-circle text-cyan-400"></i>{{ a.personality }}</span>
+            <span class="flex items-center gap-1.5 px-2 py-1 bg-gray-800/50 rounded-md"><i class="fas fa-calendar text-amber-400"></i>{{ a.created_at[:10] }}</span>
+        </div>
+        <div class="flex items-center justify-between mt-3 pt-3 border-t border-gray-700/50">
+            <span class="badge {% if a.is_active %}badge-active{% else %}badge-inactive{% endif %}">
+                {% if a.is_active %}<i class="fas fa-circle text-[6px] mr-1"></i>Active{% else %}<i class="fas fa-pause text-[6px] mr-1"></i>Inactive{% endif %}
+            </span>
+            <div class="flex items-center gap-2 text-xs text-gray-500">
+                <span><i class="fas fa-plug mr-1"></i>{{ a.tags or '—' }}</span>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="glass p-12 text-center empty-state">
+    <div class="w-20 h-20 bg-gradient-to-br from-purple-600/30 to-cyan-600/30 rounded-2xl flex items-center justify-center mx-auto mb-5 border border-purple-500/20">
+        <i class="fas fa-robot text-purple-300 text-3xl"></i>
+    </div>
+    <h3 class="text-xl font-semibold text-white mb-2">Build your first AI assistant</h3>
+    <p class="text-gray-500 text-sm mb-6 max-w-md mx-auto">Pick a template to get started, or design a custom assistant tailored to your workflow.</p>
+    <button onclick="openCreateModal()" class="btn btn-primary">
+        <i class="fas fa-plus mr-2"></i>Create Assistant
+    </button>
+</div>
+{% endif %}
+
+<!-- ============= Create / Edit Modal ============= -->
+<div id="createModal" class="modal-overlay hidden">
+    <div class="modal-content glass-strong w-full max-w-2xl max-h-[92vh] overflow-hidden flex flex-col">
+        <div class="flex items-center justify-between p-5 border-b border-gray-700/50">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-gradient-to-br from-purple-600 to-cyan-600 rounded-xl flex items-center justify-center">
+                    <i class="fas fa-wand-magic-sparkles text-white"></i>
                 </div>
                 <div>
-                    <h3 class="text-white font-semibold">Create Assistant</h3>
+                    <h3 id="createModalTitle" class="text-white font-semibold text-lg">Create Assistant</h3>
                     <p class="text-xs text-gray-500">Choose a template to start</p>
                 </div>
             </div>
+            <button onclick="closeCreateModal()" class="btn-icon btn-ghost text-gray-500 hover:text-white"><i class="fas fa-times"></i></button>
+        </div>
+        <form id="createForm" method="POST" action="/assistants/create" class="p-5 space-y-4 overflow-y-auto">
+            <input type="hidden" name="template" id="formTemplate" value="custom">
+            <input type="hidden" name="icon" id="formIcon" value="">
 
-            <form method="POST" action="/assistants/create" class="space-y-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-300 mb-2">Choose Template</label>
-                    <div class="grid grid-cols-2 gap-2" id="templateGrid">
-                        {% set templates = [
-                            ("email", "fas fa-envelope", "blue", "Email"),
-                            ("whatsapp", "fab fa-whatsapp", "green", "WhatsApp"),
-                            ("facebook", "fab fa-facebook", "indigo", "Facebook"),
-                            ("web_research", "fas fa-globe", "cyan", "Web Research"),
-                            ("calendar", "fas fa-calendar", "amber", "Calendar"),
-                            ("git", "fab fa-git-alt", "red", "Git Repo"),
-                            ("code", "fas fa-code", "purple", "Code"),
-                            ("data", "fas fa-chart-line", "teal", "Data"),
-                            ("customer", "fas fa-headset", "orange", "Support"),
-                            ("custom", "fas fa-user-gear", "gray", "Custom")
-                        ] %}
-                        {% for tmpl_id, icon, color, name in templates %}
-                        <button type="button" onclick="selectTemplate('{{ tmpl_id }}')" 
-                            class="template-btn p-3 rounded-lg border border-gray-700 text-left transition hover:border-purple-500/50"
-                            data-template="{{ tmpl_id }}">
-                            <i class="{{ icon }} text-{{ color }}-400 text-sm mb-1"></i>
-                            <p class="text-[10px] text-white font-medium">{{ name }}</p>
-                        </button>
-                        {% endfor %}
-                    </div>
-                    <input type="hidden" name="template" id="selectedTemplate" value="custom">
-                </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-300 mb-2">Template</label>
+                <div class="grid grid-cols-4 sm:grid-cols-6 gap-2" id="templateGrid"></div>
+            </div>
 
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                     <label class="block text-sm font-medium text-gray-300 mb-1.5">Name <span class="text-red-400">*</span></label>
-                    <input type="text" name="name" id="assistantName" required class="input-field" placeholder="My Email Assistant">
+                    <input type="text" name="name" id="formName" required class="input-field" placeholder="My Email Assistant">
                 </div>
-
-                <div>
-                    <label class="block text-sm font-medium text-gray-300 mb-1.5">AI Model</label>
-                    <select name="model_id" class="input-field">
-                        <option value="llama3.2:1b">Llama 3.2 1B</option>
-                        <option value="qwen2.5:0.5b">Qwen 2.5 0.5B</option>
-                        <option value="phi3:mini">Phi-3 Mini</option>
-                        <option value="codellama:3.5">Code Llama 3.5</option>
-                    </select>
-                </div>
-
                 <div>
                     <label class="block text-sm font-medium text-gray-300 mb-1.5">Personality</label>
                     <select name="personality" class="input-field">
@@ -106,158 +288,201 @@
                         <option value="concise">Concise</option>
                         <option value="detailed">Detailed</option>
                         <option value="technical">Technical</option>
+                        <option value="creative">Creative</option>
                     </select>
                 </div>
-
-                <button type="submit" class="btn btn-primary w-full py-3">
-                    <i class="fas fa-plus mr-2"></i>Create Assistant
-                </button>
-            </form>
-        </div>
-
-        <!-- Capabilities Info -->
-        <div class="card">
-            <div class="flex items-center gap-3 mb-4">
-                <div class="w-10 h-10 bg-cyan-600/20 rounded-xl flex items-center justify-center">
-                    <i class="fas fa-info-circle text-cyan-400"></i>
-                </div>
-                <h3 class="text-white font-semibold">Capabilities</h3>
             </div>
-            <div id="capabilitiesContent" class="space-y-2 text-sm">
-                <p class="text-gray-400">Select a template to see capabilities</p>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-300 mb-1.5">AI Model</label>
+                <select name="model_id" id="formModel" class="input-field"></select>
             </div>
-        </div>
-    </div>
 
-    <!-- Right Column: Assistants List -->
-    <div class="lg:col-span-2 space-y-6">
-        <div class="flex items-center justify-between">
-            <h3 class="text-white font-semibold flex items-center gap-2">
-                <i class="fas fa-robot text-gray-400"></i> Your Assistants
-            </h3>
-            {% if assistants %}
-            <input type="text" id="assistantSearch" class="input-field py-1.5 px-3 text-sm w-48" placeholder="Search..." onkeyup="filterAssistants()">
-            {% endif %}
-        </div>
-
-        {% if assistants %}
-        <div class="space-y-4" id="assistantsList">
-            {% for a in assistants %}
-            <div class="card group hover:border-purple-500/30 transition-all assistant-card" data-name="{{ a.name|lower }}">
-                <div class="flex items-start justify-between mb-3">
-                    <div class="flex items-center gap-3 min-w-0">
-                        <div class="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0
-                            {% if a.is_active %}bg-green-600/20{% else %}bg-gray-700/50{% endif %}">
-                            <i class="{{ a.avatar or 'fas fa-robot' }} text-{{ 'green' if a.is_active else 'gray' }}-400 text-lg"></i>
-                        </div>
-                        <div class="min-w-0">
-                            <div class="flex items-center gap-2">
-                                <h4 class="text-white font-semibold truncate">{{ a.name }}</h4>
-                                {% if a.is_active %}
-                                <span class="badge badge-green text-[10px]">Active</span>
-                                {% else %}
-                                <span class="badge bg-gray-700 text-gray-400 text-[10px]">Inactive</span>
-                                {% endif %}
-                            </div>
-                            <p class="text-xs text-gray-500 truncate">{{ a.description }}</p>
-                        </div>
-                    </div>
-                    <div class="flex items-center gap-1 flex-shrink-0 ml-2">
-                        <button onclick="showAssistantDetail('{{ a.id }}')" class="p-2 text-gray-500 hover:text-blue-400 hover:bg-blue-600/10 rounded-lg transition" title="View & Configure">
-                            <i class="fas fa-eye text-sm"></i>
-                        </button>
-                        <form method="POST" action="/assistants/{{ a.id }}/delete" class="inline" onsubmit="return confirm('Delete assistant \'{{ a.name }}\'?')">
-                            <button type="submit" class="p-2 text-gray-500 hover:text-red-400 hover:bg-red-600/10 rounded-lg transition" title="Delete">
-                                <i class="fas fa-trash text-sm"></i>
-                            </button>
-                        </form>
-                    </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-1.5">Temperature: <span id="tempVal" class="text-purple-400 font-mono">0.7</span></label>
+                    <input type="range" name="temperature" id="tempSlider" min="0" max="2" step="0.1" value="0.7" class="range-slider" oninput="document.getElementById('tempVal').textContent=this.value">
                 </div>
-                <div class="flex items-center gap-4 text-xs text-gray-500">
-                    <span><i class="fas fa-cube mr-1"></i>{{ a.model_id }}</span>
-                    <span><i class="fas fa-user mr-1"></i>{{ a.personality }}</span>
-                    <span><i class="fas fa-clock mr-1"></i>{{ a.created_at[:10] }}</span>
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-1.5">Max tokens: <span id="tokensVal" class="text-cyan-400 font-mono">1000</span></label>
+                    <input type="range" name="max_tokens" id="tokensSlider" min="100" max="4000" step="100" value="1000" class="range-slider" oninput="document.getElementById('tokensVal').textContent=this.value">
                 </div>
             </div>
-            {% endfor %}
-        </div>
-        {% else %}
-        <div class="card text-center py-12">
-            <div class="w-16 h-16 bg-purple-600/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <i class="fas fa-robot text-purple-400 text-2xl"></i>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-300 mb-1.5">Description</label>
+                <input type="text" name="description" id="formDescription" class="input-field" placeholder="What does this assistant do?">
             </div>
-            <h3 class="text-white font-semibold mb-2">No Assistants Yet</h3>
-            <p class="text-gray-500 text-sm mb-4">Create your first AI assistant to automate tasks</p>
-        </div>
-        {% endif %}
+
+            <div>
+                <label class="block text-sm font-medium text-gray-300 mb-1.5">Tags (comma-separated)</label>
+                <input type="text" name="tags" id="formTags" class="input-field" placeholder="productivity, email, support">
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-300 mb-1.5">Custom system prompt <span class="text-xs text-gray-500">(optional - overrides template)</span></label>
+                <textarea name="system_prompt" id="formSystemPrompt" rows="4" class="input-field font-mono text-xs" placeholder="You are a helpful assistant that..."></textarea>
+            </div>
+
+            <div class="p-3 bg-gray-800/40 rounded-lg border border-gray-700/40" id="capabilitiesBox">
+                <p class="text-xs text-gray-500 mb-2">Template capabilities</p>
+                <div id="capabilitiesContent" class="text-xs text-gray-400"></div>
+            </div>
+
+            <div class="flex justify-end gap-2 pt-3 border-t border-gray-700/50">
+                <button type="button" onclick="closeCreateModal()" class="btn btn-secondary">Cancel</button>
+                <button type="submit" class="btn btn-primary"><i class="fas fa-plus mr-2"></i>Create Assistant</button>
+            </div>
+        </form>
     </div>
 </div>
 
-<!-- Assistant Detail Modal -->
-<div id="assistantModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
-    <div class="bg-gray-900 rounded-2xl border border-gray-700 w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
-        <div class="flex items-center justify-between p-5 border-b border-gray-700">
+<!-- ============= Assistant Detail / Chat Modal ============= -->
+<div id="detailModal" class="modal-overlay hidden">
+    <div class="modal-content glass-strong w-full max-w-7xl h-[92vh] overflow-hidden flex flex-col">
+        <!-- Header -->
+        <div class="flex items-center justify-between p-4 border-b border-gray-700/50 bg-gradient-to-r from-purple-900/20 to-cyan-900/20">
             <div class="flex items-center gap-3">
-                <div class="w-10 h-10 bg-purple-600/20 rounded-xl flex items-center justify-center">
-                    <i class="fas fa-robot text-purple-400"></i>
+                <div id="detailAvatar" class="w-11 h-11 rounded-xl bg-gradient-to-br from-purple-600/30 to-cyan-600/30 flex items-center justify-center border border-purple-500/30">
+                    <i class="fas fa-robot text-purple-300 text-lg"></i>
                 </div>
                 <div>
-                    <h3 class="text-white font-semibold text-lg" id="modalAssistantName">Assistant</h3>
-                    <p class="text-xs text-gray-500" id="modalAssistantModel">Model</p>
+                    <h3 id="detailName" class="text-white font-semibold">—</h3>
+                    <p id="detailSubtitle" class="text-xs text-gray-400">—</p>
                 </div>
             </div>
-            <button onclick="closeAssistantModal()" class="p-2 text-gray-500 hover:text-white hover:bg-gray-700 rounded-lg transition">
-                <i class="fas fa-times text-lg"></i>
-            </button>
-        </div>
-        <div class="overflow-y-auto p-5 flex-1" id="modalContent">
-            <div class="text-center py-8"><i class="fas fa-spinner fa-spin text-2xl text-gray-500"></i></div>
-        </div>
-        <!-- Quick Actions / Example Prompts -->
-        <div class="border-t border-gray-700 p-4" id="quickActions">
-            <div class="mb-3">
-                <p class="text-xs text-gray-500 mb-2">Quick Actions - Click to try:</p>
-                <div class="flex flex-wrap gap-2" id="promptButtons"></div>
+            <div class="flex items-center gap-1">
+                <button onclick="toggleAssistantActive()" id="toggleActiveBtn" class="btn btn-ghost" title="Toggle active"><i class="fas fa-power-off"></i></button>
+                <button onclick="duplicateCurrentAssistant()" class="btn btn-ghost" title="Duplicate"><i class="fas fa-copy"></i></button>
+                <button onclick="shareCurrentAssistant()" class="btn btn-ghost" title="Share"><i class="fas fa-share-nodes"></i></button>
+                <button onclick="exportCurrentChat()" class="btn btn-ghost" title="Export chat"><i class="fas fa-download"></i></button>
+                <button onclick="closeDetailModal()" class="btn btn-ghost text-gray-500 hover:text-white"><i class="fas fa-times"></i></button>
             </div>
-            <div class="flex gap-2">
-                <input type="text" id="assistantPrompt" placeholder="Ask your assistant..." 
-                    class="flex-1 bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-purple-500"
-                    onkeydown="if(event.key==='Enter')sendToAssistant()">
-                <button onclick="sendToAssistant()" class="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-sm font-medium transition">
-                    <i class="fas fa-paper-plane"></i>
-                </button>
-            </div>
-            <!-- Auto-Pilot Mode -->
-            <div class="mt-3 p-3 bg-gray-800/50 rounded-lg border border-gray-700">
-                <div class="flex items-center justify-between mb-2">
-                    <div class="flex items-center gap-2">
-                        <i class="fas fa-robot text-purple-400"></i>
-                        <span class="text-white text-sm font-medium">Auto-Pilot Mode</span>
-                    </div>
-                    <label class="relative inline-flex items-center cursor-pointer">
-                        <input type="checkbox" id="autoPilotToggle" class="sr-only peer" onchange="toggleAutoPilot()">
-                        <div class="w-9 h-5 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600"></div>
-                    </label>
+        </div>
+
+        <!-- Body: 3 columns -->
+        <div class="flex-1 flex overflow-hidden">
+            <!-- Sidebar: Conversations -->
+            <div class="w-64 border-r border-gray-700/50 bg-black/20 flex flex-col">
+                <div class="p-3 border-b border-gray-700/50">
+                    <button onclick="newConversation()" class="btn btn-primary w-full justify-center text-xs"><i class="fas fa-plus mr-2"></i>New Chat</button>
                 </div>
-                <div id="autoPilotSettings" class="hidden">
-                    <div class="grid grid-cols-2 gap-2 mb-2">
-                        <select id="autoPilotInterval" class="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-xs">
-                            <option value="5">Every 5 min</option>
-                            <option value="15">Every 15 min</option>
-                            <option value="30">Every 30 min</option>
-                            <option value="60">Every hour</option>
-                        </select>
-                        <select id="autoPilotAction" class="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-xs">
-                            <option value="check">Check & Report</option>
-                            <option value="reply">Auto-Reply</option>
-                            <option value="both">Check & Reply</option>
-                        </select>
+                <div class="p-3 sidebar-list" id="conversationsList">
+                    <p class="text-xs text-gray-500 text-center py-8">No conversations yet</p>
+                </div>
+            </div>
+
+            <!-- Center: Chat -->
+            <div class="flex-1 flex flex-col bg-black/10">
+                <div class="flex items-center gap-2 p-3 border-b border-gray-700/50 text-xs">
+                    <button onclick="setTab('chat')" id="tabChat" class="tab-btn active"><i class="fas fa-comments mr-1"></i>Chat</button>
+                    <button onclick="setTab('info')" id="tabInfo" class="tab-btn"><i class="fas fa-info-circle mr-1"></i>Info</button>
+                    <button onclick="setTab('tasks')" id="tabTasks" class="tab-btn"><i class="fas fa-bolt mr-1"></i>Tasks</button>
+                    <button onclick="setTab('integrations')" id="tabIntegrations" class="tab-btn"><i class="fas fa-plug mr-1"></i>Integrations</button>
+                    <button onclick="setTab('analytics')" id="tabAnalytics" class="tab-btn"><i class="fas fa-chart-line mr-1"></i>Analytics</button>
+                    <button onclick="setTab('logs')" id="tabLogs" class="tab-btn"><i class="fas fa-list mr-1"></i>Logs</button>
+                    <div class="ml-auto flex items-center gap-2 text-gray-500">
+                        <span id="chatModelLabel" class="text-xs"></span>
                     </div>
-                    <input type="text" id="autoPilotSchedule" placeholder="Schedule: every day at 9am, every hour..." 
-                        class="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-xs mb-2">
-                    <button onclick="saveAutoPilot()" class="w-full py-1.5 bg-green-600 hover:bg-green-500 text-white text-xs rounded font-medium">
-                        <i class="fas fa-save mr-1"></i>Save Auto-Pilot
-                    </button>
+                </div>
+
+                <!-- Chat Tab -->
+                <div id="panelChat" class="flex-1 flex flex-col overflow-hidden">
+                    <div id="chatScroll" class="flex-1 overflow-y-auto p-6 chat-scroll">
+                        <div class="empty-state">
+                            <i class="fas fa-comments text-5xl text-gray-600 mb-4"></i>
+                            <p class="text-sm">Start a conversation with your assistant</p>
+                        </div>
+                    </div>
+                    <div class="p-4 border-t border-gray-700/50 bg-black/30">
+                        <div id="quickPrompts" class="flex flex-wrap gap-2 mb-3"></div>
+                        <div class="flex items-end gap-2">
+                            <button onclick="toggleVoice()" id="voiceBtn" class="btn btn-secondary" title="Voice input"><i class="fas fa-microphone"></i></button>
+                            <textarea id="chatInput" rows="1" placeholder="Ask your assistant..." class="input-field resize-none flex-1" style="max-height:120px"
+                                onkeydown="if(event.key==='Enter' && !event.shiftKey){event.preventDefault();sendMessage();}"
+                                oninput="this.style.height='auto';this.style.height=(this.scrollHeight)+'px'"></textarea>
+                            <button onclick="sendMessage()" id="sendBtn" class="btn btn-primary px-5"><i class="fas fa-paper-plane"></i></button>
+                            <button onclick="stopGeneration()" id="stopBtn" class="btn btn-danger hidden px-5"><i class="fas fa-stop"></i></button>
+                        </div>
+                        <div class="flex items-center justify-between mt-2 text-[10px] text-gray-500">
+                            <span><kbd class="px-1.5 py-0.5 bg-gray-800 rounded">Enter</kbd> to send · <kbd class="px-1.5 py-0.5 bg-gray-800 rounded">Shift+Enter</kbd> for new line</span>
+                            <span id="chatMeta"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Info Tab -->
+                <div id="panelInfo" class="flex-1 overflow-y-auto p-6 hidden">
+                    <div class="grid grid-cols-2 md:grid-cols-3 gap-3 mb-5">
+                        <div class="p-3 bg-gray-800/50 rounded-lg"><p class="text-[10px] text-gray-500 uppercase">Status</p><p id="infoStatus" class="text-white font-medium">—</p></div>
+                        <div class="p-3 bg-gray-800/50 rounded-lg"><p class="text-[10px] text-gray-500 uppercase">Model</p><p id="infoModel" class="text-white font-medium">—</p></div>
+                        <div class="p-3 bg-gray-800/50 rounded-lg"><p class="text-[10px] text-gray-500 uppercase">Personality</p><p id="infoPersonality" class="text-white font-medium">—</p></div>
+                        <div class="p-3 bg-gray-800/50 rounded-lg"><p class="text-[10px] text-gray-500 uppercase">Temperature</p><p id="infoTemp" class="text-white font-medium">—</p></div>
+                        <div class="p-3 bg-gray-800/50 rounded-lg"><p class="text-[10px] text-gray-500 uppercase">Max tokens</p><p id="infoTokens" class="text-white font-medium">—</p></div>
+                        <div class="p-3 bg-gray-800/50 rounded-lg"><p class="text-[10px] text-gray-500 uppercase">Auto-reply</p><p id="infoAuto" class="text-white font-medium">—</p></div>
+                    </div>
+                    <div class="mb-5">
+                        <h4 class="text-white font-medium mb-2 text-sm">System prompt</h4>
+                        <div id="infoPrompt" class="p-4 bg-gray-800/50 rounded-lg text-sm text-gray-300 font-mono whitespace-pre-wrap">—</div>
+                    </div>
+                    <div class="mb-5">
+                        <h4 class="text-white font-medium mb-2 text-sm">Description</h4>
+                        <div id="infoDescription" class="p-4 bg-gray-800/50 rounded-lg text-sm text-gray-300">—</div>
+                    </div>
+                    <div>
+                        <h4 class="text-white font-medium mb-2 text-sm">Tags</h4>
+                        <div id="infoTags" class="flex flex-wrap gap-2"></div>
+                    </div>
+                </div>
+
+                <!-- Tasks Tab -->
+                <div id="panelTasks" class="flex-1 overflow-y-auto p-6 hidden">
+                    <div class="flex items-center justify-between mb-4">
+                        <h4 class="text-white font-medium">Automated Tasks</h4>
+                        <button onclick="openAddTaskModal()" class="btn btn-primary text-xs"><i class="fas fa-plus mr-1"></i>Add Task</button>
+                    </div>
+                    <div id="tasksList" class="space-y-2"></div>
+                </div>
+
+                <!-- Integrations Tab -->
+                <div id="panelIntegrations" class="flex-1 overflow-y-auto p-6 hidden">
+                    <div class="flex items-center justify-between mb-4">
+                        <h4 class="text-white font-medium">Integrations</h4>
+                        <button onclick="openAddIntegrationModal()" class="btn btn-primary text-xs"><i class="fas fa-plus mr-1"></i>Add Integration</button>
+                    </div>
+                    <div id="integrationsList" class="space-y-2"></div>
+                </div>
+
+                <!-- Analytics Tab -->
+                <div id="panelAnalytics" class="flex-1 overflow-y-auto p-6 hidden">
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+                        <div class="p-4 bg-gradient-to-br from-purple-600/15 to-purple-600/5 rounded-lg border border-purple-500/20">
+                            <p class="text-[10px] text-gray-500 uppercase">Conversations</p>
+                            <p id="anaConversations" class="text-2xl font-bold text-white mt-1">0</p>
+                        </div>
+                        <div class="p-4 bg-gradient-to-br from-cyan-600/15 to-cyan-600/5 rounded-lg border border-cyan-500/20">
+                            <p class="text-[10px] text-gray-500 uppercase">Messages</p>
+                            <p id="anaMessages" class="text-2xl font-bold text-white mt-1">0</p>
+                        </div>
+                        <div class="p-4 bg-gradient-to-br from-amber-600/15 to-amber-600/5 rounded-lg border border-amber-500/20">
+                            <p class="text-[10px] text-gray-500 uppercase">Tokens</p>
+                            <p id="anaTokens" class="text-2xl font-bold text-white mt-1">0</p>
+                        </div>
+                        <div class="p-4 bg-gradient-to-br from-green-600/15 to-green-600/5 rounded-lg border border-green-500/20">
+                            <p class="text-[10px] text-gray-500 uppercase">Tasks Run</p>
+                            <p id="anaTasksRun" class="text-2xl font-bold text-white mt-1">0</p>
+                        </div>
+                    </div>
+                    <div class="glass p-4">
+                        <h5 class="text-white font-medium text-sm mb-3">Activity (last 14 days)</h5>
+                        <canvas id="activityChart" height="100"></canvas>
+                    </div>
+                </div>
+
+                <!-- Logs Tab -->
+                <div id="panelLogs" class="flex-1 overflow-y-auto p-6 hidden">
+                    <h4 class="text-white font-medium mb-4">Recent Activity</h4>
+                    <div id="logsList" class="space-y-2"></div>
                 </div>
             </div>
         </div>
@@ -265,499 +490,63 @@
 </div>
 
 <!-- Add Task Modal -->
-<div id="addTaskModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
-    <div class="bg-gray-900 rounded-2xl border border-gray-700 w-full max-w-lg">
-        <div class="flex items-center justify-between p-5 border-b border-gray-700">
+<div id="taskModal" class="modal-overlay hidden">
+    <div class="modal-content glass-strong w-full max-w-lg p-5">
+        <div class="flex items-center justify-between mb-4">
             <h3 class="text-white font-semibold">Add Task</h3>
-            <button onclick="closeAddTaskModal()" class="p-2 text-gray-500 hover:text-white hover:bg-gray-700 rounded-lg transition">
-                <i class="fas fa-times"></i>
-            </button>
+            <button onclick="closeTaskModal()" class="btn-icon btn-ghost text-gray-500 hover:text-white"><i class="fas fa-times"></i></button>
         </div>
-        <form method="POST" action="/assistants/task/add" class="p-5 space-y-4">
-            <input type="hidden" name="assistant_id" id="addTaskAssistantId">
+        <form id="taskForm" class="space-y-4">
             <div>
                 <label class="block text-sm font-medium text-gray-300 mb-1.5">Task Type</label>
-                <select name="task_type" class="input-field">
-                    <optgroup label="Email">
-                        <option value="email_read">Read Emails</option>
-                        <option value="email_reply">Reply to Email</option>
-                        <option value="email_summary">Summarize Emails</option>
-                    </optgroup>
-                    <optgroup label="WhatsApp">
-                        <option value="whatsapp_read">Read Messages</option>
-                        <option value="whatsapp_reply">Reply to Message</option>
-                    </optgroup>
-                    <optgroup label="Facebook">
-                        <option value="facebook_read">Read Posts</option>
-                        <option value="facebook_post">Create Post</option>
-                    </optgroup>
-                    <optgroup label="Research">
-                        <option value="web_search">Web Search</option>
-                        <option value="web_read">Read Web Page</option>
-                        <option value="web_summarize">Summarize Content</option>
-                    </optgroup>
-                    <optgroup label="Calendar">
-                        <option value="reminder_set">Set Reminder</option>
-                        <option value="event_create">Create Event</option>
-                    </optgroup>
-                    <optgroup label="Git">
-                        <option value="git_read">Read Repository</option>
-                        <option value="git_commit">Create Commit</option>
-                        <option value="git_explain">Explain Code</option>
-                    </optgroup>
-                    <optgroup label="Code">
-                        <option value="code_write">Write Code</option>
-                        <option value="code_review">Review Code</option>
-                    </optgroup>
-                    <optgroup label="Data">
-                        <option value="data_analyze">Analyze Data</option>
-                        <option value="report_create">Create Report</option>
-                    </optgroup>
-                    <optgroup label="Support">
-                        <option value="ticket_handle">Handle Ticket</option>
-                        <option value="customer_reply">Reply to Customer</option>
-                    </optgroup>
-                    <optgroup label="Custom">
-                        <option value="custom_task">Custom Task</option>
-                    </optgroup>
-                </select>
+                <select name="task_type" id="taskTypeSelect" class="input-field"></select>
             </div>
             <div>
-                <label class="block text-sm font-medium text-gray-300 mb-1.5">Task Name</label>
+                <label class="block text-sm font-medium text-gray-300 mb-1.5">Name</label>
                 <input type="text" name="name" class="input-field" placeholder="e.g. Morning Email Check">
             </div>
             <div>
-                <label class="block text-sm font-medium text-gray-300 mb-1.5">Schedule (optional)</label>
+                <label class="block text-sm font-medium text-gray-300 mb-1.5">Schedule</label>
                 <input type="text" name="schedule" class="input-field" placeholder="e.g. every day at 9am">
             </div>
-            <button type="submit" class="btn btn-primary w-full py-3">
-                <i class="fas fa-plus mr-2"></i>Add Task
-            </button>
+            <div class="flex justify-end gap-2 pt-3 border-t border-gray-700/50">
+                <button type="button" onclick="closeTaskModal()" class="btn btn-secondary">Cancel</button>
+                <button type="submit" class="btn btn-primary"><i class="fas fa-plus mr-2"></i>Add</button>
+            </div>
         </form>
     </div>
 </div>
 
-<!-- Toast -->
-<div id="toast" class="fixed bottom-6 right-6 bg-green-600 text-white px-4 py-2.5 rounded-lg shadow-lg z-50 hidden flex items-center gap-2 text-sm font-medium">
-    <i class="fas fa-check-circle"></i>
-    <span id="toastMsg">Done!</span>
+<!-- Add Integration Modal -->
+<div id="integrationModal" class="modal-overlay hidden">
+    <div class="modal-content glass-strong w-full max-w-lg p-5 max-h-[90vh] overflow-y-auto">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-white font-semibold">Add Integration</h3>
+            <button onclick="closeIntegrationModal()" class="btn-icon btn-ghost text-gray-500 hover:text-white"><i class="fas fa-times"></i></button>
+        </div>
+        <form id="integrationForm" class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-300 mb-1.5">Type</label>
+                <select name="integration_type" id="integrationTypeSelect" class="input-field" onchange="onIntegrationTypeChange()"></select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-300 mb-1.5">Display name</label>
+                <input type="text" name="name" class="input-field" placeholder="My Email integration">
+            </div>
+            <div id="integrationConfigFields" class="space-y-3 pt-3 border-t border-gray-700/50">
+                <p class="text-xs text-gray-500">Configuration fields will appear here based on the selected type.</p>
+            </div>
+            <div class="flex justify-end gap-2 pt-3 border-t border-gray-700/50">
+                <button type="button" onclick="closeIntegrationModal()" class="btn btn-secondary">Cancel</button>
+                <button type="submit" class="btn btn-primary"><i class="fas fa-plus mr-2"></i>Add</button>
+            </div>
+        </form>
+    </div>
 </div>
 
+<div id="toastContainer"></div>
 {% endblock %}
 
 {% block scripts %}
-<script>
-let currentAssistantId = '';
-let currentAssistantData = null;
-
-const templateData = {
-    email: { 
-        name: 'Email Assistant', 
-        desc: 'Read, draft, and reply to emails', 
-        caps: ['Read incoming emails', 'Draft professional replies', 'Send responses', 'Summarize email threads', 'Filter important messages'], 
-        color: 'blue',
-        prompts: [
-            { text: 'Hi, my name is John', icon: 'fa-hand-wave' },
-            { text: 'Show me new emails today', icon: 'fa-envelope-open' },
-            { text: 'Reply all my unread emails', icon: 'fa-reply-all' },
-            { text: 'Summarize my inbox', icon: 'fa-list' },
-            { text: 'Send email to team about meeting', icon: 'fa-paper-plane' }
-        ]
-    },
-    whatsapp: { 
-        name: 'WhatsApp Assistant', 
-        desc: 'Read and reply to WhatsApp messages', 
-        caps: ['Read messages', 'Send replies', 'Voice-to-text', 'Message summarization', 'Auto-reply'], 
-        color: 'green',
-        prompts: [
-            { text: 'Hi, my name is John', icon: 'fa-hand-wave' },
-            { text: 'Show me new WhatsApp messages', icon: 'fa-comment-dots' },
-            { text: 'Reply to unread messages', icon: 'fa-reply' },
-            { text: 'Send message to Mom', icon: 'fa-paper-plane' }
-        ]
-    },
-    facebook: { 
-        name: 'Facebook Assistant', 
-        desc: 'Manage Facebook posts and interactions', 
-        caps: ['Read posts', 'Draft replies', 'Create posts', 'Manage comments', 'Analytics'], 
-        color: 'indigo',
-        prompts: [
-            { text: 'Hi, my name is John', icon: 'fa-hand-wave' },
-            { text: 'Show me new Facebook posts', icon: 'fa-newspaper' },
-            { text: 'Reply to recent comments', icon: 'fa-comment' },
-            { text: 'Create a post about AI', icon: 'fa-plus-square' }
-        ]
-    },
-    web_research: { 
-        name: 'Web Research Assistant', 
-        desc: 'Search, read, and summarize web content', 
-        caps: ['Web search', 'Page reading', 'Content summarization', 'Fact checking', 'Source verification'], 
-        color: 'cyan',
-        prompts: [
-            { text: 'Search for latest AI news', icon: 'fa-search' },
-            { text: 'Read and summarize this URL', icon: 'fa-book-reader' },
-            { text: 'Compare AI models', icon: 'fa-balance-scale' }
-        ]
-    },
-    calendar: { 
-        name: 'Calendar Assistant', 
-        desc: 'Manage calendar events and reminders', 
-        caps: ['Set reminders', 'Create events', 'Manage schedule', 'Send notifications', 'Time zone handling'], 
-        color: 'amber',
-        prompts: [
-            { text: "Hi, my name is John's assistant", icon: 'fa-hand-wave' },
-            { text: "Schedule meeting tomorrow at 3pm", icon: 'fa-calendar-plus' },
-            { text: "What's on my calendar today?", icon: 'fa-calendar-alt' },
-            { text: "Set reminder for dentist appointment", icon: 'fa-bell' }
-        ]
-    },
-    git: { 
-        name: 'Git Assistant', 
-        desc: 'Manage git repositories and code', 
-        caps: ['Read repos', 'Explain code', 'Create commits', 'Manage branches', 'Code review'], 
-        color: 'red',
-        prompts: [
-            { text: 'Show recent commits', icon: 'fa-code-commit' },
-            { text: 'Create a new branch', icon: 'fa-code-branch' },
-            { text: 'Review my last PR', icon: 'fa-code-pull-request' }
-        ]
-    },
-    code: { 
-        name: 'Code Assistant', 
-        desc: 'Read, explain, and write code', 
-        caps: ['Code explanation', 'Code generation', 'Bug fixing', 'Refactoring', 'Documentation'], 
-        color: 'purple',
-        prompts: [
-            { text: 'Write a Python function', icon: 'fa-file-code' },
-            { text: 'Explain this code', icon: 'fa-code' },
-            { text: 'Find bugs in my code', icon: 'fa-bug' }
-        ]
-    },
-    data: { 
-        name: 'Data Assistant', 
-        desc: 'Analyze data and generate reports', 
-        caps: ['Data analysis', 'Chart generation', 'Report creation', 'Pattern detection', 'Predictions'], 
-        color: 'teal',
-        prompts: [
-            { text: 'Analyze my sales data', icon: 'fa-chart-line' },
-            { text: 'Create a report', icon: 'fa-file-alt' },
-            { text: 'Show trends', icon: 'fa-chart-bar' }
-        ]
-    },
-    customer: { 
-        name: 'Support Assistant', 
-        desc: 'Handle customer inquiries and support', 
-        caps: ['Answer questions', 'Ticket management', 'Escalation', 'Knowledge base', 'Sentiment analysis'], 
-        color: 'orange',
-        prompts: [
-            { text: 'Hi, my name is John', icon: 'fa-hand-wave' },
-            { text: 'Show open support tickets', icon: 'fa-ticket-alt' },
-            { text: 'Reply to customer inquiries', icon: 'fa-headset' }
-        ]
-    },
-    custom: { 
-        name: 'Custom Assistant', 
-        desc: 'Build your own custom assistant', 
-        caps: ['Custom tasks', 'Custom integrations', 'Custom workflows', 'Flexible configuration'], 
-        color: 'gray',
-        prompts: [
-            { text: 'Hi, my name is John', icon: 'fa-hand-wave' },
-            { text: 'What can you help me with?', icon: 'fa-question-circle' }
-        ]
-    }
-};
-
-function selectTemplate(tmpl) {
-    document.getElementById('selectedTemplate').value = tmpl;
-    document.querySelectorAll('.template-btn').forEach(btn => {
-        btn.classList.remove('border-purple-500', 'bg-purple-600/10');
-        btn.classList.add('border-gray-700');
-    });
-    const selected = document.querySelector(`[data-template="${tmpl}"]`);
-    if (selected) {
-        selected.classList.add('border-purple-500', 'bg-purple-600/10');
-        selected.classList.remove('border-gray-700');
-        document.getElementById('assistantName').value = templateData[tmpl].name;
-    }
-    updateCapabilities(tmpl);
-}
-
-function updateCapabilities(tmpl) {
-    const info = templateData[tmpl];
-    const html = `
-        <p class="text-white font-medium mb-2">${info.name}</p>
-        <p class="text-gray-400 text-xs mb-3">${info.desc}</p>
-        <div class="space-y-1.5">
-            ${info.caps.map(c => `<div class="flex items-center gap-2 text-xs"><i class="fas fa-check text-${info.color}-400"></i><span class="text-gray-300">${c}</span></div>`).join('')}
-        </div>
-    `;
-    document.getElementById('capabilitiesContent').innerHTML = html;
-}
-
-function filterAssistants() {
-    const q = document.getElementById('assistantSearch').value.toLowerCase();
-    document.querySelectorAll('.assistant-card').forEach(card => {
-        card.style.display = card.dataset.name.includes(q) ? '' : 'none';
-    });
-}
-
-async function showAssistantDetail(assistantId) {
-    currentAssistantId = assistantId;
-    const modal = document.getElementById('assistantModal');
-    const content = document.getElementById('modalContent');
-    modal.classList.remove('hidden');
-    content.innerHTML = '<div class="text-center py-8"><i class="fas fa-spinner fa-spin text-2xl text-gray-500"></i></div>';
-
-    try {
-        const resp = await fetch(`/api/assistants/${assistantId}`);
-        const data = await resp.json();
-        currentAssistantData = data;
-        
-        document.getElementById('modalAssistantName').textContent = data.assistant.name;
-        document.getElementById('modalAssistantModel').textContent = data.assistant.model_id;
-        
-        // Render prompt buttons based on template
-        const tmpl = data.assistant.description || 'custom';
-        const tmplInfo = templateData[tmpl] || templateData.custom;
-        const promptBtns = document.getElementById('promptButtons');
-        promptBtns.innerHTML = tmplInfo.prompts.map(p => `
-            <button onclick="usePrompt('${p.text.replace(/'/g, "\\'")}')" 
-                class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 border border-gray-600 hover:border-purple-500 rounded-full text-xs text-gray-300 hover:text-white transition flex items-center gap-1.5">
-                <i class="fas ${p.icon} text-purple-400"></i>
-                ${p.text.length > 25 ? p.text.substring(0, 25) + '...' : p.text}
-            </button>
-        `).join('');
-        
-        let html = `
-            <div class="grid grid-cols-2 gap-4 mb-6">
-                <div class="p-3 bg-gray-800/50 rounded-lg">
-                    <p class="text-xs text-gray-500">Status</p>
-                    <p class="text-white font-medium">${data.assistant.is_active ? 'Active' : 'Inactive'}</p>
-                </div>
-                <div class="p-3 bg-gray-800/50 rounded-lg">
-                    <p class="text-xs text-gray-500">Model</p>
-                    <p class="text-white font-medium">${data.assistant.model_id}</p>
-                </div>
-                <div class="p-3 bg-gray-800/50 rounded-lg">
-                    <p class="text-xs text-gray-500">Personality</p>
-                    <p class="text-white font-medium">${data.assistant.personality}</p>
-                </div>
-                <div class="p-3 bg-gray-800/50 rounded-lg">
-                    <p class="text-xs text-gray-500">Auto Reply</p>
-                    <p class="text-white font-medium">${data.assistant.auto_reply ? 'On' : 'Off'}</p>
-                </div>
-            </div>
-
-            <div class="mb-6">
-                <h4 class="text-white font-medium mb-2">System Prompt</h4>
-                <div class="p-3 bg-gray-800/50 rounded-lg text-sm text-gray-300 font-mono">${data.assistant.system_prompt}</div>
-            </div>
-        `;
-
-        // Integrations
-        html += `
-            <div class="mb-6">
-                <h4 class="text-white font-medium mb-3">Integrations (${data.integrations.length})</h4>
-                <div class="space-y-2">
-        `;
-        if (data.integrations.length > 0) {
-            data.integrations.forEach(integ => {
-                html += `
-                    <div class="p-3 bg-gray-800/50 rounded-lg border border-gray-700 flex items-center justify-between">
-                        <div class="flex items-center gap-3">
-                            <i class="fas fa-plug text-${integ.is_active ? 'green' : 'gray'}-400"></i>
-                            <div>
-                                <p class="text-sm text-white">${integ.name}</p>
-                                <p class="text-[10px] text-gray-500">${integ.status}</p>
-                            </div>
-                        </div>
-                        <span class="badge ${integ.is_active ? 'badge-green' : 'bg-gray-700 text-gray-400'} text-[10px]">${integ.is_active ? 'Connected' : 'Disconnected'}</span>
-                    </div>
-                `;
-            });
-        } else {
-            html += '<p class="text-gray-500 text-sm">No integrations configured. Go to Integrations page to add one.</p>';
-        }
-        html += '</div></div>';
-
-        // Tasks
-        html += `
-            <div class="mb-6">
-                <div class="flex items-center justify-between mb-3">
-                    <h4 class="text-white font-medium">Tasks (${data.tasks.length})</h4>
-                    <button onclick="openAddTaskModal('${assistantId}')" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white text-xs rounded-lg transition">
-                        <i class="fas fa-plus mr-1"></i>Add Task
-                    </button>
-                </div>
-                <div class="space-y-2">
-        `;
-        if (data.tasks.length > 0) {
-            data.tasks.forEach(task => {
-                html += `
-                    <div class="p-3 bg-gray-800/50 rounded-lg border border-gray-700 flex items-center justify-between">
-                        <div class="flex items-center gap-3">
-                            <i class="fas fa-tasks text-blue-400"></i>
-                            <div>
-                                <p class="text-sm text-white">${task.name}</p>
-                                <p class="text-[10px] text-gray-500">${task.task_type} ${task.schedule ? '| ' + task.schedule : ''}</p>
-                            </div>
-                        </div>
-                        <div class="flex items-center gap-2">
-                            <span class="text-[10px] text-gray-500">${task.run_count} runs</span>
-                            <form method="POST" action="/assistants/task/${task.id}/delete" class="inline" onsubmit="return confirm('Delete task?')">
-                                <button type="submit" class="p-1 text-gray-500 hover:text-red-400 transition"><i class="fas fa-trash text-xs"></i></button>
-                            </form>
-                        </div>
-                    </div>
-                `;
-            });
-        } else {
-            html += '<p class="text-gray-500 text-sm">No tasks configured</p>';
-        }
-        html += '</div></div>';
-
-        // Recent Logs
-        html += `
-            <div>
-                <h4 class="text-white font-medium mb-3">Recent Activity</h4>
-                <div class="space-y-2 max-h-48 overflow-y-auto">
-        `;
-        if (data.recent_logs.length > 0) {
-            data.recent_logs.forEach(log => {
-                const logColor = log.status === 'success' ? 'green' : 'red';
-                html += `
-                    <div class="p-2 bg-gray-800/30 rounded text-xs flex items-center gap-2">
-                        <span class="px-1.5 py-0.5 bg-${logColor}-600/20 text-${logColor}-400 rounded text-[9px] uppercase">${log.status}</span>
-                        <span class="text-gray-400 flex-1">${log.action}</span>
-                        <span class="text-gray-600 text-[9px]">${log.created_at[:16]}</span>
-                    </div>
-                `;
-            });
-        } else {
-            html += '<p class="text-gray-500 text-sm">No activity yet</p>';
-        }
-        html += '</div></div>';
-        
-        content.innerHTML = html;
-    } catch (e) {
-        content.innerHTML = '<div class="text-center py-8 text-red-400">Failed to load assistant details</div>';
-    }
-}
-
-function usePrompt(text) {
-    document.getElementById('assistantPrompt').value = text;
-    document.getElementById('assistantPrompt').focus();
-}
-
-async function sendToAssistant() {
-    const input = document.getElementById('assistantPrompt');
-    const message = input.value.trim();
-    if (!message) return;
-    
-    input.value = '';
-    
-    const content = document.getElementById('modalContent');
-    const loadingHtml = `
-        <div class="flex items-start gap-3 mb-4">
-            <div class="w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center flex-shrink-0">
-                <i class="fas fa-user text-white text-xs"></i>
-            </div>
-            <div class="p-3 bg-gray-700 rounded-lg rounded-tl-none max-w-[80%]">
-                <p class="text-white text-sm">${message}</p>
-            </div>
-        </div>
-        <div class="flex items-start gap-3 mb-4">
-            <div class="w-8 h-8 bg-purple-600/20 rounded-full flex items-center justify-center flex-shrink-0">
-                <i class="fas fa-robot text-purple-400 text-xs"></i>
-            </div>
-            <div class="p-3 bg-gray-800 rounded-lg rounded-tl-none max-w-[80%]">
-                <p class="text-gray-400 text-sm"><i class="fas fa-spinner fa-spin mr-2"></i>Thinking...</p>
-            </div>
-        </div>
-    `;
-    content.innerHTML += loadingHtml;
-    content.scrollTop = content.scrollHeight;
-    
-    try {
-        const resp = await fetch(`/api/assistants/${currentAssistantId}/chat`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message: message })
-        });
-        const data = await resp.json();
-        
-        // Replace loading with response
-        const responseHtml = `
-            <div class="flex items-start gap-3 mb-4">
-                <div class="w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center flex-shrink-0">
-                    <i class="fas fa-user text-white text-xs"></i>
-                </div>
-                <div class="p-3 bg-gray-700 rounded-lg rounded-tl-none max-w-[80%]">
-                    <p class="text-white text-sm">${message}</p>
-                </div>
-            </div>
-            <div class="flex items-start gap-3 mb-4">
-                <div class="w-8 h-8 bg-purple-600/20 rounded-full flex items-center justify-center flex-shrink-0">
-                    <i class="fas fa-robot text-purple-400 text-xs"></i>
-                </div>
-                <div class="p-3 bg-gray-800 rounded-lg rounded-tl-none max-w-[80%]">
-                    <p class="text-white text-sm whitespace-pre-wrap">${data.response || data.message || 'I received your message!'}</p>
-                </div>
-            </div>
-        `;
-        content.innerHTML = content.innerHTML.replace(loadingHtml, responseHtml);
-        content.scrollTop = content.scrollHeight;
-    } catch (e) {
-        const errorHtml = `
-            <div class="flex items-start gap-3 mb-4">
-                <div class="w-8 h-8 bg-red-600/20 rounded-full flex items-center justify-center flex-shrink-0">
-                    <i class="fas fa-exclamation text-red-400 text-xs"></i>
-                </div>
-                <div class="p-3 bg-red-900/30 rounded-lg rounded-tl-none max-w-[80%]">
-                    <p class="text-red-400 text-sm">Sorry, I encountered an error. Please check your integrations are configured.</p>
-                </div>
-            </div>
-        `;
-        content.innerHTML = content.innerHTML.replace(loadingHtml, errorHtml);
-    }
-}
-
-function toggleAutoPilot() {
-    const toggle = document.getElementById('autoPilotToggle');
-    const settings = document.getElementById('autoPilotSettings');
-    settings.classList.toggle('hidden', !toggle.checked);
-}
-
-function saveAutoPilot() {
-    const interval = document.getElementById('autoPilotInterval').value;
-    const action = document.getElementById('autoPilotAction').value;
-    const schedule = document.getElementById('autoPilotSchedule').value;
-    
-    showToast(`Auto-Pilot saved! Every ${interval} min - ${action}`);
-}
-
-function closeAssistantModal() {
-    document.getElementById('assistantModal').classList.add('hidden');
-}
-
-function openAddTaskModal(assistantId) {
-    document.getElementById('addTaskAssistantId').value = assistantId;
-    document.getElementById('addTaskModal').classList.remove('hidden');
-}
-
-function closeAddTaskModal() {
-    document.getElementById('addTaskModal').classList.add('hidden');
-}
-
-function showToast(msg) {
-    const toast = document.getElementById('toast');
-    document.getElementById('toastMsg').textContent = msg;
-    toast.classList.remove('hidden');
-    setTimeout(() => toast.classList.add('hidden'), 3000);
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-    selectTemplate('email');
-});
-</script>
+<script src="/static/js/assistants.js?v=2"></script>
 {% endblock %}

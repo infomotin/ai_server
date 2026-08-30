@@ -1,6 +1,7 @@
 import os
+import json
 import requests
-from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
+from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, Response
 from datetime import datetime
 
 app = Flask(__name__)
@@ -16,6 +17,29 @@ def get_api_headers():
     if "access_token" in session:
         headers["Authorization"] = f"Bearer {session['access_token']}"
     return headers
+
+
+def _proxy_request(method, url, timeout=30):
+    headers = get_api_headers()
+    if method == "GET":
+        return requests.get(url, headers=headers, params=request.args, timeout=timeout)
+    if method == "POST":
+        return requests.post(url, headers=headers, json=request.get_json(silent=True) or {}, params=request.args, timeout=timeout)
+    if method == "PUT":
+        return requests.put(url, headers=headers, json=request.get_json(silent=True) or {}, params=request.args, timeout=timeout)
+    if method == "DELETE":
+        return requests.delete(url, headers=headers, params=request.args, timeout=timeout)
+    return None
+
+
+def _handle_proxy_response(resp):
+    try:
+        data = resp.json()
+    except ValueError:
+        data = {"error": resp.text[:500]}
+    if resp.status_code == 401 and isinstance(data, dict) and "Invalid or expired" in str(data.get("detail", "")):
+        session.clear()
+    return data, resp.status_code
 
 
 @app.route("/")
@@ -212,6 +236,271 @@ def delete_key(key_id):
         flash(f"Connection error: {str(e)}", "error")
 
     return redirect(url_for("manage_keys"))
+
+
+OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
+
+
+@app.route("/api/management/default-model", methods=["GET", "POST"])
+def api_default_model():
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    if request.method == "GET":
+        try:
+            r = requests.get(f"{API_BASE_URL}/settings", headers=get_api_headers(), timeout=5)
+            data = r.json() if r.status_code == 200 else {}
+            return jsonify({"model": data.get("default_model")})
+        except requests.exceptions.RequestException:
+            return jsonify({"model": None})
+    data = request.get_json(silent=True) or {}
+    model = data.get("model")
+    if not model:
+        return jsonify({"error": "model required"}), 400
+    try:
+        r = requests.post(f"{API_BASE_URL}/settings/model",
+                          json={"model": model},
+                          headers=get_api_headers(), timeout=10)
+        if r.status_code == 200:
+            return r.json()
+        return jsonify({"error": r.text[:300]}), r.status_code
+    except requests.exceptions.RequestException as e:
+        return jsonify({"error": str(e)[:200]}), 500
+
+
+@app.route("/api/ollama/create", methods=["POST"])
+def api_ollama_create():
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    data = request.get_json(silent=True) or {}
+    name = data.get("name")
+    modelfile = data.get("modelfile")
+    folder = data.get("folder", "/www/AI_server/models")
+    if not name or not modelfile:
+        return jsonify({"error": "name and modelfile required"}), 400
+
+    try:
+        resp = requests.post(
+            f"{OLLAMA_BASE_URL}/api/create",
+            json={"name": name, "modelfile": modelfile},
+            stream=True,
+            timeout=300
+        )
+        last = {}
+        for line in resp.iter_lines():
+            if not line:
+                continue
+            try:
+                last = json.loads(line.decode("utf-8"))
+            except Exception:
+                pass
+        return jsonify(last or {"success": resp.status_code == 200})
+    except requests.exceptions.RequestException as e:
+        return jsonify({"error": str(e)[:200]}), 500
+
+
+@app.route("/api/ollama/status")
+def api_ollama_status():
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    try:
+        r = requests.get(f"{OLLAMA_BASE_URL}/api/tags", timeout=5)
+        if r.status_code == 200:
+            return {"online": True, "version": r.headers.get("server", "ok")}
+        return {"online": False}
+    except requests.exceptions.RequestException as e:
+        return {"online": False, "error": str(e)[:200]}
+
+
+@app.route("/api/ollama/tags")
+def api_ollama_tags():
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    try:
+        r = requests.get(f"{OLLAMA_BASE_URL}/api/tags", timeout=10)
+        return r.json() if r.status_code == 200 else {"models": []}
+    except requests.exceptions.RequestException as e:
+        return {"models": [], "error": str(e)[:200]}
+
+
+@app.route("/api/ollama/ps")
+def api_ollama_ps():
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    try:
+        r = requests.get(f"{OLLAMA_BASE_URL}/api/ps", timeout=5)
+        return r.json() if r.status_code == 200 else {"models": []}
+    except requests.exceptions.RequestException:
+        return {"models": []}
+
+
+@app.route("/api/ollama/show")
+def api_ollama_show():
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    name = request.args.get("name")
+    if not name:
+        return jsonify({"error": "name required"}), 400
+    try:
+        r = requests.post(f"{OLLAMA_BASE_URL}/api/show", json={"name": name}, timeout=15)
+        return r.json() if r.status_code == 200 else {"error": r.text[:300]}
+    except requests.exceptions.RequestException as e:
+        return jsonify({"error": str(e)[:200]}), 500
+
+
+@app.route("/api/ollama/delete", methods=["POST"])
+def api_ollama_delete():
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    data = request.get_json(silent=True) or {}
+    name = data.get("name")
+    if not name:
+        return jsonify({"error": "name required"}), 400
+    try:
+        r = requests.delete(f"{OLLAMA_BASE_URL}/api/delete", json={"name": name}, timeout=60)
+        if r.status_code == 200:
+            return {"success": True}
+        return jsonify({"error": r.text[:300]}), r.status_code
+    except requests.exceptions.RequestException as e:
+        return jsonify({"error": str(e)[:200]}), 500
+
+
+@app.route("/api/ollama/pull", methods=["POST"])
+def api_ollama_pull():
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    data = request.get_json(silent=True) or {}
+    name = (data.get("name") or "").strip()
+    if not name:
+        return jsonify({"error": "name required"}), 400
+
+    def generate():
+        try:
+            with requests.post(
+                f"{OLLAMA_BASE_URL}/api/pull",
+                json={"name": name, "stream": True},
+                stream=True,
+                timeout=None
+            ) as resp:
+                for line in resp.iter_lines():
+                    if not line:
+                        continue
+                    try:
+                        payload = json.loads(line.decode("utf-8"))
+                    except Exception:
+                        continue
+                    yield "data: " + json.dumps(payload) + "\n\n"
+                yield "data: " + json.dumps({"status": "success", "done": True}) + "\n\n"
+        except requests.exceptions.RequestException as e:
+            yield "data: " + json.dumps({"error": str(e)[:200]}) + "\n\n"
+
+    return Response(generate(), mimetype="text/event-stream",
+                    headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+@app.route("/api/models/local")
+def api_models_local():
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    base = "/www/AI_server/models"
+    entries = []
+    try:
+        for name in os.listdir(base):
+            full = os.path.join(base, name)
+            if not os.path.isdir(full):
+                continue
+            size = 0
+            file_count = 0
+            gguf_files = []
+            for root, _, files in os.walk(full):
+                for f in files:
+                    p = os.path.join(root, f)
+                    try:
+                        size += os.path.getsize(p)
+                        file_count += 1
+                        if f.endswith(".gguf"):
+                            gguf_files.append(os.path.relpath(p, full))
+                    except OSError:
+                        pass
+            entries.append({
+                "name": name,
+                "path": full,
+                "size_bytes": size,
+                "file_count": file_count,
+                "gguf_files": gguf_files[:5]
+            })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    return jsonify({"models": entries, "base_dir": base})
+
+
+@app.route("/api/models/trained")
+def api_models_trained():
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    try:
+        resp = requests.get(f"{API_BASE_URL}/model-builder/custom-models",
+                            headers=get_api_headers(), timeout=10)
+        if resp.status_code == 200:
+            return resp.json()
+        return []
+    except requests.exceptions.RequestException:
+        return []
+
+
+@app.route("/api/models/library")
+def api_models_library():
+    """Curated catalog of recommended Ollama models grouped by task."""
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    return jsonify({
+        "chat_small": [
+            {"name": "qwen2.5:0.5b", "size": "397MB", "params": "0.5B", "desc": "Ultra-fast general chat, low RAM"},
+            {"name": "llama3.2:1b", "size": "1.3GB", "params": "1B", "desc": "Strong tiny model from Meta"},
+            {"name": "gemma2:2b", "size": "1.6GB", "params": "2B", "desc": "Google's compact model"},
+            {"name": "phi3:mini", "size": "2.3GB", "params": "3.8B", "desc": "Microsoft's small but smart model"},
+            {"name": "llama3.2:3b", "size": "2GB", "params": "3B", "desc": "Balanced quality/speed"}
+        ],
+        "chat_balanced": [
+            {"name": "mistral-nemo", "size": "7GB", "params": "12B", "desc": "Best mid-size for general tasks"},
+            {"name": "llama3.1:8b", "size": "4.7GB", "params": "8B", "desc": "Industry-standard 8B model"},
+            {"name": "gemma2:9b", "size": "5.4GB", "params": "9B", "desc": "Strong reasoning"},
+            {"name": "qwen2.5:7b", "size": "4.4GB", "params": "7B", "desc": "Great multilingual"},
+            {"name": "mistral:7b", "size": "4.1GB", "params": "7B", "desc": "Classic 7B Mistral"}
+        ],
+        "chat_large": [
+            {"name": "llama3.1:70b", "size": "38GB", "params": "70B", "desc": "Top quality (needs 64GB+ RAM)"},
+            {"name": "qwen2.5:32b", "size": "20GB", "params": "32B", "desc": "Excellent multilingual"},
+            {"name": "mixtral:8x7b", "size": "26GB", "params": "47B", "desc": "Mixture of experts"},
+            {"name": "deepseek-r1:32b", "size": "20GB", "params": "32B", "desc": "Strong reasoning"}
+        ],
+        "code": [
+            {"name": "qwen2.5-coder:1.5b", "size": "1GB", "params": "1.5B", "desc": "Lightweight coding"},
+            {"name": "codellama:3.5", "size": "3.5GB", "params": "3.5B", "desc": "Code completion"},
+            {"name": "qwen2.5-coder:7b", "size": "4.7GB", "params": "7B", "desc": "Strong coding at 7B"},
+            {"name": "deepseek-coder-v2:16b", "size": "8.9GB", "params": "16B", "desc": "Top coding quality"}
+        ],
+        "embedding": [
+            {"name": "nomic-embed-text", "size": "274MB", "params": "137M", "desc": "Best small embedder"},
+            {"name": "mxbai-embed-large", "size": "670MB", "params": "335M", "desc": "High quality embeddings"},
+            {"name": "all-minilm", "size": "46MB", "params": "22M", "desc": "Tiny embedder"}
+        ],
+        "vision": [
+            {"name": "llama3.2-vision:11b", "size": "7.9GB", "params": "11B", "desc": "Image + text"},
+            {"name": "llava:7b", "size": "4.7GB", "params": "7B", "desc": "Classic vision model"},
+            {"name": "moondream:1.8b", "size": "1.1GB", "params": "1.8B", "desc": "Tiny vision model"}
+        ],
+        "reasoning": [
+            {"name": "deepseek-r1:1.5b", "size": "1.1GB", "params": "1.5B", "desc": "Reasoning at small size"},
+            {"name": "deepseek-r1:7b", "size": "4.7GB", "params": "7B", "desc": "Best mid-size reasoning"},
+            {"name": "deepseek-r1:14b", "size": "9GB", "params": "14B", "desc": "Strong reasoning"},
+            {"name": "qwq:32b", "size": "20GB", "params": "32B", "desc": "Qwen reasoning model"}
+        ],
+        "multilingual": [
+            {"name": "qwen2.5:7b", "size": "4.4GB", "params": "7B", "desc": "29 languages"},
+            {"name": "aya:8b", "size": "4.8GB", "params": "8B", "desc": "23 languages"},
+            {"name": "llama3.1:8b", "size": "4.7GB", "params": "8B", "desc": "8 languages"}
+        ]
+    })
 
 
 @app.route("/models")
@@ -484,6 +773,461 @@ def delete_skill(skill_id):
         flash(f"Connection error: {str(e)}", "error")
 
     return redirect(url_for("manage_skills"))
+
+
+@app.route("/api/skills/<skill_id>/test", methods=["POST"])
+def api_test_skill(skill_id):
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    data = request.get_json(silent=True) or {}
+    try:
+        resp = requests.post(
+            f"{API_BASE_URL}/skills/{skill_id}/test",
+            json=data,
+            headers=get_api_headers(),
+            timeout=60
+        )
+        return jsonify(resp.json()), resp.status_code
+    except requests.exceptions.RequestException as e:
+        return jsonify({"success": False, "error": str(e)[:300]}), 500
+
+
+# ============= Programming Hub Routes =============
+
+@app.route("/programming")
+def programming_hub():
+    if "access_token" not in session:
+        return redirect(url_for("login"))
+    return render_template("programming.html")
+
+
+@app.route("/api/programming/run", methods=["POST"])
+def api_run_code():
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    import subprocess, time, tempfile, os
+    data = request.get_json(silent=True) or {}
+    code = data.get("code", "")
+    lang = data.get("language", "python")
+
+    if not code.strip():
+        return jsonify({"success": False, "error": "No code provided"}), 400
+
+    start = time.time()
+
+    try:
+        if lang == "python":
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False, dir='/tmp') as f:
+                f.write(code)
+                f.flush()
+                result = subprocess.run(
+                    ['python3', f.name],
+                    capture_output=True, text=True, timeout=15,
+                    cwd='/tmp', env={**os.environ, 'PYTHONDONTWRITEBYTECODE': '1'}
+                )
+                os.unlink(f.name)
+                elapsed = round((time.time() - start) * 1000)
+                return jsonify({
+                    "success": result.returncode == 0,
+                    "stdout": result.stdout[-5000:] if result.stdout else "",
+                    "stderr": result.stderr[-3000:] if result.stderr else "",
+                    "language": "python",
+                    "latency_ms": elapsed,
+                    "exit_code": result.returncode
+                })
+
+        elif lang == "javascript":
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.js', delete=False, dir='/tmp') as f:
+                f.write(code)
+                f.flush()
+                result = subprocess.run(
+                    ['node', f.name],
+                    capture_output=True, text=True, timeout=15,
+                    cwd='/tmp'
+                )
+                os.unlink(f.name)
+                elapsed = round((time.time() - start) * 1000)
+                return jsonify({
+                    "success": result.returncode == 0,
+                    "stdout": result.stdout[-5000:] if result.stdout else "",
+                    "stderr": result.stderr[-3000:] if result.stderr else "",
+                    "language": "javascript",
+                    "latency_ms": elapsed,
+                    "exit_code": result.returncode
+                })
+
+        elif lang == "bash":
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.sh', delete=False, dir='/tmp') as f:
+                f.write(code)
+                f.flush()
+                result = subprocess.run(
+                    ['bash', f.name],
+                    capture_output=True, text=True, timeout=15,
+                    cwd='/tmp'
+                )
+                os.unlink(f.name)
+                elapsed = round((time.time() - start) * 1000)
+                return jsonify({
+                    "success": result.returncode == 0,
+                    "stdout": result.stdout[-5000:] if result.stdout else "",
+                    "stderr": result.stderr[-3000:] if result.stderr else "",
+                    "language": "bash",
+                    "latency_ms": elapsed,
+                    "exit_code": result.returncode
+                })
+
+        else:
+            return jsonify({"success": False, "error": f"Unsupported language: {lang}"}), 400
+
+    except subprocess.TimeoutExpired:
+        return jsonify({"success": False, "error": "Code execution timed out (15s limit)", "latency_ms": 15000})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)[:500], "latency_ms": round((time.time() - start) * 1000)})
+
+
+@app.route("/api/programming/explain", methods=["POST"])
+def api_explain_code():
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    data = request.get_json(silent=True) or {}
+    code = data.get("code", "")
+    model = data.get("model", "qwen2.5-coder:1.5b")
+
+    if not code.strip():
+        return jsonify({"success": False, "error": "No code provided"}), 400
+
+    import time
+    start = time.time()
+
+    try:
+        resp = requests.post(
+            "http://localhost:11434/api/chat",
+            json={
+                "model": model,
+                "messages": [
+                    {"role": "system", "content": "You are an expert programming teacher. Explain code step by step in simple terms. Describe what each part does, the overall logic, input/output, time complexity, and potential improvements. Use clear formatting with bullet points. Also provide a trace table showing variable values at each step."},
+                    {"role": "user", "content": f"Explain this code in detail with variable trace:\n\n{code}"}
+                ],
+                "stream": False
+            },
+            timeout=60
+        )
+        elapsed = round((time.time() - start) * 1000)
+
+        if resp.status_code == 200:
+            result = resp.json()
+            reply = result.get("message", {}).get("content", "No response")
+            tokens = result.get("eval_count", 0)
+            return jsonify({"success": True, "explanation": reply, "tokens": tokens, "latency_ms": elapsed, "model": model})
+        else:
+            return jsonify({"success": False, "error": "Ollama error", "latency_ms": elapsed})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)[:300], "latency_ms": round((time.time() - start) * 1000)})
+
+
+@app.route("/api/programming/book-qa", methods=["POST"])
+def api_book_qa():
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    data = request.get_json(silent=True) or {}
+    book_text = data.get("book_text", "")
+    book_title = data.get("book_title", "Unknown Book")
+    model = data.get("model", "qwen2.5-coder:1.5b")
+
+    if not book_text.strip():
+        return jsonify({"success": False, "error": "No book text provided"}), 400
+
+    import time
+    start = time.time()
+
+    try:
+        resp = requests.post(
+            "http://localhost:11434/api/chat",
+            json={
+                "model": model,
+                "messages": [
+                    {"role": "system", "content": f"You are a book analysis expert. Analyze the book '{book_title}' and generate: 1) A brief summary (3-5 sentences) 2) Key themes and ideas 3) 10 quiz questions with answers 4) Character analysis 5) Important quotes 6) Critical thinking questions. Format everything clearly with markdown."},
+                    {"role": "user", "content": f"Analyze this book content and generate Q&A:\n\n{book_text[:6000]}"}
+                ],
+                "stream": False
+            },
+            timeout=90
+        )
+        elapsed = round((time.time() - start) * 1000)
+
+        if resp.status_code == 200:
+            result = resp.json()
+            reply = result.get("message", {}).get("content", "No response")
+            tokens = result.get("eval_count", 0)
+            return jsonify({"success": True, "analysis": reply, "tokens": tokens, "latency_ms": elapsed, "model": model})
+        else:
+            return jsonify({"success": False, "error": "Ollama error", "latency_ms": elapsed})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)[:300], "latency_ms": round((time.time() - start) * 1000)})
+
+
+@app.route("/api/programming/skill-test", methods=["POST"])
+def api_programming_skill_test():
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    data = request.get_json(silent=True) or {}
+    topic = data.get("topic", "python")
+    difficulty = data.get("difficulty", "medium")
+    model = data.get("model", "qwen2.5-coder:1.5b")
+
+    import time
+    start = time.time()
+
+    try:
+        resp = requests.post(
+            "http://localhost:11434/api/chat",
+            json={
+                "model": model,
+                "messages": [
+                    {"role": "system", "content": f"You are a programming exam creator. Generate a {difficulty} level programming quiz on {topic}. Create 5 questions mixing multiple choice, code completion, and debugging challenges. For each question provide: question, options (if MC), correct answer, and explanation. Format as JSON array."},
+                    {"role": "user", "content": f"Generate a {difficulty} {topic} programming quiz with 5 questions. Include code snippets where relevant."}
+                ],
+                "stream": False
+            },
+            timeout=60
+        )
+        elapsed = round((time.time() - start) * 1000)
+
+        if resp.status_code == 200:
+            result = resp.json()
+            reply = result.get("message", {}).get("content", "No response")
+            tokens = result.get("eval_count", 0)
+            return jsonify({"success": True, "quiz": reply, "tokens": tokens, "latency_ms": elapsed, "model": model, "topic": topic, "difficulty": difficulty})
+        else:
+            return jsonify({"success": False, "error": "Ollama error", "latency_ms": elapsed})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)[:300], "latency_ms": round((time.time() - start) * 1000)})
+
+
+@app.route("/api/programming/sql-explain", methods=["POST"])
+def api_sql_explain():
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    data = request.get_json(silent=True) or {}
+    code = data.get("code", "")
+    model = data.get("model", "qwen2.5-coder:1.5b")
+
+    if not code.strip():
+        return jsonify({"success": False, "error": "No SQL provided"}), 400
+
+    import time
+    start = time.time()
+
+    try:
+        resp = requests.post(
+            "http://localhost:11434/api/chat",
+            json={
+                "model": model,
+                "messages": [
+                    {"role": "system", "content": "You are a SQL expert. Analyze this SQL query and explain: 1) What the query does step by step, 2) Tables and joins used, 3) WHERE conditions and filters, 4) GROUP BY and HAVING logic, 5) Performance tips, 6) Potential issues, 7) How to optimize it. Use clear formatting with examples."},
+                    {"role": "user", "content": f"Explain this SQL query in detail:\n\n{code}"}
+                ],
+                "stream": False
+            },
+            timeout=60
+        )
+        elapsed = round((time.time() - start) * 1000)
+
+        if resp.status_code == 200:
+            result = resp.json()
+            reply = result.get("message", {}).get("content", "No response")
+            tokens = result.get("eval_count", 0)
+            return jsonify({"success": True, "explanation": reply, "tokens": tokens, "latency_ms": elapsed, "model": model})
+        else:
+            return jsonify({"success": False, "error": "Ollama error", "latency_ms": elapsed})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)[:300], "latency_ms": round((time.time() - start) * 1000)})
+
+
+@app.route("/api/programming/book-upload", methods=["POST"])
+def api_book_upload():
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    import time, tempfile, os
+    start = time.time()
+    model = request.form.get("model", "qwen2.5-coder:1.5b")
+    book_title = request.form.get("book_title", "Unknown Book")
+    mode = request.form.get("mode", "analyze")
+
+    book_text = ""
+    if "file" in request.files:
+        f = request.files["file"]
+        if f.filename:
+            content = f.read()
+            if f.filename.endswith(".txt"):
+                book_text = content.decode("utf-8", errors="ignore")
+            elif f.filename.endswith(".pdf"):
+                try:
+                    import subprocess
+                    with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+                        tmp.write(content)
+                        tmp.flush()
+                        result = subprocess.run(["pdftotext", tmp.name, "-"], capture_output=True, text=True, timeout=30)
+                        book_text = result.stdout
+                        os.unlink(tmp.name)
+                except Exception:
+                    return jsonify({"success": False, "error": "PDF parsing failed. Install poppler-utils: apt install poppler-utils"})
+            else:
+                book_text = content.decode("utf-8", errors="ignore")[:50000]
+
+    url = request.form.get("url", "")
+    if url and not book_text:
+        try:
+            import subprocess, re
+            result = subprocess.run(
+                ["curl", "-sL", "--max-time", "15", url],
+                capture_output=True, text=True, timeout=20
+            )
+            book_text = result.stdout[:50000]
+            book_text = re.sub(r'<[^>]+>', ' ', book_text)
+            book_text = re.sub(r'\s+', ' ', book_text).strip()
+        except Exception:
+            return jsonify({"success": False, "error": "Failed to fetch URL"})
+
+    if not book_text.strip():
+        return jsonify({"success": False, "error": "No content provided"}), 400
+
+    if mode == "quiz":
+        prompt = f"Based on this book content, generate 10 quiz questions with 4 options each, correct answer marked with [CORRECT], and explanation. Format as numbered list.\n\nBook: {book_title}\n\nContent:\n{book_text[:6000]}"
+    elif mode == "summary":
+        prompt = f"Provide a comprehensive summary of '{book_title}'. Include: 1) Overview (2-3 paragraphs) 2) Key themes 3) Main characters/people 4) Important events 5) Lessons learned. Format with markdown.\n\nContent:\n{book_text[:6000]}"
+    else:
+        prompt = f"Analyze the book '{book_title}' in depth. Include: 1) Summary 2) Themes 3) Character analysis 4) Writing style 5) Historical context 6) Critical analysis 7) Key quotes 8) Quiz questions with answers 9) Discussion questions. Format with markdown.\n\nContent:\n{book_text[:6000]}"
+
+    try:
+        resp = requests.post(
+            "http://localhost:11434/api/chat",
+            json={
+                "model": model,
+                "messages": [
+                    {"role": "system", "content": "You are a literary analysis expert and educator. Provide thorough, well-structured analysis with clear formatting."},
+                    {"role": "user", "content": prompt}
+                ],
+                "stream": False
+            },
+            timeout=90
+        )
+        elapsed = round((time.time() - start) * 1000)
+
+        if resp.status_code == 200:
+            result = resp.json()
+            reply = result.get("message", {}).get("content", "No response")
+            tokens = result.get("eval_count", 0)
+            return jsonify({"success": True, "analysis": reply, "tokens": tokens, "latency_ms": elapsed, "model": model})
+        else:
+            return jsonify({"success": False, "error": "Ollama error", "latency_ms": elapsed})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)[:300], "latency_ms": round((time.time() - start) * 1000)})
+
+
+@app.route("/api/programming/visualino", methods=["POST"])
+def api_visualino_code():
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    data = request.get_json(silent=True) or {}
+    blocks = data.get("blocks", [])
+    board = data.get("board", "esp32")
+    model = data.get("model", "qwen2.5-coder:1.5b")
+
+    block_desc = "\n".join([f"- {b.get('type','?')}: {b.get('label','')}" for b in blocks])
+
+    import time
+    start = time.time()
+
+    try:
+        board_info = {
+            "esp32": "ESP32 with Arduino framework, WiFi, Bluetooth, GPIO pins, ADC, DAC, PWM",
+            "arduino": "Arduino Uno, ATmega328P, digital/analog pins, Serial, I2C, SPI",
+            "esp8266": "ESP8266 NodeMCU, WiFi, GPIO, ADC, PWM, limited RAM",
+            "stm32": "STM32 Blue Pill, ARM Cortex-M0, GPIO, ADC, UART, SPI, I2C"
+        }.get(board, "generic microcontroller")
+
+        resp = requests.post(
+            "http://localhost:11434/api/chat",
+            json={
+                "model": model,
+                "messages": [
+                    {"role": "system", "content": f"You are an expert embedded systems programmer. Generate Arduino/C++ code for {board} ({board_info}). Include proper setup(), loop(), comments, pin definitions, and library imports. Code should be ready to compile and upload."},
+                    {"role": "user", "content": f"Generate code for this block program:\n{block_desc}\n\nBoard: {board}\n\nProvide complete, compilable Arduino code with comments."}
+                ],
+                "stream": False
+            },
+            timeout=60
+        )
+        elapsed = round((time.time() - start) * 1000)
+
+        if resp.status_code == 200:
+            result = resp.json()
+            reply = result.get("message", {}).get("content", "No response")
+            tokens = result.get("eval_count", 0)
+            return jsonify({"success": True, "code": reply, "tokens": tokens, "latency_ms": elapsed, "model": model, "board": board})
+        else:
+            return jsonify({"success": False, "error": "Ollama error", "latency_ms": elapsed})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)[:300], "latency_ms": round((time.time() - start) * 1000)})
+
+
+@app.route("/api/programming/optimize", methods=["POST"])
+def api_optimize_query():
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    data = request.get_json(silent=True) or {}
+    code = data.get("code", "")
+    model = data.get("model", "qwen2.5-coder:1.5b")
+
+    if not code.strip():
+        return jsonify({"success": False, "error": "No SQL provided"}), 400
+
+    import time
+    start = time.time()
+
+    try:
+        resp = requests.post(
+            "http://localhost:11434/api/chat",
+            json={
+                "model": model,
+                "messages": [
+                    {"role": "system", "content": """You are a database performance expert. Analyze this SQL query and provide:
+1. PROBLEMS FOUND: List each issue with severity (Critical/Warning/Info)
+2. WHY IT'S SLOW: Explain the root cause of each problem (e.g., full table scan, missing index, unnecessary sorting)
+3. OPTIMIZED QUERY: Provide the rewritten, faster query
+4. INDEXES TO ADD: Specific CREATE INDEX statements with explanation of why each helps
+5. EXECUTION PLAN: Describe what the database engine does step by step
+6. PERFORMANCE RATING: Score 1-10 with justification
+7. EXPECTED IMPROVEMENT: Estimate speedup factor
+
+Be specific, use examples, and explain the WHY behind every suggestion."""},
+                    {"role": "user", "content": f"Optimize this SQL query:\n\n{code}"}
+                ],
+                "stream": False
+            },
+            timeout=60
+        )
+        elapsed = round((time.time() - start) * 1000)
+
+        if resp.status_code == 200:
+            result = resp.json()
+            reply = result.get("message", {}).get("content", "No response")
+            tokens = result.get("eval_count", 0)
+            return jsonify({"success": True, "optimization": reply, "tokens": tokens, "latency_ms": elapsed, "model": model})
+        else:
+            return jsonify({"success": False, "error": "Ollama error", "latency_ms": elapsed})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)[:300], "latency_ms": round((time.time() - start) * 1000)})
 
 
 @app.route("/data")
@@ -1069,6 +1813,97 @@ def api_management_model_info(model_id):
         return {"detail": "Connection error"}
 
 
+@app.route("/api/management/live-metrics")
+def api_management_live_metrics():
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    try:
+        resp = requests.get(f"{API_BASE_URL}/management/live-metrics",
+                            headers=get_api_headers(), timeout=10)
+        return resp.json() if resp.status_code == 200 else {"current": {}, "history": []}
+    except requests.exceptions.RequestException:
+        return {"current": {}, "history": [], "error": "Connection error"}
+
+
+@app.route("/api/management/activity")
+def api_management_activity():
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    try:
+        limit = request.args.get("limit", 50, type=int)
+        resp = requests.get(f"{API_BASE_URL}/management/activity",
+                            params={"limit": limit}, headers=get_api_headers(), timeout=10)
+        return resp.json() if resp.status_code == 200 else []
+    except requests.exceptions.RequestException:
+        return []
+
+
+@app.route("/api/management/health-check")
+def api_management_health_check():
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    try:
+        resp = requests.get(f"{API_BASE_URL}/management/health-check",
+                            headers=get_api_headers(), timeout=10)
+        return resp.json() if resp.status_code == 200 else {"ollama_reachable": False}
+    except requests.exceptions.RequestException:
+        return {"ollama_reachable": False, "error": "Connection error"}
+
+
+@app.route("/api/management/benchmark", methods=["POST"])
+def api_management_benchmark():
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    try:
+        data = request.get_json() or {}
+        resp = requests.post(f"{API_BASE_URL}/management/benchmark",
+                             json=data, headers=get_api_headers(), timeout=120)
+        return resp.json() if resp.status_code == 200 else {"error": "Benchmark failed"}
+    except requests.exceptions.RequestException as e:
+        return {"error": str(e)[:300]}
+
+
+@app.route("/api/management/playground", methods=["POST"])
+def api_management_playground():
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    try:
+        data = request.get_json() or {}
+        resp = requests.post(f"{API_BASE_URL}/management/playground",
+                             json=data, headers=get_api_headers(), timeout=120)
+        return resp.json() if resp.status_code == 200 else {"error": "Playground failed"}
+    except requests.exceptions.RequestException as e:
+        return {"error": str(e)[:300]}
+
+
+@app.route("/api/management/kb/<kb_id>/search", methods=["POST"])
+def api_management_kb_search(kb_id):
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    try:
+        data = request.get_json() or {}
+        resp = requests.post(f"{API_BASE_URL}/management/knowledge-bases/{kb_id}/search",
+                             json=data, headers=get_api_headers(), timeout=30)
+        return resp.json() if resp.status_code == 200 else {"results": [], "error": "Search failed"}
+    except requests.exceptions.RequestException as e:
+        return {"results": [], "error": str(e)[:300]}
+
+
+@app.route("/api/management/kb/create", methods=["POST"])
+def api_management_kb_create():
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    try:
+        data = request.get_json() or {}
+        resp = requests.post(f"{API_BASE_URL}/management/knowledge-bases",
+                             json=data, headers=get_api_headers(), timeout=15)
+        if resp.status_code == 200:
+            return resp.json()
+        return jsonify({"detail": resp.text[:300]}), resp.status_code
+    except requests.exceptions.RequestException as e:
+        return jsonify({"detail": str(e)[:300]}), 500
+
+
 @app.route("/model-builder")
 def model_builder():
     if "access_token" not in session:
@@ -1302,6 +2137,74 @@ def api_model_builder_model(model_id):
         return response.json() if response.status_code == 200 else {"detail": "Not found"}
     except requests.exceptions.RequestException:
         return {"detail": "Connection error"}
+
+
+@app.route("/api/model-builder/model/<model_id>/test", methods=["POST"])
+def api_model_builder_test(model_id):
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    data = request.get_json(silent=True) or {}
+    if not data.get("message"):
+        return jsonify({"error": "Message required"}), 400
+    try:
+        response = requests.post(
+            f"{API_BASE_URL}/model-builder/models/{model_id}/test",
+            json=data,
+            headers=get_api_headers(),
+            timeout=60
+        )
+        return response.json() if response.status_code == 200 else ({"error": "Test failed"}, 502)
+    except requests.exceptions.RequestException as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/model-builder/model/<model_id>/logs")
+def api_model_builder_logs(model_id):
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    try:
+        response = requests.get(
+            f"{API_BASE_URL}/model-builder/models/{model_id}/logs",
+            headers=get_api_headers(),
+            timeout=10
+        )
+        return response.json() if response.status_code == 200 else {"error": "Not found"}
+    except requests.exceptions.RequestException as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/model-builder/model/<model_id>/clone", methods=["POST"])
+def api_model_builder_clone(model_id):
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    data = request.get_json(silent=True) or {}
+    if not data.get("name"):
+        return jsonify({"error": "Name required"}), 400
+    try:
+        response = requests.post(
+            f"{API_BASE_URL}/model-builder/models/{model_id}/clone",
+            json=data,
+            headers=get_api_headers(),
+            timeout=10
+        )
+        return response.json() if response.status_code == 200 else ({"error": "Clone failed"}, 500)
+    except requests.exceptions.RequestException as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/model-builder/model/<model_id>/export")
+def api_model_builder_export(model_id):
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    try:
+        response = requests.get(
+            f"{API_BASE_URL}/model-builder/models/{model_id}/export",
+            headers=get_api_headers(),
+            timeout=10
+        )
+        return response.json() if response.status_code == 200 else {"error": "Not found"}
+    except requests.exceptions.RequestException as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/model-builder/lightweight/create", methods=["POST"])
@@ -1614,6 +2517,22 @@ def api_database_export():
 
 # ============= AI Assistants Routes =============
 
+@app.route("/api/models")
+def api_models():
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    try:
+        resp = requests.get(f"{API_BASE_URL}/v1/models", headers=get_api_headers(), timeout=10)
+        if resp.status_code == 200:
+            data = resp.json()
+            if isinstance(data, dict) and "data" in data:
+                return data["data"]
+            return data
+        return []
+    except requests.exceptions.RequestException:
+        return []
+
+
 @app.route("/assistants")
 def assistants():
     if "access_token" not in session:
@@ -1654,9 +2573,24 @@ def assistants_create():
         return redirect(url_for("assistants"))
 
     try:
-        payload = {"name": name, "template": template, "model_id": model_id, "personality": personality}
+        payload = {
+            "name": name,
+            "template": template,
+            "model_id": model_id,
+            "personality": personality,
+            "description": request.form.get("description") or None,
+            "system_prompt": request.form.get("system_prompt") or None,
+            "temperature": float(request.form["temperature"]) if request.form.get("temperature") else None,
+            "max_tokens": int(request.form["max_tokens"]) if request.form.get("max_tokens") else None,
+            "color": request.form.get("color") or None,
+            "icon": request.form.get("icon") or None,
+        }
+        tags_raw = request.form.get("tags", "")
+        if tags_raw:
+            payload["tags"] = [t.strip() for t in tags_raw.split(",") if t.strip()]
+        payload = {k: v for k, v in payload.items() if v is not None}
         resp = requests.post(f"{API_BASE_URL}/assistants", json=payload, headers=get_api_headers(), timeout=10)
-        if resp.status_code == 200:
+        if resp.status_code in (200, 201):
             flash(f"Assistant '{name}' created!", "success")
         else:
             flash("Failed to create assistant", "error")
@@ -1825,11 +2759,38 @@ def api_assistants_chat(assistant_id):
             f"{API_BASE_URL}/assistants/{assistant_id}/chat",
             json=data,
             headers=get_api_headers(),
-            timeout=30
+            timeout=120
         )
         return resp.json() if resp.status_code == 200 else {"response": "Error", "success": False}
     except requests.exceptions.RequestException:
         return {"response": "Connection error", "success": False}
+
+
+@app.route("/api/assistants/proxy", methods=["GET", "POST", "PUT", "DELETE"])
+@app.route("/api/assistants/proxy/", methods=["GET", "POST", "PUT", "DELETE"])
+def api_assistants_proxy_root():
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    return _assistants_proxy_forward("")
+
+
+def _assistants_proxy_forward(path):
+    url = f"{API_BASE_URL}/assistants/{path}" if path else f"{API_BASE_URL}/assistants"
+    try:
+        resp = _proxy_request(request.method, url, timeout=60)
+        if resp is None:
+            return jsonify({"error": "Method not allowed"}), 405
+        data, status = _handle_proxy_response(resp)
+        return jsonify(data), status
+    except requests.exceptions.RequestException as e:
+        return jsonify({"error": str(e)[:300]}), 500
+
+
+@app.route("/api/assistants/proxy/<path:path>", methods=["GET", "POST", "PUT", "DELETE"])
+def api_assistants_proxy(path):
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    return _assistants_proxy_forward(path)
 
 
 # ============= Integrations API Routes =============
@@ -2148,6 +3109,527 @@ def api_messenger_send():
         return resp.json() if resp.status_code == 200 else {"success": False}
     except requests.exceptions.RequestException:
         return {"success": False, "message": "Connection error"}
+
+
+# ============= QR Code / Barcode Integration =============
+
+@app.route("/api/integrations/qr/generate", methods=["POST"])
+def api_qr_generate():
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    data = request.get_json(silent=True) or {}
+    content = data.get("content", "https://openlocalai.dev")
+    size = data.get("size", 300)
+    try:
+        import qrcode
+        from io import BytesIO
+        import base64
+        qr = qrcode.QRCode(version=1, box_size=10, border=2)
+        qr.add_data(content)
+        qr.make(fit=True)
+        img = qr.make_image(fill_color="black", back_color="white")
+        buf = BytesIO()
+        img.save(buf, format="PNG")
+        b64 = base64.b64encode(buf.getvalue()).decode()
+        return jsonify({"success": True, "image": f"data:image/png;base64,{b64}", "content": content})
+    except ImportError:
+        return jsonify({"success": False, "error": "qrcode module not installed. Run: pip install qrcode[pil]"}), 500
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/integrations/barcode/scan", methods=["POST"])
+def api_barcode_scan():
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    if "image" not in request.files:
+        return jsonify({"success": False, "error": "No image provided"}), 400
+    file = request.files["image"]
+    try:
+        import cv2
+        import numpy as np
+        from pyzbar import pyzbar
+        file_bytes = np.frombuffer(file.read(), np.uint8)
+        img = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
+        barcodes = pyzbar.decode(img)
+        results = []
+        for barcode in barcodes:
+            results.append({
+                "data": barcode.data.decode("utf-8"),
+                "type": barcode.type,
+                "rect": {"x": barcode.rect.left, "y": barcode.rect.top, "w": barcode.rect.width, "h": barcode.rect.height}
+            })
+        return jsonify({"success": True, "barcodes": results, "count": len(results)})
+    except ImportError:
+        return jsonify({"success": False, "error": "opencv/pyzbar not installed"}), 500
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/integrations/barcode/generate", methods=["POST"])
+def api_barcode_generate():
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    data = request.get_json(silent=True) or {}
+    content = data.get("content", "TEST-12345")
+    barcode_type = data.get("type", "code128")
+    try:
+        from barcode import Code128, Code39, EAN13
+        from barcode.writer import ImageWriter
+        from io import BytesIO
+        import base64
+        writers = {"code128": Code128, "code39": Code39, "ean13": EAN13}
+        cls = writers.get(barcode_type, Code128)
+        barcode_obj = cls(content, writer=ImageWriter())
+        buf = BytesIO()
+        barcode_obj.write(buf)
+        b64 = base64.b64encode(buf.getvalue()).decode()
+        return jsonify({"success": True, "image": f"data:image/png;base64,{b64}", "content": content, "type": barcode_type})
+    except ImportError:
+        return jsonify({"success": False, "error": "python-barcode not installed. Run: pip install python-barcode"}), 500
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+# ============= Webhook Manager =============
+
+WEBHOOKS_FILE = "/www/AI_server/data/webhooks.json"
+
+def _load_webhooks():
+    import os
+    if os.path.exists(WEBHOOKS_FILE):
+        with open(WEBHOOKS_FILE) as f:
+            return json.load(f)
+    return []
+
+def _save_webhooks(hooks):
+    import os
+    os.makedirs(os.path.dirname(WEBHOOKS_FILE), exist_ok=True)
+    with open(WEBHOOKS_FILE, "w") as f:
+        json.dump(hooks, f, indent=2)
+
+@app.route("/api/integrations/webhooks", methods=["GET"])
+def api_webhooks_list():
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    hooks = _load_webhooks()
+    user_id = session.get("user", {}).get("id", "default")
+    return jsonify([h for h in hooks if h.get("user_id") == user_id])
+
+@app.route("/api/integrations/webhooks", methods=["POST"])
+def api_webhooks_create():
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    data = request.get_json(silent=True) or {}
+    hooks = _load_webhooks()
+    import uuid
+    hook = {
+        "id": str(uuid.uuid4()),
+        "user_id": session.get("user", {}).get("id", "default"),
+        "name": data.get("name", "Untitled Webhook"),
+        "url": data.get("url", ""),
+        "method": data.get("method", "POST"),
+        "headers": data.get("headers", {}),
+        "body": data.get("body", ""),
+        "events": data.get("events", []),
+        "active": True,
+        "last_triggered": None,
+        "trigger_count": 0,
+        "created_at": datetime.now().isoformat()
+    }
+    hooks.append(hook)
+    _save_webhooks(hooks)
+    return jsonify({"success": True, "webhook": hook})
+
+@app.route("/api/integrations/webhooks/<hook_id>", methods=["DELETE"])
+def api_webhooks_delete(hook_id):
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    hooks = _load_webhooks()
+    hooks = [h for h in hooks if h["id"] != hook_id]
+    _save_webhooks(hooks)
+    return jsonify({"success": True})
+
+@app.route("/api/integrations/webhooks/<hook_id>/test", methods=["POST"])
+def api_webhooks_test(hook_id):
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    hooks = _load_webhooks()
+    hook = next((h for h in hooks if h["id"] == hook_id), None)
+    if not hook:
+        return jsonify({"error": "Webhook not found"}), 404
+    try:
+        resp = requests.request(
+            method=hook.get("method", "POST"),
+            url=hook["url"],
+            headers=hook.get("headers", {}),
+            json=hook.get("body") if hook.get("body") else None,
+            timeout=10
+        )
+        hook["last_triggered"] = datetime.now().isoformat()
+        hook["trigger_count"] = hook.get("trigger_count", 0) + 1
+        _save_webhooks(hooks)
+        return jsonify({"success": True, "status": resp.status_code, "response": resp.text[:500]})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)})
+
+
+# ============= API Connection Tester =============
+
+@app.route("/api/integrations/api-test", methods=["POST"])
+def api_connection_test():
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    data = request.get_json(silent=True) or {}
+    url = data.get("url", "")
+    method = data.get("method", "GET")
+    headers = data.get("headers", {})
+    body = data.get("body", "")
+    auth_type = data.get("auth_type", "none")
+    auth_token = data.get("auth_token", "")
+
+    if not url:
+        return jsonify({"success": False, "error": "URL required"}), 400
+
+    if auth_type == "bearer" and auth_token:
+        headers["Authorization"] = f"Bearer {auth_token}"
+    elif auth_type == "basic" and auth_token:
+        import base64
+        headers["Authorization"] = f"Basic {base64.b64encode(auth_token.encode()).decode()}"
+
+    try:
+        import time
+        start = time.time()
+        resp = requests.request(
+            method=method.upper(),
+            url=url,
+            headers=headers,
+            json=body if body and method.upper() in ("POST", "PUT", "PATCH") else None,
+            timeout=15
+        )
+        elapsed = round((time.time() - start) * 1000)
+        return jsonify({
+            "success": True,
+            "status": resp.status_code,
+            "time_ms": elapsed,
+            "headers": dict(resp.headers),
+            "body": resp.text[:2000],
+            "size": len(resp.content)
+        })
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)})
+
+
+# ============= External Services Catalog =============
+
+@app.route("/api/integrations/catalog", methods=["GET"])
+def api_integration_catalog():
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    return jsonify({
+        "services": [
+            {"id": "whatsapp_web", "name": "WhatsApp Web", "icon": "fab fa-whatsapp", "color": "green", "category": "messaging", "auth_type": "qr", "description": "Scan QR code to connect WhatsApp Web"},
+            {"id": "telegram_bot", "name": "Telegram Bot", "icon": "fab fa-telegram", "color": "sky", "category": "messaging", "auth_type": "token", "description": "Connect via Bot Token from @BotFather"},
+            {"id": "slack", "name": "Slack", "icon": "fab fa-slack", "color": "purple", "category": "messaging", "auth_type": "token", "description": "Connect to Slack workspace"},
+            {"id": "discord_bot", "name": "Discord Bot", "icon": "fab fa-discord", "color": "indigo", "category": "messaging", "auth_type": "token", "description": "Connect Discord bot"},
+            {"id": "email_imap", "name": "Email (IMAP/SMTP)", "icon": "fas fa-envelope", "color": "blue", "category": "messaging", "auth_type": "credentials", "description": "Read and send emails"},
+            {"id": "github", "name": "GitHub", "icon": "fab fa-github", "color": "gray", "category": "dev", "auth_type": "token", "description": "Repos, issues, pull requests"},
+            {"id": "gitlab", "name": "GitLab", "icon": "fab fa-gitlab", "color": "orange", "category": "dev", "auth_type": "token", "description": "Repos, issues, CI/CD"},
+            {"id": "jira", "name": "Jira", "icon": "fab fa-jira", "color": "blue", "category": "dev", "auth_type": "token", "description": "Project management and issues"},
+            {"id": "google_calendar", "name": "Google Calendar", "icon": "fas fa-calendar", "color": "blue", "category": "productivity", "auth_type": "oauth", "description": "Events and scheduling"},
+            {"id": "google_sheets", "name": "Google Sheets", "icon": "fas fa-table", "color": "green", "category": "productivity", "auth_type": "oauth", "description": "Spreadsheet integration"},
+            {"id": "notion", "name": "Notion", "icon": "fas fa-book", "color": "gray", "category": "productivity", "auth_type": "token", "description": "Notes, docs, databases"},
+            {"id": "stripe", "name": "Stripe", "icon": "fas fa-credit-card", "color": "purple", "category": "payments", "auth_type": "token", "description": "Payment processing webhooks"},
+            {"id": "paypal", "name": "PayPal", "icon": "fab fa-paypal", "color": "blue", "category": "payments", "auth_type": "token", "description": "Payment notifications"},
+            {"id": "twilio_sms", "name": "Twilio SMS", "icon": "fas fa-sms", "color": "red", "category": "messaging", "auth_type": "credentials", "description": "Send and receive SMS"},
+            {"id": "openai_api", "name": "OpenAI API", "icon": "fas fa-brain", "color": "green", "category": "ai", "auth_type": "token", "description": "GPT-4, DALL-E, Whisper"},
+            {"id": "anthropic_api", "name": "Anthropic API", "icon": "fas fa-robot", "color": "amber", "category": "ai", "auth_type": "token", "description": "Claude models"},
+            {"id": "mqtt", "name": "MQTT (IoT)", "icon": "fas fa-microchip", "color": "cyan", "category": "iot", "auth_type": "credentials", "description": "IoT device messaging"},
+            {"id": "webhook_custom", "name": "Custom Webhook", "icon": "fas fa-plug", "color": "gray", "category": "custom", "auth_type": "url", "description": "Any HTTP endpoint"},
+            {"id": "n8n", "name": "n8n Automation", "icon": "fas faworkflow", "color": "red", "category": "automation", "auth_type": "token", "description": "Workflow automation"},
+            {"id": "zapier", "name": "Zapier", "icon": "fas fa-bolt", "color": "orange", "category": "automation", "auth_type": "token", "description": "App automation platform"},
+        ]
+    })
+
+
+# ============= WhatsApp Web Bridge (Node.js) =============
+
+WA_BRIDGE_URL = "http://localhost:3333"
+
+
+def _wa_bridge_request(method, path, timeout=30, **kwargs):
+    try:
+        return requests.request(method, f"{WA_BRIDGE_URL}{path}", timeout=timeout, **kwargs)
+    except requests.exceptions.RequestException as e:
+        return None
+
+
+@app.route("/api/integrations/whatsapp/qr", methods=["POST"])
+def api_whatsapp_qr():
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    data = request.get_json(silent=True) or {}
+    phone = data.get("phone", "")
+    message = data.get("message", "Hello! I'm interested in your business.")
+    session_id = data.get("session_id", f"wa_{session.get('user', {}).get('id', 'default')}")
+
+    bridge = _wa_bridge_request("POST", f"/sessions/{session_id}/init", timeout=10)
+    if bridge is None:
+        return jsonify({
+            "success": False,
+            "error": "WhatsApp bridge not running. Please start it with: cd /www/AI_server/whatsapp_web && node server.js",
+            "fallback": True
+        }), 503
+
+    import time
+    for _ in range(20):
+        time.sleep(1)
+        qr_resp = _wa_bridge_request("GET", f"/sessions/{session_id}/qr", timeout=5)
+        if qr_resp and qr_resp.status_code == 200:
+            try:
+                d = qr_resp.json()
+                if d.get("success"):
+                    return jsonify({
+                        "success": True,
+                        "image": d.get("qrImage"),
+                        "content": d.get("qr"),
+                        "session_id": session_id,
+                        "is_real_whatsapp_web": True,
+                        "instructions": "Open WhatsApp on your iPhone → Settings → Linked Devices → Link a Device → Scan this QR code",
+                        "scan_steps": [
+                            "1. Open WhatsApp Business on your iPhone",
+                            "2. Tap Settings (gear icon) at the bottom right",
+                            "3. Tap 'Linked Devices'",
+                            "4. Tap 'Link a Device'",
+                            "5. Point your camera at this QR code"
+                        ]
+                    })
+            except Exception:
+                pass
+
+    return jsonify({
+        "success": False,
+        "error": "QR code not ready yet. Please try again in a few seconds.",
+        "session_id": session_id
+    }), 408
+
+
+@app.route("/api/integrations/whatsapp/status", methods=["GET"])
+def api_whatsapp_status():
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    session_id = request.args.get("session_id", f"wa_{session.get('user', {}).get('id', 'default')}")
+    bridge = _wa_bridge_request("GET", f"/sessions/{session_id}/status", timeout=5)
+    if bridge is None:
+        return jsonify({"success": False, "bridge_running": False, "error": "Bridge not running"}), 503
+    try:
+        return jsonify(bridge.json())
+    except Exception:
+        return jsonify({"success": False, "error": "Invalid response from bridge"}), 500
+
+
+@app.route("/api/integrations/whatsapp/logout", methods=["POST"])
+def api_whatsapp_logout():
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    data = request.get_json(silent=True) or {}
+    session_id = data.get("session_id", f"wa_{session.get('user', {}).get('id', 'default')}")
+    bridge = _wa_bridge_request("POST", f"/sessions/{session_id}/logout", timeout=15)
+    if bridge is None:
+        return jsonify({"success": False, "error": "Bridge not running"}), 503
+    try:
+        return jsonify(bridge.json())
+    except Exception:
+        return jsonify({"success": False, "error": "Invalid response"}), 500
+
+
+@app.route("/api/integrations/whatsapp/send-wa", methods=["POST"])
+def api_whatsapp_send_wa():
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    data = request.get_json(silent=True) or {}
+    session_id = data.get("session_id", f"wa_{session.get('user', {}).get('id', 'default')}")
+    to = data.get("to", "")
+    text = data.get("text", "")
+    if not to or not text:
+        return jsonify({"success": False, "message": "Recipient and text required"}), 400
+    bridge = _wa_bridge_request("POST", f"/sessions/{session_id}/send", json={"to": to, "text": text}, timeout=15)
+    if bridge is None:
+        return jsonify({"success": False, "error": "Bridge not running"}), 503
+    try:
+        return jsonify(bridge.json())
+    except Exception:
+        return jsonify({"success": False, "error": "Invalid response"}), 500
+
+
+@app.route("/api/integrations/whatsapp/chat-link-qr", methods=["POST"])
+def api_whatsapp_chat_link_qr():
+    """Generate a wa.me click-to-chat QR code (works with WhatsApp Business app)"""
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    data = request.get_json(silent=True) or {}
+    phone = data.get("phone", "")
+    message = data.get("message", "Hello! I'm interested in your business.")
+    try:
+        import qrcode
+        from io import BytesIO
+        import base64
+        import urllib.parse
+
+        clean_phone = ''.join(c for c in phone if c.isdigit())
+        if not clean_phone:
+            qr_content = "https://www.whatsapp.com/channel/"
+            instructions = "Scan with WhatsApp to open the official WhatsApp channel directory."
+        else:
+            qr_content = f"https://wa.me/{clean_phone}?text={urllib.parse.quote(message)}"
+            instructions = f"Scan with your iPhone WhatsApp Business app to start a chat with +{clean_phone}."
+
+        qr = qrcode.QRCode(version=1, box_size=10, border=2, error_correction=qrcode.constants.ERROR_CORRECT_M)
+        qr.add_data(qr_content)
+        qr.make(fit=True)
+        img = qr.make_image(fill_color="black", back_color="white")
+        buf = BytesIO()
+        img.save(buf, format="PNG")
+        b64 = base64.b64encode(buf.getvalue()).decode()
+        return jsonify({
+            "success": True,
+            "image": f"data:image/png;base64,{b64}",
+            "content": qr_content,
+            "phone": clean_phone,
+            "instructions": instructions,
+            "scan_steps": [
+                "1. Open WhatsApp Business on your iPhone",
+                "2. Tap the camera icon next to the new chat button",
+                "3. Point your camera at this QR code",
+                "4. WhatsApp will open a chat with the business"
+            ]
+        })
+    except ImportError:
+        return jsonify({"success": False, "error": "qrcode module not installed"}), 500
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/integrations/whatsapp/test", methods=["POST"])
+def api_whatsapp_test():
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    data = request.get_json(silent=True) or {}
+    config = data.get("config", {})
+    if not config.get("phone_number_id") or not config.get("access_token"):
+        return jsonify({"success": False, "message": "Phone Number ID and Access Token required"}), 400
+    try:
+        from src.services.integrations_service import WhatsAppIntegration
+        wa = WhatsAppIntegration(config)
+        result = wa.test_connection()
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)[:200]}), 500
+
+
+@app.route("/api/integrations/whatsapp/webhook", methods=["GET", "POST"])
+def api_whatsapp_webhook():
+    if request.method == "GET":
+        verify_token = request.args.get("hub.verify_token", "")
+        challenge = request.args.get("hub.challenge", "")
+        expected = "openlocalai_whatsapp_token"
+        if verify_token == expected:
+            return challenge, 200
+        return "Forbidden", 403
+    try:
+        payload = request.get_json(silent=True) or {}
+        entries = payload.get("entry", [])
+        for entry in entries:
+            changes = entry.get("changes", [])
+            for change in changes:
+                value = change.get("value", {})
+                messages = value.get("messages", [])
+                for msg in messages:
+                    from_num = msg.get("from", "")
+                    msg_type = msg.get("type", "")
+                    text = ""
+                    if msg_type == "text":
+                        text = msg.get("text", {}).get("body", "")
+                    elif msg_type == "image":
+                        text = "[Image]"
+                    elif msg_type == "audio":
+                        text = "[Audio]"
+                    elif msg_type == "video":
+                        text = "[Video]"
+                    else:
+                        text = f"[{msg_type}]"
+                    save_whatsapp_message(from_num, text, msg_type, "inbound", value.get("metadata", {}).get("phone_number_id", ""))
+        return jsonify({"status": "ok"}), 200
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 200
+
+
+def save_whatsapp_message(from_num, text, msg_type, direction, phone_id):
+    import json as json_mod
+    import os
+    storage_path = "/www/AI_server/data/whatsapp_messages.json"
+    os.makedirs(os.path.dirname(storage_path), exist_ok=True)
+    messages = []
+    if os.path.exists(storage_path):
+        try:
+            with open(storage_path, 'r') as f:
+                messages = json_mod.load(f)
+        except:
+            messages = []
+    from datetime import datetime
+    messages.append({
+        "from": from_num,
+        "text": text,
+        "type": msg_type,
+        "direction": direction,
+        "phone_id": phone_id,
+        "timestamp": datetime.utcnow().isoformat()
+    })
+    messages = messages[-200:]
+    with open(storage_path, 'w') as f:
+        json_mod.dump(messages, f, indent=2)
+
+
+@app.route("/api/integrations/whatsapp/messages", methods=["GET"])
+def api_whatsapp_messages():
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    import json as json_mod
+    import os
+    storage_path = "/www/AI_server/data/whatsapp_messages.json"
+    if not os.path.exists(storage_path):
+        return jsonify({"success": True, "messages": []})
+    try:
+        with open(storage_path, 'r') as f:
+            messages = json_mod.load(f)
+        return jsonify({"success": True, "messages": messages[-50:]})
+    except:
+        return jsonify({"success": True, "messages": []})
+
+
+@app.route("/api/integrations/telegram/qr", methods=["POST"])
+def api_telegram_qr():
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    data = request.get_json(silent=True) or {}
+    bot_token = data.get("bot_token", "")
+    if not bot_token:
+        return jsonify({"success": False, "error": "Bot token required"}), 400
+    try:
+        import qrcode
+        from io import BytesIO
+        import base64
+        qr_content = f"https://t.me/{bot_token.split(':')[0]}" if ":" in bot_token else "https://t.me/BotFather"
+        qr = qrcode.QRCode(version=1, box_size=10, border=2)
+        qr.add_data(qr_content)
+        qr.make(fit=True)
+        img = qr.make_image(fill_color="black", back_color="white")
+        buf = BytesIO()
+        img.save(buf, format="PNG")
+        b64 = base64.b64encode(buf.getvalue()).decode()
+        return jsonify({"success": True, "image": f"data:image/png;base64,{b64}", "content": qr_content, "instructions": "Scan to open your Telegram bot"})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
 
 
 if __name__ == "__main__":

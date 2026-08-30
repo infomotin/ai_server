@@ -9,11 +9,17 @@
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background: #0f172a; color: #e2e8f0; }
-        .sidebar { width: 260px; min-height: 100vh; background: #1e293b; border-right: 1px solid #334155; position: fixed; top: 0; left: 0; z-index: 50; transition: transform 0.3s; }
+        .sidebar { width: 260px; min-height: 100vh; background: #1e293b; border-right: 1px solid #334155; position: fixed; top: 0; left: 0; z-index: 50; transition: transform 0.3s ease, width 0.3s ease; }
         .sidebar.collapsed { transform: translateX(-260px); }
-        .main-content { margin-left: 260px; min-height: 100vh; display: flex; flex-direction: column; transition: margin-left 0.3s; }
+        .main-content { margin-left: 260px; min-height: 100vh; display: flex; flex-direction: column; transition: margin-left 0.3s ease; }
         .main-content.expanded { margin-left: 0; }
+        .main-content.no-sidebar { margin-left: 0; }
         .header { height: 64px; background: #1e293b; border-bottom: 1px solid #334155; display: flex; align-items: center; justify-content: space-between; padding: 0 24px; position: sticky; top: 0; z-index: 40; }
+        .sidebar-toggle-btn { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 8px; background: rgba(51, 65, 85, 0.5); border: 1px solid #334155; color: #94a3b8; cursor: pointer; transition: all 0.2s; }
+        .sidebar-toggle-btn:hover { background: rgba(71, 85, 105, 0.6); color: #e2e8f0; border-color: #475569; }
+        .sidebar-float-btn { position: fixed; top: 14px; left: 14px; z-index: 60; display: none; align-items: center; justify-content: center; width: 38px; height: 38px; border-radius: 10px; background: linear-gradient(135deg, #1e293b, #0f172a); border: 1px solid #334155; color: #94a3b8; cursor: pointer; box-shadow: 0 4px 14px rgba(0,0,0,0.5); transition: all 0.2s; }
+        .sidebar-float-btn:hover { color: #c4b5fd; border-color: #8b5cf6; }
+        .sidebar-float-btn.visible { display: inline-flex; }
         .content-area { flex: 1; padding: 24px; }
         .footer { background: #1e293b; border-top: 1px solid #334155; padding: 16px 24px; text-align: center; font-size: 13px; color: #64748b; }
         .nav-item { display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-radius: 8px; color: #94a3b8; text-decoration: none; transition: all 0.2s; margin: 2px 8px; font-size: 14px; }
@@ -47,6 +53,7 @@
     </style>
 </head>
 <body>
+    {% block sidebar %}
     <!-- Sidebar -->
     <aside class="sidebar" id="sidebar">
         <div class="p-6 border-b border-gray-700">
@@ -62,6 +69,7 @@
         </div>
 
         <nav class="py-4">
+            {% if session.get('user') %}
             <div class="nav-section">Main</div>
             <a href="/dashboard" class="nav-item {% if request.path == '/dashboard' %}active{% endif %}">
                 <i class="fas fa-th-large w-5"></i> Dashboard
@@ -95,6 +103,9 @@
             <a href="/skills" class="nav-item {% if request.path == '/skills' %}active{% endif %}">
                 <i class="fas fa-wand-magic-sparkles w-5"></i> Skills
             </a>
+            <a href="/programming" class="nav-item {% if request.path == '/programming' %}active{% endif %}">
+                <i class="fas fa-laptop-code w-5"></i> Programming Hub
+            </a>
             <a href="/data" class="nav-item {% if request.path == '/data' %}active{% endif %}">
                 <i class="fas fa-database w-5"></i> Data Sources
             </a>
@@ -105,7 +116,6 @@
             </a>
 
             <div class="mt-8 mx-4 p-4 bg-gray-800 rounded-xl border border-gray-700">
-                {% if session.get('user') %}
                 <div class="flex items-center gap-3 mb-3">
                     <div class="w-9 h-9 bg-blue-600 rounded-full flex items-center justify-center text-sm font-bold">{{ session['user']['username'][0]|upper }}</div>
                     <div class="flex-1 min-w-0">
@@ -116,26 +126,39 @@
                 <a href="/logout" class="flex items-center gap-2 text-xs text-gray-400 hover:text-red-400 transition">
                     <i class="fas fa-sign-out-alt"></i> Sign Out
                 </a>
-                {% else %}
-                <a href="/login" class="flex items-center gap-2 text-sm text-gray-300 hover:text-white transition">
-                    <i class="fas fa-sign-in-alt"></i> Sign In
-                </a>
-                {% endif %}
             </div>
+            {% else %}
+            <div class="nav-section">Welcome</div>
+            <a href="/login" class="nav-item {% if request.path == '/login' %}active{% endif %}">
+                <i class="fas fa-sign-in-alt w-5"></i> Sign In
+            </a>
+            <a href="/register" class="nav-item {% if request.path == '/register' %}active{% endif %}">
+                <i class="fas fa-user-plus w-5"></i> Register
+            </a>
+            {% endif %}
         </nav>
     </aside>
 
+    <button id="sidebarFloatBtn" onclick="toggleSidebar()" class="sidebar-float-btn" title="Open sidebar">
+        <i class="fas fa-bars text-base"></i>
+    </button>
+    {% endblock %}
+
     <!-- Main Content -->
-    <div class="main-content" id="mainContent">
+    <div class="main-content {% if not session.get('user') %}no-sidebar{% endif %}" id="mainContent">
+        {% block header %}
         <!-- Header -->
         <header class="header">
-            <div class="flex items-center gap-4">
-                <button onclick="toggleSidebar()" class="text-gray-400 hover:text-white md:hidden">
-                    <i class="fas fa-bars text-xl"></i>
+            <div class="flex items-center gap-3">
+                {% if session.get('user') %}
+                <button onclick="toggleSidebar()" id="sidebarToggleBtn" class="sidebar-toggle-btn" title="Toggle sidebar">
+                    <i class="fas fa-bars text-base" id="sidebarToggleIcon"></i>
                 </button>
+                {% endif %}
                 <h2 class="text-lg font-semibold text-white hidden md:block">{% block header_title %}Dashboard{% endblock %}</h2>
             </div>
             <div class="flex items-center gap-4">
+                {% if session.get('user') %}
                 <a href="http://203.55.176.101:8000/docs" target="_blank" class="text-gray-400 hover:text-white text-sm hidden sm:flex items-center gap-2">
                     <i class="fas fa-book"></i> API Docs
                 </a>
@@ -143,8 +166,10 @@
                     <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
                     <span class="text-xs text-green-400 font-medium">System Online</span>
                 </div>
+                {% endif %}
             </div>
         </header>
+        {% endblock %}
 
         <!-- Content -->
         <main class="content-area">
@@ -178,13 +203,39 @@
     </div>
 
     <script>
-        function toggleSidebar() {
+        const SIDEBAR_KEY = 'openlocalai_sidebar_collapsed';
+
+        function applySidebarState(collapsed) {
             const sidebar = document.getElementById('sidebar');
             const main = document.getElementById('mainContent');
-            sidebar.classList.toggle('collapsed');
-            sidebar.classList.toggle('mobile-open');
-            main.classList.toggle('expanded');
+            const icon = document.getElementById('sidebarToggleIcon');
+            const floatBtn = document.getElementById('sidebarFloatBtn');
+            if (!sidebar || !main) return;
+            sidebar.classList.toggle('collapsed', collapsed);
+            main.classList.toggle('expanded', collapsed);
+            if (icon) {
+                icon.className = collapsed ? 'fas fa-angles-right text-base' : 'fas fa-bars text-base';
+            }
+            if (floatBtn) {
+                floatBtn.classList.toggle('visible', collapsed);
+            }
         }
+
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const willCollapse = !sidebar.classList.contains('collapsed');
+            applySidebarState(willCollapse);
+            try { localStorage.setItem(SIDEBAR_KEY, willCollapse ? '1' : '0'); } catch (e) {}
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const sidebar = document.getElementById('sidebar');
+            if (!sidebar) return;
+            let saved = '0';
+            try { saved = localStorage.getItem(SIDEBAR_KEY) || '0'; } catch (e) {}
+            const isMobile = window.matchMedia('(max-width: 768px)').matches;
+            applySidebarState(saved === '1' && !isMobile);
+        });
     </script>
     {% block scripts %}{% endblock %}
 </body>

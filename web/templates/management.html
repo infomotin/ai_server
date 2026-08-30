@@ -1,35 +1,190 @@
 {% extends "base.html" %}
 {% block title %}OpenLocalAI - Management{% endblock %}
-{% block header_title %}AI Model Management{% endblock %}
+{% block header_title %}AI Control Center{% endblock %}
 
 {% block content %}
 <!-- Tabs -->
 <div class="flex flex-wrap gap-1 mb-6 bg-gray-800 p-1 rounded-xl">
-    <button onclick="showTab('models')" id="tab-models" class="px-3 py-2 rounded-lg text-sm font-medium bg-blue-600 text-white transition">
-        <i class="fas fa-cube mr-1"></i>Model Selection
+    <button onclick="showTab('overview')" id="tab-overview" class="px-3 py-2 rounded-lg text-sm font-medium bg-blue-600 text-white transition">
+        <i class="fas fa-chart-line mr-1"></i>Overview
     </button>
-    <button onclick="showTab('info')" id="tab-info" class="px-3 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white transition">
-        <i class="fas fa-info-circle mr-1"></i>Model Info
+    <button onclick="showTab('models')" id="tab-models" class="px-3 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white transition">
+        <i class="fas fa-cube mr-1"></i>Models
     </button>
-    <button onclick="showTab('pdf')" id="tab-pdf" class="px-3 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white transition">
-        <i class="fas fa-file-pdf mr-1"></i>Train from PDF
+    <button onclick="showTab('knowledge')" id="tab-knowledge" class="px-3 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white transition">
+        <i class="fas fa-brain mr-1"></i>Knowledge Bases
     </button>
-    <button onclick="showTab('web')" id="tab-web" class="px-3 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white transition">
-        <i class="fas fa-globe mr-1"></i>Train from Web
+    <button onclick="showTab('playground')" id="tab-playground" class="px-3 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white transition">
+        <i class="fas fa-terminal mr-1"></i>Playground
     </button>
     <button onclick="showTab('restrict')" id="tab-restrict" class="px-3 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white transition">
-        <i class="fas fa-shield-halved mr-1"></i>Restriction Mode
+        <i class="fas fa-shield-halved mr-1"></i>Guardrails
     </button>
-    <button onclick="showTab('security')" id="tab-security" class="px-3 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white transition">
-        <i class="fas fa-lock mr-1"></i>Security
+    <button onclick="showTab('activity')" id="tab-activity" class="px-3 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white transition">
+        <i class="fas fa-stream mr-1"></i>Activity
     </button>
-    <button onclick="showTab('resources')" id="tab-resources" class="px-3 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white transition">
-        <i class="fas fa-server mr-1"></i>Resources
+    <button onclick="showTab('ingest')" id="tab-ingest" class="px-3 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white transition">
+        <i class="fas fa-file-import mr-1"></i>Ingest
     </button>
 </div>
 
-<!-- ==================== MODEL SELECTION TAB ==================== -->
-<div id="panel-models" class="space-y-6">
+<!-- ==================== OVERVIEW TAB ==================== -->
+<div id="panel-overview" class="space-y-6">
+    <!-- KPI row -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div class="stat-card">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-xs text-gray-500 uppercase">Active Model</p>
+                    <p class="text-lg font-bold text-white mt-1" id="kpi-model">—</p>
+                </div>
+                <div class="w-10 h-10 rounded-lg bg-blue-600/20 flex items-center justify-center">
+                    <i class="fas fa-microchip text-blue-400"></i>
+                </div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-xs text-gray-500 uppercase">Req / min</p>
+                    <p class="text-2xl font-bold text-white mt-1" id="kpi-rpm">0</p>
+                </div>
+                <div class="w-10 h-10 rounded-lg bg-emerald-600/20 flex items-center justify-center">
+                    <i class="fas fa-bolt text-emerald-400"></i>
+                </div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-xs text-gray-500 uppercase">Knowledge Bases</p>
+                    <p class="text-2xl font-bold text-white mt-1" id="kpi-kb">0</p>
+                </div>
+                <div class="w-10 h-10 rounded-lg bg-purple-600/20 flex items-center justify-center">
+                    <i class="fas fa-brain text-purple-400"></i>
+                </div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-xs text-gray-500 uppercase">Ollama</p>
+                    <p class="text-lg font-bold mt-1" id="kpi-ollama">
+                        <span class="text-gray-500">checking…</span>
+                    </p>
+                </div>
+                <div class="w-10 h-10 rounded-lg bg-amber-600/20 flex items-center justify-center">
+                    <i class="fas fa-server text-amber-400"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Live chart -->
+    <div class="card">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-white font-semibold"><i class="fas fa-wave-square mr-2 text-blue-400"></i>Live System Telemetry</h3>
+            <div class="flex items-center gap-3 text-xs">
+                <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-blue-400"></span>CPU</span>
+                <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-purple-400"></span>Memory</span>
+                <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-emerald-400"></span>Req/min</span>
+                <button onclick="refreshLiveMetrics()" class="btn btn-sm bg-gray-700 text-white hover:bg-gray-600"><i class="fas fa-sync-alt"></i></button>
+            </div>
+        </div>
+        <div class="relative" style="height: 220px;">
+            <canvas id="liveChart"></canvas>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <!-- Resource gauges -->
+        <div class="card lg:col-span-2">
+            <h3 class="text-white font-semibold mb-4"><i class="fas fa-gauge-high mr-2 text-blue-400"></i>Resource Snapshot</h3>
+            <div class="grid grid-cols-3 gap-4">
+                <div class="text-center">
+                    <div class="relative w-24 h-24 mx-auto">
+                        <svg class="w-24 h-24 transform -rotate-90" viewBox="0 0 36 36">
+                            <path class="text-gray-700" stroke="currentColor" stroke-width="3" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
+                            <path id="cpu-arc" class="text-blue-500" stroke="currentColor" stroke-width="3" fill="none" stroke-dasharray="0, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
+                        </svg>
+                        <div class="absolute inset-0 flex items-center justify-center">
+                            <span class="text-lg font-bold text-white" id="cpu-value">0%</span>
+                        </div>
+                    </div>
+                    <p class="text-sm text-white mt-2">CPU</p>
+                </div>
+                <div class="text-center">
+                    <div class="relative w-24 h-24 mx-auto">
+                        <svg class="w-24 h-24 transform -rotate-90" viewBox="0 0 36 36">
+                            <path class="text-gray-700" stroke="currentColor" stroke-width="3" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
+                            <path id="mem-arc" class="text-purple-500" stroke="currentColor" stroke-width="3" fill="none" stroke-dasharray="0, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
+                        </svg>
+                        <div class="absolute inset-0 flex items-center justify-center">
+                            <span class="text-lg font-bold text-white" id="mem-value">0%</span>
+                        </div>
+                    </div>
+                    <p class="text-sm text-white mt-2">Memory</p>
+                    <p class="text-[10px] text-gray-500" id="mem-detail">—</p>
+                </div>
+                <div class="text-center">
+                    <div class="relative w-24 h-24 mx-auto">
+                        <svg class="w-24 h-24 transform -rotate-90" viewBox="0 0 36 36">
+                            <path class="text-gray-700" stroke="currentColor" stroke-width="3" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
+                            <path id="disk-arc" class="text-green-500" stroke="currentColor" stroke-width="3" fill="none" stroke-dasharray="0, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
+                        </svg>
+                        <div class="absolute inset-0 flex items-center justify-center">
+                            <span class="text-lg font-bold text-white" id="disk-value">0%</span>
+                        </div>
+                    </div>
+                    <p class="text-sm text-white mt-2">Disk</p>
+                    <p class="text-[10px] text-gray-500" id="disk-detail">—</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Top models -->
+        <div class="card">
+            <h3 class="text-white font-semibold mb-4"><i class="fas fa-ranking-star mr-2 text-blue-400"></i>Top Models</h3>
+            <div id="top-models" class="space-y-2 text-sm text-gray-300">
+                <p class="text-gray-500">No traffic yet.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Active training tasks -->
+    <div class="card">
+        <div class="flex items-center justify-between mb-3">
+            <h3 class="text-white font-semibold"><i class="fas fa-tasks mr-2 text-yellow-400"></i>Active Training Tasks</h3>
+            <span class="text-xs text-gray-500" id="active-task-count">0 running</span>
+        </div>
+        <div id="overview-tasks" class="space-y-2">
+            {% if tasks %}
+                {% for task in tasks %}
+                <div class="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg" data-task-id="{{ task.id }}">
+                    <div class="flex items-center gap-3">
+                        {% if task.status == 'completed' %}<i class="fas fa-check-circle text-green-400"></i>
+                        {% elif task.status == 'running' %}<i class="fas fa-spinner fa-spin text-blue-400"></i>
+                        {% elif task.status == 'failed' %}<i class="fas fa-times-circle text-red-400"></i>
+                        {% else %}<i class="fas fa-clock text-gray-400"></i>{% endif %}
+                        <span class="text-sm text-white">{{ task.task_type|upper }} · {{ task.id[:8] }}</span>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <div class="w-32 bg-gray-700 rounded-full h-1.5">
+                            <div class="bg-blue-500 h-1.5 rounded-full" style="width:{{ task.progress_percent }}%"></div>
+                        </div>
+                        <span class="text-xs text-gray-400 w-10 text-right">{{ task.progress_percent }}%</span>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <p class="text-gray-500 text-sm">No tasks running.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- ==================== MODELS TAB ==================== -->
+<div id="panel-models" class="hidden space-y-6">
     {% if current_model %}
     <div class="flex items-center gap-3 p-4 bg-blue-900/30 border border-blue-700 rounded-xl">
         <i class="fas fa-check-circle text-blue-400"></i>
@@ -40,18 +195,12 @@
 
     <div class="card">
         <h3 class="text-white font-semibold mb-4"><i class="fas fa-th-large mr-2 text-blue-400"></i>Available Models</h3>
-        <p class="text-gray-400 text-sm mb-4">Select a model. Lighter models use less memory and respond faster.</p>
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {% for model in models %}
             <div class="p-4 bg-gray-800/50 rounded-xl border border-gray-700 hover:border-blue-500 transition relative">
-                {% if model.recommendation == 'lightweight' %}
-                <span class="absolute top-2 right-2 badge badge-green text-[10px]">Lightweight</span>
-                {% elif model.recommendation == 'balanced' %}
-                <span class="absolute top-2 right-2 badge badge-blue text-[10px]">Balanced</span>
-                {% else %}
-                <span class="absolute top-2 right-2 badge badge-yellow text-[10px]">Powerful</span>
-                {% endif %}
-
+                {% if model.recommendation == 'lightweight' %}<span class="absolute top-2 right-2 badge badge-green text-[10px]">Lightweight</span>
+                {% elif model.recommendation == 'balanced' %}<span class="absolute top-2 right-2 badge badge-blue text-[10px]">Balanced</span>
+                {% else %}<span class="absolute top-2 right-2 badge badge-yellow text-[10px]">Powerful</span>{% endif %}
                 <div class="flex items-center gap-3 mb-3">
                     <div class="w-10 h-10 rounded-lg flex items-center justify-center
                         {% if model.recommendation == 'lightweight' %}bg-green-600/20
@@ -64,146 +213,355 @@
                     </div>
                     <div>
                         <div class="font-medium text-white text-sm">{{ model.name }}</div>
-                        <div class="text-xs text-gray-500">{{ model.parameter_count // 1000000000 }}B params | {{ model.size_gb }}GB</div>
+                        <div class="text-xs text-gray-500">{{ model.parameter_count // 1000000000 }}B params · {{ model.size_gb }}GB</div>
                     </div>
                 </div>
-
                 <div class="flex flex-wrap gap-1 mb-3">
                     {% for cap in model.capabilities[:3] %}
                     <span class="px-2 py-0.5 bg-gray-700 rounded text-[10px] text-gray-300">{{ cap }}</span>
                     {% endfor %}
                 </div>
-
                 <div class="flex items-center justify-between">
                     <span class="text-xs text-gray-500">VRAM: {{ model.vram_required }}</span>
                     {% if model.is_current %}
                     <span class="badge badge-blue">Active</span>
                     {% else %}
-                    <form method="POST" action="/management/model/switch" class="inline">
-                        <input type="hidden" name="model" value="{{ model.id }}">
-                        <button type="submit" class="btn btn-primary btn-sm text-xs">Switch</button>
-                    </form>
+                    <div class="flex gap-1">
+                        <form method="POST" action="/management/model/switch" class="inline">
+                            <input type="hidden" name="model" value="{{ model.id }}">
+                            <button type="submit" class="btn btn-primary btn-sm text-xs">Switch</button>
+                        </form>
+                        <button onclick="runBenchmark('{{ model.id }}')" class="btn btn-sm bg-gray-700 text-white hover:bg-gray-600 text-xs" title="Benchmark">
+                            <i class="fas fa-stopwatch"></i>
+                        </button>
+                    </div>
                     {% endif %}
                 </div>
             </div>
             {% endfor %}
         </div>
     </div>
-</div>
 
-<!-- ==================== MODEL INFO TAB ==================== -->
-<div id="panel-info" class="hidden space-y-6">
+    <!-- Benchmark panel -->
     <div class="card">
-        <h3 class="text-white font-semibold mb-4"><i class="fas fa-info-circle mr-2 text-blue-400"></i>Model Information</h3>
-        <p class="text-gray-400 text-sm mb-4">Select a model to view detailed information.</p>
+        <h3 class="text-white font-semibold mb-4"><i class="fas fa-stopwatch mr-2 text-emerald-400"></i>Model Benchmark</h3>
+        <p class="text-gray-400 text-sm mb-4">Measure latency and tokens-per-second for any installed model.</p>
+        <div class="flex flex-wrap gap-3 items-end mb-3">
+            <div class="flex-1 min-w-[180px]">
+                <label class="block text-xs text-gray-400 mb-1">Model</label>
+                <select id="bench-model" class="input-field">
+                    {% for model in models %}
+                    <option value="{{ model.id }}" {% if model.is_current %}selected{% endif %}>{{ model.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="flex-[3] min-w-[260px]">
+                <label class="block text-xs text-gray-400 mb-1">Prompt</label>
+                <input id="bench-prompt" class="input-field" value="Write a short poem about open source AI in exactly three lines.">
+            </div>
+            <button onclick="runBenchmark()" class="btn btn-primary"><i class="fas fa-play mr-1"></i>Run</button>
+        </div>
+        <div id="bench-result" class="hidden mt-3 p-4 bg-gray-900 rounded-lg border border-gray-700">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                <div><p class="text-xs text-gray-500">Latency</p><p class="text-white font-bold" id="bench-latency">—</p></div>
+                <div><p class="text-xs text-gray-500">Prompt tokens</p><p class="text-white font-bold" id="bench-prompt-tok">—</p></div>
+                <div><p class="text-xs text-gray-500">Completion tokens</p><p class="text-white font-bold" id="bench-comp-tok">—</p></div>
+                <div><p class="text-xs text-gray-500">Tokens / sec</p><p class="text-emerald-400 font-bold" id="bench-tps">—</p></div>
+            </div>
+            <pre id="bench-preview" class="mt-3 text-xs text-green-300 whitespace-pre-wrap max-h-40 overflow-y-auto"></pre>
+        </div>
+    </div>
 
-        <div class="flex gap-3 mb-6">
+    <!-- Model info -->
+    <div class="card">
+        <h3 class="text-white font-semibold mb-4"><i class="fas fa-info-circle mr-2 text-blue-400"></i>Model Inspector</h3>
+        <div class="flex gap-3 mb-4">
             <select id="info-model-select" class="input-field flex-1" onchange="loadModelInfo(this.value)">
-                <option value="">Choose a model...</option>
+                <option value="">Choose a model…</option>
                 {% for model in models %}
                 <option value="{{ model.id }}" {% if model.is_current %}selected{% endif %}>{{ model.name }} ({{ model.id }})</option>
                 {% endfor %}
             </select>
         </div>
-
         <div id="model-info-content" class="hidden">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div class="p-4 bg-gray-800/50 rounded-lg">
-                    <p class="text-xs text-gray-500 mb-1">Provider</p>
-                    <p class="text-sm text-white font-medium" id="info-provider">-</p>
-                </div>
-                <div class="p-4 bg-gray-800/50 rounded-lg">
-                    <p class="text-xs text-gray-500 mb-1">Parameters</p>
-                    <p class="text-sm text-white font-medium" id="info-params">-</p>
-                </div>
-                <div class="p-4 bg-gray-800/50 rounded-lg">
-                    <p class="text-xs text-gray-500 mb-1">Quantization</p>
-                    <p class="text-sm text-white font-medium" id="info-quant">-</p>
-                </div>
-                <div class="p-4 bg-gray-800/50 rounded-lg">
-                    <p class="text-xs text-gray-500 mb-1">VRAM Required</p>
-                    <p class="text-sm text-white font-medium" id="info-vram">-</p>
-                </div>
-                <div class="p-4 bg-gray-800/50 rounded-lg">
-                    <p class="text-xs text-gray-500 mb-1">Category</p>
-                    <p class="text-sm text-white font-medium" id="info-rec">-</p>
-                </div>
-                <div class="p-4 bg-gray-800/50 rounded-lg">
-                    <p class="text-xs text-gray-500 mb-1">Capabilities</p>
-                    <p class="text-sm text-white font-medium" id="info-caps">-</p>
-                </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div class="p-3 bg-gray-800/50 rounded-lg"><p class="text-[10px] text-gray-500">Provider</p><p class="text-sm text-white font-medium" id="info-provider">—</p></div>
+                <div class="p-3 bg-gray-800/50 rounded-lg"><p class="text-[10px] text-gray-500">Capabilities</p><p class="text-sm text-white font-medium" id="info-caps">—</p></div>
+                <div class="p-3 bg-gray-800/50 rounded-lg"><p class="text-[10px] text-gray-500">Category</p><p class="text-sm text-white font-medium" id="info-rec">—</p></div>
             </div>
-
-            <div class="mt-4 p-4 bg-gray-800/50 rounded-lg">
-                <p class="text-xs text-gray-500 mb-2">Lighter Alternatives</p>
+            <div class="mt-3 p-3 bg-gray-800/50 rounded-lg">
+                <p class="text-[10px] text-gray-500 mb-1">Lighter alternatives</p>
                 <div id="info-lighter" class="flex flex-wrap gap-2"></div>
             </div>
-
-            <div class="mt-4 p-4 bg-gray-900 rounded-lg">
-                <p class="text-xs text-gray-500 mb-2">Raw Model Details</p>
-                <pre class="text-xs text-green-400 overflow-x-auto max-h-64 overflow-y-auto" id="info-raw"></pre>
-            </div>
+            <pre class="mt-3 text-[10px] text-green-400 bg-gray-900 p-3 rounded max-h-48 overflow-auto" id="info-raw"></pre>
         </div>
     </div>
 </div>
 
-<!-- ==================== TRAIN FROM PDF TAB ==================== -->
-<div id="panel-pdf" class="hidden space-y-6">
+<!-- ==================== KNOWLEDGE BASES TAB ==================== -->
+<div id="panel-knowledge" class="hidden space-y-6">
     <div class="card">
-        <h3 class="text-white font-semibold mb-4"><i class="fas fa-file-pdf mr-2 text-red-400"></i>Train Model from PDF</h3>
-        <p class="text-gray-400 text-sm mb-4">Upload a PDF document. Text will be extracted and stored as a knowledge base that enhances model responses.</p>
-
-        <form method="POST" action="/management/pdf/upload" enctype="multipart/form-data" class="space-y-4">
-            <div>
-                <label class="block text-sm font-medium text-gray-300 mb-1.5">Knowledge Base Name</label>
-                <input type="text" name="kb_name" class="input-field" placeholder="e.g. Company Documentation" required>
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-300 mb-1.5">PDF File</label>
-                <input type="file" name="pdf_file" accept=".pdf" class="input-field" required>
-                <p class="text-xs text-gray-500 mt-1">Maximum 10MB. Text will be extracted automatically.</p>
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-300 mb-1.5">Target Model (optional)</label>
-                <select name="model_id" class="input-field">
-                    <option value="">Current model</option>
-                    {% for model in models %}
-                    <option value="{{ model.id }}">{{ model.name }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <button type="submit" class="btn btn-primary w-full">
-                <i class="fas fa-upload mr-2"></i>Upload & Process PDF
-            </button>
+        <h3 class="text-white font-semibold mb-4"><i class="fas fa-plus-circle mr-2 text-purple-400"></i>Create Knowledge Base</h3>
+        <form id="kb-create-form" class="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <input name="name" required placeholder="KB name" class="input-field md:col-span-1">
+            <select name="source_type" class="input-field">
+                <option value="text">Manual Text</option>
+                <option value="pdf">PDF Upload (use Ingest tab)</option>
+                <option value="web">Web Crawl (use Ingest tab)</option>
+            </select>
+            <select name="model_id" class="input-field">
+                <option value="">Default model</option>
+                {% for model in models %}
+                <option value="{{ model.id }}">{{ model.name }}</option>
+                {% endfor %}
+            </select>
+            <textarea name="content_text" rows="3" placeholder="Paste training text (for Manual Text type)" class="input-field md:col-span-3"></textarea>
+            <button class="btn btn-primary md:col-span-3"><i class="fas fa-save mr-1"></i>Create KB</button>
         </form>
     </div>
 
-    <!-- Background Tasks -->
+    <div class="card">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-white font-semibold"><i class="fas fa-database mr-2 text-purple-400"></i>Your Knowledge Bases</h3>
+            <span class="text-xs text-gray-500" id="kb-count">0 total</span>
+        </div>
+        <div id="kb-list" class="space-y-2">
+            {% for kb in knowledge_bases %}
+            <div class="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg border border-gray-700" data-kb-id="{{ kb.id }}">
+                <div class="flex items-center gap-3">
+                    <div class="w-9 h-9 rounded-lg flex items-center justify-center
+                        {% if kb.is_active %}bg-green-600/20{% else %}bg-gray-600/20{% endif %}">
+                        <i class="fas fa-database {% if kb.is_active %}text-green-400{% else %}text-gray-400{% endif %}"></i>
+                    </div>
+                    <div>
+                        <div class="text-sm text-white font-medium">{{ kb.name }}</div>
+                        <div class="text-[11px] text-gray-500">{{ kb.source_type|upper }} · {{ kb.chunk_count }} chunks · {{ kb.total_chars }} chars</div>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button onclick="searchKB('{{ kb.id }}', '{{ kb.name|escape }}')" class="btn btn-sm bg-blue-600/20 text-blue-300 hover:bg-blue-600/40 text-xs">
+                        <i class="fas fa-search mr-1"></i>Test
+                    </button>
+                    <form method="POST" action="/management/kb/toggle/{{ kb.id }}" class="inline">
+                        <button type="submit" class="btn btn-sm {% if kb.is_active %}bg-yellow-600/20 text-yellow-300{% else %}bg-green-600/20 text-green-300{% endif %} text-xs">
+                            {% if kb.is_active %}Disable{% else %}Enable{% endif %}
+                        </button>
+                    </form>
+                    <form method="POST" action="/management/kb/delete/{{ kb.id }}" class="inline" onsubmit="return confirm('Delete this knowledge base?')">
+                        <button type="submit" class="text-red-400 hover:text-red-300 text-sm"><i class="fas fa-trash"></i></button>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+            {% if not knowledge_bases %}
+            <p class="text-gray-500 text-sm text-center py-4">No knowledge bases yet. Create one above or use the Ingest tab.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- ==================== PLAYGROUND TAB ==================== -->
+<div id="panel-playground" class="hidden space-y-6">
+    <div class="card">
+        <h3 class="text-white font-semibold mb-4"><i class="fas fa-terminal mr-2 text-emerald-400"></i>Prompt Playground</h3>
+        <p class="text-gray-400 text-sm mb-4">Send a one-off chat completion to any model and inspect the response.</p>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+            <div>
+                <label class="block text-xs text-gray-400 mb-1">Model</label>
+                <select id="pg-model" class="input-field">
+                    {% for model in models %}
+                    <option value="{{ model.id }}" {% if model.is_current %}selected{% endif %}>{{ model.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="md:col-span-2">
+                <label class="block text-xs text-gray-400 mb-1">System prompt</label>
+                <input id="pg-system" class="input-field" value="You are a helpful, concise assistant.">
+            </div>
+        </div>
+        <label class="block text-xs text-gray-400 mb-1">User message</label>
+        <textarea id="pg-user" class="input-field mb-3" rows="4" placeholder="Ask anything…">Explain in two sentences what a vector database is.</textarea>
+        <div class="flex gap-2">
+            <button onclick="runPlayground()" class="btn btn-primary"><i class="fas fa-paper-plane mr-1"></i>Send</button>
+            <button onclick="document.getElementById('pg-output').textContent=''" class="btn bg-gray-700 text-white hover:bg-gray-600">Clear</button>
+        </div>
+        <div id="pg-output" class="mt-4 p-4 bg-gray-900 rounded-lg border border-gray-700 text-sm text-gray-200 min-h-[80px] whitespace-pre-wrap font-mono"></div>
+        <div id="pg-meta" class="mt-2 text-[11px] text-gray-500"></div>
+    </div>
+</div>
+
+<!-- ==================== GUARDRAILS TAB ==================== -->
+<div id="panel-restrict" class="hidden space-y-6">
+    <div class="card">
+        <h3 class="text-white font-semibold mb-4"><i class="fas fa-shield-halved mr-2 text-purple-400"></i>Create Restriction Profile</h3>
+        <form method="POST" action="/management/restriction/create" class="space-y-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-1.5">Profile name</label>
+                    <input type="text" name="name" class="input-field" placeholder="e.g. Customer Support Bot" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-1.5">Restriction mode</label>
+                    <select name="restriction_mode" class="input-field" onchange="toggleRestrictionFields(this.value)">
+                        <option value="none">No Restrictions</option>
+                        <option value="topic">Topic-Based Filtering</option>
+                        <option value="security">Security Level</option>
+                        <option value="custom">Custom Rules</option>
+                    </select>
+                </div>
+            </div>
+            <div id="topic-fields" class="hidden grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-1.5">Allowed topics</label>
+                    <input type="text" name="allowed_topics" class="input-field" placeholder="products, pricing, support">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-1.5">Blocked topics</label>
+                    <input type="text" name="blocked_topics" class="input-field" placeholder="politics, religion, competitors">
+                </div>
+            </div>
+            <div id="security-fields" class="hidden">
+                <label class="block text-sm font-medium text-gray-300 mb-1.5">Security level</label>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <label class="p-3 bg-gray-800/50 rounded-lg border border-gray-700 cursor-pointer hover:border-blue-500 transition text-center">
+                        <input type="radio" name="security_level" value="none" class="hidden peer">
+                        <div class="peer-checked:text-blue-400"><i class="fas fa-unlock text-lg mb-1"></i><p class="text-sm font-medium">None</p></div>
+                    </label>
+                    <label class="p-3 bg-gray-800/50 rounded-lg border border-gray-700 cursor-pointer hover:border-blue-500 transition text-center">
+                        <input type="radio" name="security_level" value="low" class="hidden peer">
+                        <div class="peer-checked:text-blue-400"><i class="fas fa-shield-halved text-lg mb-1"></i><p class="text-sm font-medium">Low</p></div>
+                    </label>
+                    <label class="p-3 bg-gray-800/50 rounded-lg border border-gray-700 cursor-pointer hover:border-blue-500 transition text-center">
+                        <input type="radio" name="security_level" value="medium" class="hidden peer" checked>
+                        <div class="peer-checked:text-blue-400"><i class="fas fa-shield text-lg mb-1"></i><p class="text-sm font-medium">Medium</p></div>
+                    </label>
+                    <label class="p-3 bg-gray-800/50 rounded-lg border border-gray-700 cursor-pointer hover:border-blue-500 transition text-center">
+                        <input type="radio" name="security_level" value="high" class="hidden peer">
+                        <div class="peer-checked:text-blue-400"><i class="fas fa-shield-halved text-lg mb-1"></i><p class="text-sm font-medium">High</p></div>
+                    </label>
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary w-full"><i class="fas fa-plus mr-2"></i>Create profile</button>
+        </form>
+    </div>
+
+    <div class="card">
+        <h3 class="text-white font-semibold mb-4"><i class="fas fa-list mr-2 text-gray-400"></i>Restriction Profiles</h3>
+        {% if restrictions %}
+        <div class="space-y-3">
+            {% for profile in restrictions %}
+            <div class="flex items-center justify-between p-4 bg-gray-800/50 rounded-xl border border-gray-700">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-lg flex items-center justify-center {% if profile.is_active %}bg-green-600/20{% else %}bg-gray-600/20{% endif %}">
+                        {% if profile.restriction_mode == 'topic' %}<i class="fas fa-tag {% if profile.is_active %}text-green-400{% else %}text-gray-400{% endif %}"></i>
+                        {% elif profile.restriction_mode == 'security' %}<i class="fas fa-shield {% if profile.is_active %}text-green-400{% else %}text-gray-400{% endif %}"></i>
+                        {% elif profile.restriction_mode == 'custom' %}<i class="fas fa-cog {% if profile.is_active %}text-green-400{% else %}text-gray-400{% endif %}"></i>
+                        {% else %}<i class="fas fa-unlock {% if profile.is_active %}text-green-400{% else %}text-gray-400{% endif %}"></i>{% endif %}
+                    </div>
+                    <div>
+                        <div class="text-sm text-white font-medium">{{ profile.name }}</div>
+                        <div class="text-xs text-gray-500">Mode: {{ profile.restriction_mode }} · Level: {{ profile.security_level }}</div>
+                        {% if profile.allowed_topics %}<div class="text-[10px] text-gray-500 mt-1">Topics: {{ profile.allowed_topics|join(', ') }}</div>{% endif %}
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    {% if profile.is_active %}<span class="badge badge-green">Active</span>
+                    {% else %}
+                    <form method="POST" action="/management/restriction/activate/{{ profile.id }}" class="inline">
+                        <button type="submit" class="btn btn-primary btn-sm text-xs">Activate</button>
+                    </form>
+                    {% endif %}
+                    <form method="POST" action="/management/restriction/delete/{{ profile.id }}" class="inline" onsubmit="return confirm('Delete this profile?')">
+                        <button type="submit" class="text-red-400 hover:text-red-300 text-sm"><i class="fas fa-trash"></i></button>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% if restrictions|selectattr('is_active')|list %}
+        <form method="POST" action="/management/restriction/deactivate" class="mt-4">
+            <button type="submit" class="btn btn-danger w-full"><i class="fas fa-times mr-2"></i>Deactivate all</button>
+        </form>
+        {% endif %}
+        {% else %}
+        <p class="text-gray-500 text-sm text-center py-4">No restriction profiles yet.</p>
+        {% endif %}
+    </div>
+</div>
+
+<!-- ==================== ACTIVITY TAB ==================== -->
+<div id="panel-activity" class="hidden space-y-6">
+    <div class="card">
+        <div class="flex items-center justify-between mb-3">
+            <h3 class="text-white font-semibold"><i class="fas fa-stream mr-2 text-blue-400"></i>Recent API Activity</h3>
+            <div class="flex items-center gap-2 text-xs text-gray-400">
+                <label class="flex items-center gap-1"><input type="checkbox" id="activity-pause"> Pause</label>
+                <span class="badge bg-blue-600/20 text-blue-300" id="activity-rpm">0 req/min</span>
+            </div>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="min-w-full text-sm">
+                <thead>
+                    <tr class="text-left text-xs uppercase text-gray-500 border-b border-gray-700">
+                        <th class="py-2 pr-3">Time</th>
+                        <th class="py-2 pr-3">Model</th>
+                        <th class="py-2 pr-3">Tokens</th>
+                        <th class="py-2 pr-3">Latency</th>
+                    </tr>
+                </thead>
+                <tbody id="activity-rows" class="text-gray-300">
+                    <tr><td colspan="4" class="py-6 text-center text-gray-500">Loading…</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- ==================== INGEST TAB (PDF + Web) ==================== -->
+<div id="panel-ingest" class="hidden space-y-6">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="card">
+            <h3 class="text-white font-semibold mb-4"><i class="fas fa-file-pdf mr-2 text-red-400"></i>Upload PDF</h3>
+            <form method="POST" action="/management/pdf/upload" enctype="multipart/form-data" class="space-y-3">
+                <input name="kb_name" class="input-field" placeholder="Knowledge base name" required>
+                <input type="file" name="pdf_file" accept=".pdf" class="input-field" required>
+                <select name="model_id" class="input-field">
+                    <option value="">Current model</option>
+                    {% for model in models %}<option value="{{ model.id }}">{{ model.name }}</option>{% endfor %}
+                </select>
+                <button class="btn btn-primary w-full"><i class="fas fa-upload mr-1"></i>Upload & process</button>
+            </form>
+        </div>
+        <div class="card">
+            <h3 class="text-white font-semibold mb-4"><i class="fas fa-globe mr-2 text-blue-400"></i>Crawl Website</h3>
+            <form method="POST" action="/management/web/crawl" class="space-y-3">
+                <input name="url" class="input-field" placeholder="https://example.com" required>
+                <div class="grid grid-cols-2 gap-3">
+                    <input type="number" name="max_pages" class="input-field" value="10" min="1" max="100">
+                    <select name="model_id" class="input-field">
+                        <option value="">Current model</option>
+                        {% for model in models %}<option value="{{ model.id }}">{{ model.name }}</option>{% endfor %}
+                    </select>
+                </div>
+                <button class="btn btn-primary w-full"><i class="fas fa-spider mr-1"></i>Start crawl</button>
+            </form>
+        </div>
+    </div>
+
     {% if tasks %}
     <div class="card">
-        <h3 class="text-white font-semibold mb-4"><i class="fas fa-spinner mr-2 text-yellow-400"></i>Background Tasks</h3>
-        <div class="space-y-3" id="tasks-list">
+        <h3 class="text-white font-semibold mb-4"><i class="fas fa-tasks mr-2 text-yellow-400"></i>Background Tasks</h3>
+        <div class="space-y-2" id="tasks-list">
             {% for task in tasks %}
             <div class="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg" data-task-id="{{ task.id }}">
                 <div class="flex items-center gap-3">
-                    <div class="w-8 h-8 rounded-lg flex items-center justify-center
-                        {% if task.status == 'completed' %}bg-green-600/20
-                        {% elif task.status == 'running' %}bg-blue-600/20
-                        {% elif task.status == 'failed' %}bg-red-600/20
-                        {% else %}bg-gray-600/20{% endif %}">
-                        {% if task.status == 'completed' %}
-                        <i class="fas fa-check text-green-400 text-sm"></i>
-                        {% elif task.status == 'running' %}
-                        <i class="fas fa-spinner fa-spin text-blue-400 text-sm"></i>
-                        {% elif task.status == 'failed' %}
-                        <i class="fas fa-times text-red-400 text-sm"></i>
-                        {% else %}
-                        <i class="fas fa-clock text-gray-400 text-sm"></i>
-                        {% endif %}
-                    </div>
+                    {% if task.status == 'completed' %}<i class="fas fa-check-circle text-green-400"></i>
+                    {% elif task.status == 'running' %}<i class="fas fa-spinner fa-spin text-blue-400"></i>
+                    {% elif task.status == 'failed' %}<i class="fas fa-times-circle text-red-400"></i>
+                    {% else %}<i class="fas fa-clock text-gray-400"></i>{% endif %}
                     <div>
-                        <div class="text-sm text-white">{{ task.task_type|upper }} - {{ task.id[:8] }}</div>
-                        <div class="text-xs text-gray-500">
+                        <div class="text-sm text-white">{{ task.task_type|upper }} · {{ task.id[:8] }}</div>
+                        <div class="text-[11px] text-gray-500">
                             {% if task.result_summary %}{{ task.result_summary[:80] }}
                             {% elif task.error_message %}Error: {{ task.error_message[:80] }}
                             {% else %}{{ task.status }}{% endif %}
@@ -211,11 +569,11 @@
                     </div>
                 </div>
                 <div class="flex items-center gap-2">
-                    {% if task.status in ['pending', 'running'] %}
-                    <div class="w-24 bg-gray-700 rounded-full h-2">
-                        <div class="bg-blue-500 h-2 rounded-full transition-all" style="width: {{ task.progress_percent }}%"></div>
+                    <div class="w-24 bg-gray-700 rounded-full h-1.5">
+                        <div class="bg-blue-500 h-1.5 rounded-full" style="width:{{ task.progress_percent }}%"></div>
                     </div>
-                    <span class="text-xs text-gray-500">{{ task.progress_percent }}%</span>
+                    <span class="text-xs text-gray-500 w-8 text-right">{{ task.progress_percent }}%</span>
+                    {% if task.status in ['pending', 'running'] %}
                     <form method="POST" action="/management/task/cancel/{{ task.id }}" class="inline">
                         <button type="submit" class="text-red-400 hover:text-red-300 text-xs"><i class="fas fa-times"></i></button>
                     </form>
@@ -228,339 +586,29 @@
     {% endif %}
 </div>
 
-<!-- ==================== TRAIN FROM WEB TAB ==================== -->
-<div id="panel-web" class="hidden space-y-6">
-    <div class="card">
-        <h3 class="text-white font-semibold mb-4"><i class="fas fa-globe mr-2 text-blue-400"></i>Train Model from Web Crawling</h3>
-        <p class="text-gray-400 text-sm mb-4">Enter a website URL to crawl. Text content from pages will be extracted and stored as a knowledge base.</p>
-
-        <form method="POST" action="/management/web/crawl" class="space-y-4">
-            <div>
-                <label class="block text-sm font-medium text-gray-300 mb-1.5">Website URL</label>
-                <input type="url" name="url" class="input-field" placeholder="https://example.com" required>
-            </div>
-            <div class="grid grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-300 mb-1.5">Max Pages</label>
-                    <input type="number" name="max_pages" class="input-field" value="10" min="1" max="100">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-300 mb-1.5">Target Model</label>
-                    <select name="model_id" class="input-field">
-                        <option value="">Current model</option>
-                        {% for model in models %}
-                        <option value="{{ model.id }}">{{ model.name }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-            </div>
-            <button type="submit" class="btn btn-primary w-full">
-                <i class="fas fa-spider mr-2"></i>Start Web Crawl
-            </button>
-        </form>
-    </div>
-</div>
-
-<!-- ==================== RESTRICTION MODE TAB ==================== -->
-<div id="panel-restrict" class="hidden space-y-6">
-    <div class="card">
-        <h3 class="text-white font-semibold mb-4"><i class="fas fa-shield-halved mr-2 text-purple-400"></i>Create Restriction Profile</h3>
-        <p class="text-gray-400 text-sm mb-4">Configure how the AI model filters and restricts its responses.</p>
-
-        <form method="POST" action="/management/restriction/create" class="space-y-4">
-            <div>
-                <label class="block text-sm font-medium text-gray-300 mb-1.5">Profile Name</label>
-                <input type="text" name="name" class="input-field" placeholder="e.g. Customer Support Bot" required>
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-300 mb-1.5">Restriction Mode</label>
-                <select name="restriction_mode" class="input-field" onchange="toggleRestrictionFields(this.value)">
-                    <option value="none">No Restrictions</option>
-                    <option value="topic">Topic-Based Filtering</option>
-                    <option value="security">Security Level</option>
-                    <option value="custom">Custom Rules</option>
-                </select>
-            </div>
-
-            <div id="topic-fields" class="hidden space-y-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-300 mb-1.5">Allowed Topics (comma-separated)</label>
-                    <input type="text" name="allowed_topics" class="input-field" placeholder="e.g. products, pricing, support">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-300 mb-1.5">Blocked Topics (comma-separated)</label>
-                    <input type="text" name="blocked_topics" class="input-field" placeholder="e.g. politics, religion, competitors">
-                </div>
-            </div>
-
-            <div id="security-fields" class="hidden">
-                <label class="block text-sm font-medium text-gray-300 mb-1.5">Security Level</label>
-                <div class="grid grid-cols-2 gap-3">
-                    <label class="p-3 bg-gray-800/50 rounded-lg border border-gray-700 cursor-pointer hover:border-blue-500 transition">
-                        <input type="radio" name="security_level" value="low" class="hidden peer">
-                        <div class="peer-checked:text-blue-400 text-center">
-                            <i class="fas fa-shield-halved text-lg mb-1"></i>
-                            <p class="text-sm font-medium">Low</p>
-                            <p class="text-[10px] text-gray-500">Basic filtering</p>
-                        </div>
-                    </label>
-                    <label class="p-3 bg-gray-800/50 rounded-lg border border-gray-700 cursor-pointer hover:border-blue-500 transition">
-                        <input type="radio" name="security_level" value="medium" class="hidden peer" checked>
-                        <div class="peer-checked:text-blue-400 text-center">
-                            <i class="fas fa-shield text-lg mb-1"></i>
-                            <p class="text-sm font-medium">Medium</p>
-                            <p class="text-[10px] text-gray-500">Standard protection</p>
-                        </div>
-                    </label>
-                    <label class="p-3 bg-gray-800/50 rounded-lg border border-gray-700 cursor-pointer hover:border-blue-500 transition">
-                        <input type="radio" name="security_level" value="high" class="hidden peer">
-                        <div class="peer-checked:text-blue-400 text-center">
-                            <i class="fas fa-shield-halved text-lg mb-1"></i>
-                            <p class="text-sm font-medium">High</p>
-                            <p class="text-[10px] text-gray-500">Maximum restriction</p>
-                        </div>
-                    </label>
-                    <label class="p-3 bg-gray-800/50 rounded-lg border border-gray-700 cursor-pointer hover:border-blue-500 transition">
-                        <input type="radio" name="security_level" value="none" class="hidden peer">
-                        <div class="peer-checked:text-blue-400 text-center">
-                            <i class="fas fa-unlock text-lg mb-1"></i>
-                            <p class="text-sm font-medium">None</p>
-                            <p class="text-[10px] text-gray-500">No security filtering</p>
-                        </div>
-                    </label>
-                </div>
-            </div>
-
-            <button type="submit" class="btn btn-primary w-full">
-                <i class="fas fa-plus mr-2"></i>Create Restriction Profile
-            </button>
-        </form>
-    </div>
-
-    <!-- Existing Profiles -->
-    {% if restrictions %}
-    <div class="card">
-        <h3 class="text-white font-semibold mb-4"><i class="fas fa-list mr-2 text-gray-400"></i>Restriction Profiles</h3>
-        <div class="space-y-3">
-            {% for profile in restrictions %}
-            <div class="flex items-center justify-between p-4 bg-gray-800/50 rounded-xl border border-gray-700">
-                <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-lg flex items-center justify-center
-                        {% if profile.is_active %}bg-green-600/20{% else %}bg-gray-600/20{% endif %}">
-                        {% if profile.restriction_mode == 'topic' %}
-                        <i class="fas fa-tag {% if profile.is_active %}text-green-400{% else %}text-gray-400{% endif %}"></i>
-                        {% elif profile.restriction_mode == 'security' %}
-                        <i class="fas fa-shield {% if profile.is_active %}text-green-400{% else %}text-gray-400{% endif %}"></i>
-                        {% elif profile.restriction_mode == 'custom' %}
-                        <i class="fas fa-cog {% if profile.is_active %}text-green-400{% else %}text-gray-400{% endif %}"></i>
-                        {% else %}
-                        <i class="fas fa-unlock {% if profile.is_active %}text-green-400{% else %}text-gray-400{% endif %}"></i>
-                        {% endif %}
-                    </div>
-                    <div>
-                        <div class="text-sm text-white font-medium">{{ profile.name }}</div>
-                        <div class="text-xs text-gray-500">Mode: {{ profile.recommendation_mode if profile.recommendation_mode else profile.restriction_mode }} | Level: {{ profile.security_level }}</div>
-                        {% if profile.allowed_topics %}
-                        <div class="text-[10px] text-gray-500 mt-1">Topics: {{ profile.allowed_topics|join(', ') }}</div>
-                        {% endif %}
-                    </div>
-                </div>
-                <div class="flex items-center gap-2">
-                    {% if profile.is_active %}
-                    <span class="badge badge-green">Active</span>
-                    {% else %}
-                    <form method="POST" action="/management/restriction/activate/{{ profile.id }}" class="inline">
-                        <button type="submit" class="btn btn-primary btn-sm text-xs">Activate</button>
-                    </form>
-                    {% endif %}
-                    <form method="POST" action="/management/restriction/delete/{{ profile.id }}" class="inline"
-                          onsubmit="return confirm('Delete this restriction profile?')">
-                        <button type="submit" class="text-red-400 hover:text-red-300 text-sm"><i class="fas fa-trash"></i></button>
-                    </form>
-                </div>
-            </div>
-            {% endfor %}
+<!-- KB search modal -->
+<div id="kb-search-modal" class="fixed inset-0 bg-black/60 hidden z-50 flex items-center justify-center p-4">
+    <div class="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-2xl p-6">
+        <div class="flex items-center justify-between mb-3">
+            <h3 class="text-white font-semibold"><i class="fas fa-search mr-2 text-blue-400"></i>Test KB: <span id="kb-modal-name" class="text-blue-300"></span></h3>
+            <button onclick="closeKBModal()" class="text-gray-400 hover:text-white"><i class="fas fa-times"></i></button>
         </div>
-
-        {% if restrictions|selectattr('is_active')|list %}
-        <form method="POST" action="/management/restriction/deactivate" class="mt-4">
-            <button type="submit" class="btn btn-danger w-full">
-                <i class="fas fa-times mr-2"></i>Deactivate All Restrictions
-            </button>
-        </form>
-        {% endif %}
-    </div>
-    {% endif %}
-</div>
-
-<!-- ==================== SECURITY TAB ==================== -->
-<div id="panel-security" class="hidden space-y-6">
-    <div class="card">
-        <h3 class="text-white font-semibold mb-4"><i class="fas fa-lock mr-2 text-green-400"></i>Security Guidelines</h3>
-        <p class="text-gray-400 text-sm mb-4">Configure security levels to control what the AI model can discuss.</p>
-
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div class="p-4 bg-gray-800/50 rounded-xl border border-gray-700">
-                <div class="flex items-center gap-3 mb-3">
-                    <div class="w-10 h-10 bg-green-600/20 rounded-lg flex items-center justify-center">
-                        <i class="fas fa-unlock text-green-400"></i>
-                    </div>
-                    <div>
-                        <h4 class="text-sm font-medium text-white">No Security</h4>
-                        <p class="text-[10px] text-gray-500">Unrestricted responses</p>
-                    </div>
-                </div>
-                <p class="text-xs text-gray-400">The model responds without any content filtering. Best for private, trusted environments.</p>
-            </div>
-
-            <div class="p-4 bg-gray-800/50 rounded-xl border border-gray-700">
-                <div class="flex items-center gap-3 mb-3">
-                    <div class="w-10 h-10 bg-yellow-600/20 rounded-lg flex items-center justify-center">
-                        <i class="fas fa-shield-halved text-yellow-400"></i>
-                    </div>
-                    <div>
-                        <h4 class="text-sm font-medium text-white">Low Security</h4>
-                        <p class="text-[10px] text-gray-500">Basic content filtering</p>
-                    </div>
-                </div>
-                <p class="text-xs text-gray-400">Filters harmful, illegal, and explicit content. Suitable for general use.</p>
-            </div>
-
-            <div class="p-4 bg-gray-800/50 rounded-xl border border-gray-700">
-                <div class="flex items-center gap-3 mb-3">
-                    <div class="w-10 h-10 bg-orange-600/20 rounded-lg flex items-center justify-center">
-                        <i class="fas fa-shield text-orange-400"></i>
-                    </div>
-                    <div>
-                        <h4 class="text-sm font-medium text-white">Medium Security</h4>
-                        <p class="text-[10px] text-gray-500">Standard protection</p>
-                    </div>
-                </div>
-                <p class="text-xs text-gray-400">Blocks weapons, hacking, drugs, self-harm, fraud. Recommended for business use.</p>
-            </div>
-
-            <div class="p-4 bg-gray-800/50 rounded-xl border border-gray-700">
-                <div class="flex items-center gap-3 mb-3">
-                    <div class="w-10 h-10 bg-red-600/20 rounded-lg flex items-center justify-center">
-                        <i class="fas fa-shield-halved text-red-400"></i>
-                    </div>
-                    <div>
-                        <h4 class="text-sm font-medium text-white">High Security</h4>
-                        <p class="text-[10px] text-gray-500">Maximum restriction</p>
-                    </div>
-                </div>
-                <p class="text-xs text-gray-400">Family-friendly only. Blocks all controversial, political, and sensitive topics. Best for public-facing applications.</p>
-            </div>
+        <div class="flex gap-2 mb-3">
+            <input id="kb-modal-query" class="input-field flex-1" placeholder="Enter a test query…">
+            <button onclick="runKBSearch()" class="btn btn-primary"><i class="fas fa-search"></i></button>
         </div>
-
-        <div class="mt-6 p-4 bg-blue-900/20 border border-blue-700 rounded-xl">
-            <h4 class="text-sm font-medium text-blue-300 mb-2"><i class="fas fa-lightbulb mr-1"></i>How Security Works</h4>
-            <p class="text-xs text-gray-400">Security guidelines are applied via system prompts that instruct the model on what content to avoid. Create a restriction profile in the "Restriction Mode" tab to apply these guidelines.</p>
-        </div>
-    </div>
-</div>
-
-<!-- ==================== RESOURCES TAB ==================== -->
-<div id="panel-resources" class="hidden space-y-6">
-    <div class="card">
-        <h3 class="text-white font-semibold mb-4"><i class="fas fa-server mr-2 text-blue-400"></i>System Resources</h3>
-        <p class="text-gray-400 text-sm mb-4">Monitor server resource usage. Background tasks run with minimal resource impact.</p>
-
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4" id="resource-gauges">
-            <div class="p-4 bg-gray-800/50 rounded-xl text-center">
-                <div class="relative w-20 h-20 mx-auto mb-3">
-                    <svg class="w-20 h-20 transform -rotate-90" viewBox="0 0 36 36">
-                        <path class="text-gray-700" stroke="currentColor" stroke-width="3" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
-                        <path id="cpu-arc" class="text-blue-500" stroke="currentColor" stroke-width="3" fill="none" stroke-dasharray="0, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
-                    </svg>
-                    <div class="absolute inset-0 flex items-center justify-center">
-                        <span class="text-lg font-bold text-white" id="cpu-value">{{ resources.cpu_percent|default(0) }}%</span>
-                    </div>
-                </div>
-                <p class="text-sm text-white font-medium">CPU Usage</p>
-            </div>
-
-            <div class="p-4 bg-gray-800/50 rounded-xl text-center">
-                <div class="relative w-20 h-20 mx-auto mb-3">
-                    <svg class="w-20 h-20 transform -rotate-90" viewBox="0 0 36 36">
-                        <path class="text-gray-700" stroke="currentColor" stroke-width="3" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
-                        <path id="mem-arc" class="text-purple-500" stroke="currentColor" stroke-width="3" fill="none" stroke-dasharray="0, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
-                    </svg>
-                    <div class="absolute inset-0 flex items-center justify-center">
-                        <span class="text-lg font-bold text-white" id="mem-value">{{ resources.memory_percent|default(0) }}%</span>
-                    </div>
-                </div>
-                <p class="text-sm text-white font-medium">Memory</p>
-                <p class="text-xs text-gray-500">{{ resources.memory_used_gb|default(0) }} / {{ resources.memory_total_gb|default(0) }} GB</p>
-            </div>
-
-            <div class="p-4 bg-gray-800/50 rounded-xl text-center">
-                <div class="relative w-20 h-20 mx-auto mb-3">
-                    <svg class="w-20 h-20 transform -rotate-90" viewBox="0 0 36 36">
-                        <path class="text-gray-700" stroke="currentColor" stroke-width="3" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
-                        <path id="disk-arc" class="text-green-500" stroke="currentColor" stroke-width="3" fill="none" stroke-dasharray="0, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
-                    </svg>
-                    <div class="absolute inset-0 flex items-center justify-center">
-                        <span class="text-lg font-bold text-white" id="disk-value">{{ resources.disk_percent|default(0) }}%</span>
-                    </div>
-                </div>
-                <p class="text-sm text-white font-medium">Disk</p>
-                <p class="text-xs text-gray-500">{{ resources.disk_used_gb|default(0) }} / {{ resources.disk_total_gb|default(0) }} GB</p>
-            </div>
-        </div>
-
-        <div class="mt-4 flex justify-center">
-            <button onclick="refreshResources()" class="btn btn-primary btn-sm">
-                <i class="fas fa-sync-alt mr-1"></i>Refresh
-            </button>
-        </div>
-    </div>
-
-    <!-- Active Tasks -->
-    <div class="card">
-        <h3 class="text-white font-semibold mb-4"><i class="fas fa-tasks mr-2 text-yellow-400"></i>Background Tasks</h3>
-        <div id="bg-tasks-list" class="space-y-2">
-            {% if tasks %}
-            {% for task in tasks %}
-            <div class="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
-                <div class="flex items-center gap-3">
-                    <div class="w-6 h-6 rounded flex items-center justify-center
-                        {% if task.status == 'completed' %}bg-green-600/20
-                        {% elif task.status == 'running' %}bg-blue-600/20
-                        {% elif task.status == 'failed' %}bg-red-600/20
-                        {% else %}bg-gray-600/20{% endif %}">
-                        {% if task.status == 'completed' %}
-                        <i class="fas fa-check text-green-400 text-[10px]"></i>
-                        {% elif task.status == 'running' %}
-                        <i class="fas fa-spinner fa-spin text-blue-400 text-[10px]"></i>
-                        {% elif task.status == 'failed' %}
-                        <i class="fas fa-times text-red-400 text-[10px]"></i>
-                        {% else %}
-                        <i class="fas fa-clock text-gray-400 text-[10px]"></i>
-                        {% endif %}
-                    </div>
-                    <span class="text-sm text-white">{{ task.task_type|upper }}</span>
-                    <span class="text-xs text-gray-500">{{ task.id[:8] }}</span>
-                </div>
-                <div class="flex items-center gap-2">
-                    <span class="text-xs text-gray-500">{{ task.status }}</span>
-                    {% if task.status in ['pending', 'running'] %}
-                    <span class="text-xs text-blue-400">{{ task.progress_percent }}%</span>
-                    {% endif %}
-                </div>
-            </div>
-            {% endfor %}
-            {% else %}
-            <p class="text-gray-500 text-sm text-center py-4">No background tasks</p>
-            {% endif %}
-        </div>
+        <div id="kb-modal-results" class="space-y-2 max-h-96 overflow-y-auto text-sm"></div>
     </div>
 </div>
 
 {% endblock %}
 
 {% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script>
+const TAB_KEY = "mgmt_tab";
+const _state = { chart: null, history: [], activityTimer: null, metricsTimer: null, currentTab: "overview" };
+
 function showTab(name) {
     document.querySelectorAll('[id^="panel-"]').forEach(p => p.classList.add('hidden'));
     document.querySelectorAll('[id^="tab-"]').forEach(t => {
@@ -569,104 +617,313 @@ function showTab(name) {
     });
     document.getElementById('panel-' + name).classList.remove('hidden');
     const tab = document.getElementById('tab-' + name);
-    if (tab) {
-        tab.classList.add('bg-blue-600', 'text-white');
-        tab.classList.remove('text-gray-400');
-    }
+    if (tab) { tab.classList.add('bg-blue-600', 'text-white'); tab.classList.remove('text-gray-400'); }
+    _state.currentTab = name;
+    try { localStorage.setItem(TAB_KEY, name); } catch (e) {}
+    if (name === 'overview') { refreshLiveMetrics(); }
+    if (name === 'activity') { refreshActivity(); }
 }
+try { const t = localStorage.getItem(TAB_KEY); if (t) showTab(t); } catch (e) {}
 
 function toggleRestrictionFields(mode) {
     document.getElementById('topic-fields').classList.toggle('hidden', mode !== 'topic');
     document.getElementById('security-fields').classList.toggle('hidden', mode !== 'security');
 }
 
-async function loadModelInfo(modelId) {
-    if (!modelId) {
-        document.getElementById('model-info-content').classList.add('hidden');
-        return;
-    }
+// ---------- Overview live chart ----------
+function initChart() {
+    if (_state.chart) return;
+    const ctx = document.getElementById('liveChart').getContext('2d');
+    _state.chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [
+                { label: 'CPU %', data: [], borderColor: '#60a5fa', backgroundColor: 'rgba(96,165,250,.1)', tension: .35, borderWidth: 2, pointRadius: 0, fill: true },
+                { label: 'Memory %', data: [], borderColor: '#c084fc', backgroundColor: 'rgba(192,132,252,.1)', tension: .35, borderWidth: 2, pointRadius: 0, fill: true },
+                { label: 'Req / min', data: [], borderColor: '#34d399', backgroundColor: 'rgba(52,211,153,.1)', tension: .35, borderWidth: 2, pointRadius: 0, fill: false, yAxisID: 'y1' },
+            ]
+        },
+        options: {
+            maintainAspectRatio: false,
+            responsive: true,
+            interaction: { intersect: false, mode: 'index' },
+            plugins: { legend: { display: false }, tooltip: { backgroundColor: '#0f172a' } },
+            scales: {
+                x: { ticks: { color: '#64748b', maxTicksLimit: 8 }, grid: { color: 'rgba(148,163,184,.1)' } },
+                y: { min: 0, max: 100, ticks: { color: '#64748b' }, grid: { color: 'rgba(148,163,184,.1)' } },
+                y1: { min: 0, position: 'right', ticks: { color: '#34d399' }, grid: { display: false } },
+            }
+        }
+    });
+}
 
+function pushSample(s) {
+    if (!_state.chart) initChart();
+    const t = new Date(s.ts || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const d = _state.chart.data;
+    d.labels.push(t);
+    d.datasets[0].data.push(s.cpu || 0);
+    d.datasets[1].data.push(s.mem || 0);
+    d.datasets[2].data.push(s.req_per_min || 0);
+    if (d.labels.length > 60) { d.labels.shift(); d.datasets.forEach(ds => ds.data.shift()); }
+    _state.chart.update('none');
+}
+
+async function refreshLiveMetrics() {
+    try {
+        const resp = await fetch('/api/management/live-metrics');
+        const data = await resp.json();
+        const cur = data.current || {};
+        document.getElementById('kpi-rpm').textContent = cur.req_per_min || 0;
+        document.getElementById('kpi-kb').textContent = document.querySelectorAll('#kb-list [data-kb-id]').length;
+        document.getElementById('kpi-model').textContent = '{{ current_model or "—" }}';
+
+        if (cur.cpu != null) {
+            document.getElementById('cpu-value').textContent = Math.round(cur.cpu) + '%';
+            document.getElementById('cpu-arc').setAttribute('stroke-dasharray', cur.cpu + ', 100');
+        }
+        if (cur.mem != null) {
+            document.getElementById('mem-value').textContent = Math.round(cur.mem) + '%';
+            document.getElementById('mem-arc').setAttribute('stroke-dasharray', cur.mem + ', 100');
+        }
+        if (cur.disk != null) {
+            document.getElementById('disk-value').textContent = Math.round(cur.disk) + '%';
+            document.getElementById('disk-arc').setAttribute('stroke-dasharray', cur.disk + ', 100');
+        }
+
+        // Mem/Disk detail
+        try {
+            const r = await fetch('/api/management/resources');
+            const rd = await r.json();
+            if (rd.memory_used_gb) document.getElementById('mem-detail').textContent = `${rd.memory_used_gb.toFixed(1)} / ${rd.memory_total_gb.toFixed(1)} GB`;
+            if (rd.disk_used_gb) document.getElementById('disk-detail').textContent = `${rd.disk_used_gb.toFixed(1)} / ${rd.disk_total_gb.toFixed(1)} GB`;
+        } catch (e) {}
+
+        if (cur.ts) pushSample(cur);
+
+        // Top models
+        if (data.by_model && Object.keys(data.by_model).length) {
+            const total = Object.values(data.by_model).reduce((a,b) => a+b, 0);
+            const sorted = Object.entries(data.by_model).sort((a,b) => b[1]-a[1]).slice(0,5);
+            document.getElementById('top-models').innerHTML = sorted.map(([m, c]) => {
+                const pct = Math.round((c / total) * 100);
+                return `<div>
+                    <div class="flex items-center justify-between text-xs"><span class="text-gray-200">${m}</span><span class="text-gray-500">${c} (${pct}%)</span></div>
+                    <div class="w-full bg-gray-700 rounded-full h-1.5 mt-1"><div class="bg-blue-500 h-1.5 rounded-full" style="width:${pct}%"></div></div>
+                </div>`;
+            }).join('');
+        }
+
+        // Tasks
+        if (Array.isArray(data.history)) {
+            const running = data.history.filter(s => (s.active_tasks || 0) > 0).length;
+            document.getElementById('active-task-count').textContent = running + ' running';
+        }
+    } catch (e) { console.error(e); }
+}
+
+async function refreshOllamaStatus() {
+    try {
+        const r = await fetch('/api/management/health-check');
+        const d = await r.json();
+        const el = document.getElementById('kpi-ollama');
+        if (d.ollama_reachable) {
+            el.innerHTML = `<span class="text-green-400">Online</span> <span class="text-xs text-gray-500">${d.latency_ms}ms</span>`;
+        } else {
+            el.innerHTML = `<span class="text-red-400">Offline</span>`;
+        }
+    } catch (e) {
+        document.getElementById('kpi-ollama').innerHTML = '<span class="text-red-400">Unknown</span>';
+    }
+}
+
+// ---------- Models ----------
+async function runBenchmark(modelId) {
+    const sel = document.getElementById('bench-model');
+    if (modelId) sel.value = modelId;
+    const m = sel.value;
+    const prompt = document.getElementById('bench-prompt').value;
+    if (!m) { alert('Pick a model'); return; }
+    const btn = event && event.target ? event.target : null;
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>'; }
+    document.getElementById('bench-result').classList.remove('hidden');
+    document.getElementById('bench-latency').textContent = '…';
+    document.getElementById('bench-prompt-tok').textContent = '…';
+    document.getElementById('bench-comp-tok').textContent = '…';
+    document.getElementById('bench-tps').textContent = '…';
+    document.getElementById('bench-preview').textContent = 'Running…';
+    try {
+        const resp = await fetch('/api/management/benchmark', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ model_id: m, prompt })
+        });
+        const d = await resp.json();
+        if (d.error) { document.getElementById('bench-preview').textContent = 'Error: ' + d.error; return; }
+        document.getElementById('bench-latency').textContent = d.elapsed_s + ' s';
+        document.getElementById('bench-prompt-tok').textContent = d.prompt_tokens;
+        document.getElementById('bench-comp-tok').textContent = d.completion_tokens;
+        document.getElementById('bench-tps').textContent = d.tokens_per_second;
+        document.getElementById('bench-preview').textContent = d.preview || '';
+    } catch (e) { document.getElementById('bench-preview').textContent = 'Error: ' + e; }
+    finally { if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-play"></i> Run'; } }
+}
+
+async function loadModelInfo(modelId) {
+    if (!modelId) { document.getElementById('model-info-content').classList.add('hidden'); return; }
     try {
         const resp = await fetch('/api/management/model-info/' + encodeURIComponent(modelId));
         const data = await resp.json();
-
-        if (data.detail) {
-            alert('Error: ' + data.detail);
-            return;
-        }
-
+        if (data.detail) { alert('Error: ' + data.detail); return; }
         document.getElementById('model-info-content').classList.remove('hidden');
-        document.getElementById('info-provider').textContent = data.id ? 'Ollama' : '-';
-        document.getElementById('info-params').textContent = data.capabilities ? data.capabilities.length + ' capabilities' : '-';
-        document.getElementById('info-rec').textContent = data.recommendation || '-';
-
-        const lighterDiv = document.getElementById('info-lighter');
-        if (data.lighter_models && data.lighter_models.length > 0) {
-            lighterDiv.innerHTML = data.lighter_models.map(m =>
-                '<span class="px-2 py-1 bg-green-600/20 border border-green-700 rounded text-xs text-green-300">' + m + '</span>'
-            ).join('');
+        document.getElementById('info-provider').textContent = 'Ollama';
+        document.getElementById('info-caps').textContent = (data.capabilities || []).join(', ');
+        document.getElementById('info-rec').textContent = data.recommendation || '—';
+        const lighter = document.getElementById('info-lighter');
+        if (data.lighter_models && data.lighter_models.length) {
+            lighter.innerHTML = data.lighter_models.map(m => `<span class="px-2 py-1 bg-green-600/20 border border-green-700 rounded text-xs text-green-300">${m}</span>`).join('');
         } else {
-            lighterDiv.innerHTML = '<span class="text-xs text-gray-500">Already using the lightest model</span>';
+            lighter.innerHTML = '<span class="text-xs text-gray-500">Already the lightest</span>';
         }
-
         document.getElementById('info-raw').textContent = JSON.stringify(data.details || data, null, 2);
-    } catch (err) {
-        console.error('Failed to load model info:', err);
-    }
+    } catch (e) { console.error(e); }
 }
 
-async function refreshResources() {
+// ---------- Knowledge bases ----------
+document.getElementById('kb-create-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const payload = {
+        name: fd.get('name'),
+        source_type: fd.get('source_type'),
+        content_text: fd.get('content_text') || null,
+        model_id: fd.get('model_id') || null,
+    };
     try {
-        const resp = await fetch('/api/management/resources');
-        const data = await resp.json();
+        const r = await fetch('/api/management/kb/create', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
+        if (r.ok) { location.reload(); } else { const d = await r.json(); alert('Failed: ' + (d.detail || JSON.stringify(d))); }
+    } catch (err) { alert('Error: ' + err); }
+});
 
-        if (data.cpu_percent !== undefined) {
-            document.getElementById('cpu-value').textContent = data.cpu_percent + '%';
-            document.getElementById('cpu-arc').setAttribute('stroke-dasharray', data.cpu_percent + ', 100');
-        }
-        if (data.memory_percent !== undefined) {
-            document.getElementById('mem-value').textContent = data.memory_percent + '%';
-            document.getElementById('mem-arc').setAttribute('stroke-dasharray', data.memory_percent + ', 100');
-        }
-        if (data.disk_percent !== undefined) {
-            document.getElementById('disk-value').textContent = data.disk_percent + '%';
-            document.getElementById('disk-arc').setAttribute('stroke-dasharray', data.disk_percent + ', 100');
-        }
-    } catch (err) {
-        console.error('Failed to refresh resources:', err);
-    }
+function openKBModal() { document.getElementById('kb-search-modal').classList.remove('hidden'); document.getElementById('kb-search-modal').classList.add('flex'); }
+function closeKBModal() { document.getElementById('kb-search-modal').classList.add('hidden'); document.getElementById('kb-search-modal').classList.remove('flex'); }
+let _currentKB = null;
+function searchKB(kbId, name) {
+    _currentKB = kbId;
+    document.getElementById('kb-modal-name').textContent = name || kbId;
+    document.getElementById('kb-modal-results').innerHTML = '<p class="text-gray-500">Type a query and press Search.</p>';
+    openKBModal();
+    setTimeout(() => document.getElementById('kb-modal-query').focus(), 100);
 }
-
-function updateArc(id, percent) {
-    const arc = document.getElementById(id);
-    if (arc) {
-        arc.setAttribute('stroke-dasharray', percent + ', 100');
-    }
-}
-
-updateArc('cpu-arc', {{ resources.cpu_percent|default(0) }});
-updateArc('mem-arc', {{ resources.memory_percent|default(0) }});
-updateArc('disk-arc', {{ resources.disk_percent|default(0) }});
-
-setInterval(refreshResources, 10000);
-
-setInterval(async () => {
+async function runKBSearch() {
+    if (!_currentKB) return;
+    const q = document.getElementById('kb-modal-query').value.trim();
+    if (!q) return;
+    const out = document.getElementById('kb-modal-results');
+    out.innerHTML = '<p class="text-gray-500"><i class="fas fa-spinner fa-spin mr-1"></i> Searching…</p>';
     try {
-        const resp = await fetch('/api/management/tasks');
-        const tasks = await resp.json();
-        const list = document.getElementById('tasks-list');
-        if (list && tasks.length > 0) {
-            tasks.forEach(task => {
-                const el = document.querySelector('[data-task-id="' + task.id + '"]');
-                if (el) {
-                    const progress = el.querySelector('.bg-blue-500');
-                    const label = el.querySelector('.text-xs.text-gray-500');
-                    if (progress) progress.style.width = task.progress_percent + '%';
-                    if (label && task.status === 'running') label.textContent = task.progress_percent + '%';
-                }
-            });
+        const r = await fetch('/api/management/kb/' + encodeURIComponent(_currentKB) + '/search', {
+            method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ query: q, top_k: 5 })
+        });
+        const d = await r.json();
+        if (d.warning) { out.innerHTML = '<p class="text-yellow-400 text-sm">' + d.warning + '</p>'; return; }
+        if (!d.results || !d.results.length) { out.innerHTML = '<p class="text-gray-500 text-sm">No matches.</p>'; return; }
+        out.innerHTML = d.results.map((r, i) => `
+            <div class="p-3 bg-gray-800 rounded-lg border border-gray-700">
+                <div class="flex items-center justify-between text-xs text-gray-400 mb-1">
+                    <span>#${i+1} · ${r.source || ''}</span>
+                    <span class="badge bg-blue-600/20 text-blue-300">score ${r.score}</span>
+                </div>
+                <p class="text-sm text-gray-200 whitespace-pre-wrap">${(r.snippet || '').replace(/</g,'&lt;')}</p>
+            </div>
+        `).join('');
+    } catch (e) { out.innerHTML = '<p class="text-red-400 text-sm">Error: ' + e + '</p>'; }
+}
+document.getElementById('kb-modal-query')?.addEventListener('keydown', (e) => { if (e.key === 'Enter') runKBSearch(); });
+
+// ---------- Playground ----------
+async function runPlayground() {
+    const model_id = document.getElementById('pg-model').value;
+    const sys = document.getElementById('pg-system').value;
+    const user = document.getElementById('pg-user').value;
+    if (!user.trim()) return;
+    const out = document.getElementById('pg-output');
+    const meta = document.getElementById('pg-meta');
+    out.textContent = 'Thinking…';
+    meta.textContent = '';
+    const messages = [];
+    if (sys) messages.push({ role: 'system', content: sys });
+    messages.push({ role: 'user', content: user });
+    try {
+        const r = await fetch('/api/management/playground', {
+            method: 'POST', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ model_id, messages })
+        });
+        const d = await r.json();
+        if (d.error) { out.textContent = 'Error: ' + d.error; return; }
+        out.textContent = d.content || '(empty)';
+        const u = d.usage || {};
+        meta.textContent = `Model: ${d.model} · ${d.elapsed_s}s · ${u.completion_tokens || 0} completion / ${u.prompt_tokens || 0} prompt tokens`;
+    } catch (e) { out.textContent = 'Error: ' + e; }
+}
+
+// ---------- Activity ----------
+async function refreshActivity() {
+    if (document.getElementById('activity-pause')?.checked) return;
+    try {
+        const r = await fetch('/api/management/activity?limit=50');
+        const rows = await r.json();
+        const tbody = document.getElementById('activity-rows');
+        if (!rows.length) { tbody.innerHTML = '<tr><td colspan="4" class="py-6 text-center text-gray-500">No activity yet.</td></tr>'; return; }
+        tbody.innerHTML = rows.map(r => {
+            const t = r.created_at ? new Date(r.created_at).toLocaleTimeString() : '—';
+            const lat = r.latency_ms != null ? r.latency_ms + ' ms' : '—';
+            return `<tr class="border-b border-gray-800 hover:bg-gray-800/40">
+                <td class="py-2 pr-3 text-gray-400 text-xs">${t}</td>
+                <td class="py-2 pr-3 text-white text-xs">${r.model || '—'}</td>
+                <td class="py-2 pr-3 text-emerald-300 text-xs">${r.tokens || 0}</td>
+                <td class="py-2 pr-3 text-gray-300 text-xs">${lat}</td>
+            </tr>`;
+        }).join('');
+        const minuteAgo = Date.now() - 60000;
+        const rpm = rows.filter(r => r.created_at && new Date(r.created_at).getTime() > minuteAgo).length;
+        document.getElementById('activity-rpm').textContent = rpm + ' req/min';
+    } catch (e) { console.error(e); }
+}
+
+// ---------- Background task progress polling ----------
+async function refreshTasks() {
+    try {
+        const r = await fetch('/api/management/tasks');
+        const tasks = await r.json();
+        document.querySelectorAll('[data-task-id]').forEach(el => {
+            const t = tasks.find(x => x.id === el.dataset.taskId);
+            if (!t) return;
+            const bar = el.querySelector('.bg-blue-500');
+            if (bar) bar.style.width = t.progress_percent + '%';
+            const pct = el.querySelector('.text-xs.text-gray-500.w-8');
+            if (pct) pct.textContent = t.progress_percent + '%';
+        });
+        if (_state.currentTab === 'overview') {
+            const running = tasks.filter(t => t.status === 'running' || t.status === 'pending').length;
+            document.getElementById('active-task-count').textContent = running + ' running';
         }
     } catch (e) {}
-}, 3000);
+}
+
+// ---------- Boot ----------
+initChart();
+refreshLiveMetrics();
+refreshOllamaStatus();
+setInterval(refreshLiveMetrics, 5000);
+setInterval(refreshOllamaStatus, 15000);
+setInterval(refreshTasks, 3000);
+setInterval(() => { if (_state.currentTab === 'activity') refreshActivity(); }, 4000);
+
+// Auto-load info for current model
+setTimeout(() => {
+    const sel = document.getElementById('info-model-select');
+    if (sel && sel.value) loadModelInfo(sel.value);
+}, 200);
 </script>
 {% endblock %}

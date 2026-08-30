@@ -1,252 +1,208 @@
 {% extends "base.html" %}
 {% block title %}OpenLocalAI - Models{% endblock %}
-{% block header_title %}Model Management{% endblock %}
+{% block header_title %}Model Hub{% endblock %}
 
 {% block content %}
+<style>
+:root {
+    --accent: #8b5cf6;
+    --accent-2: #06b6d4;
+    --accent-3: #f59e0b;
+    --success: #10b981;
+    --danger: #ef4444;
+    --glass-bg: rgba(30, 41, 59, 0.55);
+    --glass-border: rgba(148, 163, 184, 0.15);
+}
+.glass { background: var(--glass-bg); backdrop-filter: blur(14px); border: 1px solid var(--glass-border); border-radius: 14px; }
+.gradient-text { background: linear-gradient(135deg, #c4b5fd, #67e8f9, #fde68a); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.btn { padding: 8px 14px; border-radius: 9px; font-size: 13px; font-weight: 500; cursor: pointer; transition: all .2s; border: none; display: inline-flex; align-items: center; gap: 6px; }
+.btn-primary { background: linear-gradient(135deg, #8b5cf6, #6366f1); color: white; box-shadow: 0 4px 14px rgba(139,92,246,0.35); }
+.btn-primary:hover { transform: translateY(-1px); }
+.btn-secondary { background: rgba(51, 65, 85, 0.6); color: #e2e8f0; border: 1px solid rgba(148,163,184,0.25); }
+.btn-secondary:hover { background: rgba(71, 85, 105, 0.7); }
+.btn-danger { background: linear-gradient(135deg, #ef4444, #dc2626); color: white; }
+.btn-icon { padding: 7px; border-radius: 8px; background: transparent; color: #94a3b8; border: 1px solid transparent; cursor: pointer; }
+.btn-icon:hover { background: rgba(51, 65, 85, 0.5); color: #e2e8f0; }
+.input-field { width: 100%; padding: 10px 14px; background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(148,163,184,0.25); border-radius: 9px; color: #e2e8f0; font-size: 13px; outline: none; transition: all .2s; }
+.input-field:focus { border-color: #8b5cf6; box-shadow: 0 0 0 3px rgba(139,92,246,0.15); }
+.tab-btn { padding: 8px 14px; border-radius: 9px; font-size: 13px; color: #94a3b8; cursor: pointer; transition: all .2s; display: inline-flex; align-items: center; gap: 6px; border: 1px solid transparent; }
+.tab-btn:hover { color: #e2e8f0; background: rgba(51, 65, 85, 0.4); }
+.tab-btn.active { background: rgba(139, 92, 246, 0.15); color: #c4b5fd; border-color: rgba(139, 92, 246, 0.3); }
+.badge { padding: 3px 9px; border-radius: 999px; font-size: 10px; font-weight: 600; }
+.badge-green { background: rgba(16, 185, 129, 0.18); color: #6ee7b7; border: 1px solid rgba(16, 185, 129, 0.3); }
+.badge-blue { background: rgba(6, 182, 212, 0.18); color: #67e8f9; border: 1px solid rgba(6, 182, 212, 0.3); }
+.badge-purple { background: rgba(139, 92, 246, 0.18); color: #c4b5fd; border: 1px solid rgba(139, 92, 246, 0.3); }
+.badge-amber { background: rgba(245, 158, 11, 0.18); color: #fcd34d; border: 1px solid rgba(245, 158, 11, 0.3); }
+.badge-gray { background: rgba(100, 116, 139, 0.18); color: #94a3b8; border: 1px solid rgba(100, 116, 139, 0.3); }
+.pulse-dot { width: 8px; height: 8px; border-radius: 50%; background: #10b981; box-shadow: 0 0 0 0 rgba(16,185,129,0.6); animation: pulse 2s infinite; }
+.pulse-dot.gray { background: #ef4444; box-shadow: 0 0 0 0 rgba(239,68,68,0.6); }
+.pulse-dot.amber { background: #f59e0b; box-shadow: 0 0 0 0 rgba(245,158,11,0.6); }
+@keyframes pulse { 0% { box-shadow: 0 0 0 0 currentColor; } 70% { box-shadow: 0 0 0 8px transparent; } 100% { box-shadow: 0 0 0 0 transparent; } }
+.model-card { padding: 16px; border-radius: 14px; background: var(--glass-bg); border: 1px solid var(--glass-border); transition: all .2s; position: relative; overflow: hidden; }
+.model-card:hover { border-color: rgba(139, 92, 246, 0.4); transform: translateY(-2px); box-shadow: 0 10px 24px rgba(0,0,0,0.3); }
+.progress-bar { height: 6px; background: rgba(51,65,85,0.5); border-radius: 3px; overflow: hidden; }
+.progress-bar > div { height: 100%; background: linear-gradient(90deg, #8b5cf6, #06b6d4); transition: width .3s; }
+.toast { position: fixed; bottom: 24px; right: 24px; padding: 12px 18px; border-radius: 12px; background: rgba(16,185,129,0.95); color: white; box-shadow: 0 8px 24px rgba(0,0,0,0.4); z-index: 100; animation: slideIn .25s; max-width: 400px; }
+.toast.error { background: rgba(239,68,68,0.95); }
+.toast.info { background: rgba(6,182,212,0.95); }
+@keyframes slideIn { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+</style>
+
+<!-- Header Status -->
+<div class="flex items-center justify-between mb-6">
+    <div>
+        <h2 class="text-2xl font-bold gradient-text">Model Hub</h2>
+        <p class="text-sm text-gray-400 mt-1">Install, manage, and deploy LLM models</p>
+    </div>
+    <div class="flex items-center gap-3">
+        <div id="ollamaStatus" class="flex items-center gap-2 px-3 py-2 glass">
+            <span id="ollamaDot" class="pulse-dot gray"></span>
+            <span id="ollamaText" class="text-xs text-gray-300">Checking Ollama...</span>
+        </div>
+        <button onclick="location.reload()" class="btn btn-secondary"><i class="fas fa-sync-alt"></i> Refresh</button>
+    </div>
+</div>
+
 <!-- Tabs -->
-<div class="flex gap-1 mb-6 bg-gray-800 p-1 rounded-xl w-fit">
-    <button onclick="showTab('ollama')" id="tab-ollama" class="px-4 py-2 rounded-lg text-sm font-medium bg-blue-600 text-white transition">Ollama Models</button>
-    <button onclick="showTab('huggingface')" id="tab-huggingface" class="px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white transition">Hugging Face</button>
-    <button onclick="showTab('upload')" id="tab-upload" class="px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white transition">Upload Model</button>
+<div class="flex flex-wrap gap-1 mb-6 glass p-1 w-fit">
+    <button onclick="showTab('ollama')" id="tab-ollama" class="tab-btn active"><i class="fas fa-server"></i> Ollama Library</button>
+    <button onclick="showTab('library')" id="tab-library" class="tab-btn"><i class="fas fa-book"></i> Which Model for Which Task</button>
+    <button onclick="showTab('online')" id="tab-online" class="tab-btn"><i class="fab fa-hubspot"></i> Online Models</button>
+    <button onclick="showTab('local')" id="tab-local" class="tab-btn"><i class="fas fa-hdd"></i> Local Files</button>
+    <button onclick="showTab('trained')" id="tab-trained" class="tab-btn"><i class="fas fa-graduation-cap"></i> My Trained</button>
+    <button onclick="showTab('upload')" id="tab-upload" class="tab-btn"><i class="fas fa-upload"></i> Upload</button>
 </div>
 
-<!-- Ollama Tab -->
+<!-- ============== TAB: Ollama Library ============== -->
 <div id="panel-ollama" class="space-y-6">
-    {% if current_model %}
-    <div class="flex items-center gap-3 p-4 bg-blue-900/30 border border-blue-700 rounded-xl">
-        <i class="fas fa-check-circle text-blue-400"></i>
-        <span class="text-blue-200">Active Model:</span>
-        <span class="font-bold text-white">{{ current_model }}</span>
-    </div>
-    {% endif %}
-
-    <!-- Installed Models -->
-    <div class="card">
+    <div class="glass p-5">
         <div class="flex items-center justify-between mb-4">
-            <h3 class="text-white font-semibold"><i class="fas fa-hdd mr-2 text-green-400"></i>Installed Models</h3>
-            <form method="POST" action="/models/ollama/sync" class="inline">
-                <button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-sync-alt mr-1"></i>Sync</button>
-            </form>
-        </div>
-        {% set installed = models | selectattr("is_downloaded") | list %}
-        {% if installed %}
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {% for model in installed %}
-            <div class="flex items-center justify-between p-4 bg-gray-800/50 rounded-xl border border-gray-700">
-                <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 bg-green-600/20 rounded-lg flex items-center justify-center">
-                        <i class="fas fa-check-circle text-green-400"></i>
-                    </div>
-                    <div>
-                        <div class="font-medium text-white">{{ model.id }}</div>
-                        <div class="text-xs text-gray-500">{{ model.provider }} | {{ (model.parameter_count / 1000000000)|round(1) if model.parameter_count else '?' }}B</div>
-                    </div>
-                </div>
-                <div class="flex items-center gap-2">
-                    <span class="badge badge-green">Ready</span>
-                    {% if current_model != model.id %}
-                    <form method="POST" action="/models/switch">
-                        <input type="hidden" name="model" value="{{ model.id }}">
-                        <button type="submit" class="btn btn-primary btn-sm">Set Default</button>
-                    </form>
-                    {% else %}
-                    <span class="badge badge-blue">Active</span>
-                    {% endif %}
-                </div>
-            </div>
-            {% endfor %}
-        </div>
-        {% else %}
-        <p class="text-gray-500 text-center py-8">No models installed yet.</p>
-        {% endif %}
-    </div>
-
-    <!-- Pull from Ollama -->
-    <div class="card">
-        <h3 class="text-white font-semibold mb-4"><i class="fas fa-download mr-2 text-blue-400"></i>Pull from Ollama</h3>
-        <p class="text-gray-400 text-sm mb-4">Download a model from the Ollama model library.</p>
-        <form method="POST" action="/models/ollama/pull" class="flex gap-3">
-            <select name="model" class="input-field flex-1">
-                <option value="llama3.2:1b">Llama 3.2 1B (1.3GB)</option>
-                <option value="llama3.2:3b">Llama 3.2 3B (2GB)</option>
-                <option value="qwen2.5:0.5b">Qwen 2.5 0.5B (397MB)</option>
-                <option value="qwen2.5:1.5b">Qwen 2.5 1.5B (1GB)</option>
-                <option value="qwen2.5:3b">Qwen 2.5 3B (2GB)</option>
-                <option value="phi3:mini">Phi-3 Mini (2GB)</option>
-                <option value="mistral-nemo">Mistral Nemo (7GB)</option>
-                <option value="codellama:3.5">Code Llama 3.5 (3.5GB)</option>
-                <option value="gemma2:2b">Gemma 2 2B (1.6GB)</option>
-                <option value="deepseek-r1:1.5b">DeepSeek R1 1.5B (1.1GB)</option>
-                <option value="nomic-embed-text">Nomic Embed Text (274MB)</option>
-            </select>
-            <button type="submit" class="btn btn-primary"><i class="fas fa-download mr-2"></i>Pull Model</button>
-        </form>
-        <div class="mt-4">
-            <p class="text-xs text-gray-500 mb-2">Or enter any Ollama model name:</p>
-            <form method="POST" action="/models/ollama/pull" class="flex gap-3">
-                <input type="text" name="model" class="input-field flex-1" placeholder="e.g. llama3.2:8b, qwen2.5:7b, etc.">
-                <button type="submit" class="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition"><i class="fas fa-download mr-1"></i>Pull</button>
-            </form>
-        </div>
-    </div>
-</div>
-
-<!-- Hugging Face Tab -->
-<div id="panel-huggingface" class="hidden space-y-6">
-    <div class="card">
-        <h3 class="text-white font-semibold mb-4"><i class="fab fa-hubspot mr-2 text-orange-400"></i>Download from Hugging Face</h3>
-        <p class="text-gray-400 text-sm mb-4">Enter a Hugging Face model ID to download. Models are converted to GGUF format for Ollama compatibility.</p>
-
-        <!-- Search -->
-        <div class="mb-6">
-            <label class="block text-sm font-medium text-gray-300 mb-1.5">Search Models</label>
-            <div class="flex gap-3">
-                <input type="text" id="hf-search" class="input-field flex-1" placeholder="Search Hugging Face models... (e.g. llama, qwen, phi)" onkeyup="searchHF(event)">
-                <button onclick="searchHFModels()" class="btn btn-primary"><i class="fas fa-search mr-2"></i>Search</button>
-            </div>
-        </div>
-        <div id="hf-results" class="space-y-3 hidden">
-            <div class="flex items-center gap-2 text-gray-400 text-sm"><i class="fas fa-spinner fa-spin"></i> Searching...</div>
-        </div>
-
-        <!-- Direct Download -->
-        <div class="border-t border-gray-700 pt-6 mt-6">
-            <label class="block text-sm font-medium text-gray-300 mb-1.5">Direct Model ID</label>
-            <p class="text-xs text-gray-500 mb-3">Enter the full Hugging Face model path (e.g. meta-llama/Llama-3.2-1B)</p>
-            <form method="POST" action="/models/huggingface/download" class="flex gap-3">
-                <input type="text" name="model_id" class="input-field flex-1" placeholder="org/model-name" required>
-                <select name="file_pattern" class="input-field w-48">
-                    <option value="*q4*.gguf">GGUF Q4 (Small)</option>
-                    <option value="*q8*.gguf">GGUF Q8 (Medium)</option>
-                    <option value="*.gguf">Any GGUF</option>
-                    <option value="*">Full Model (Large)</option>
+            <h3 class="text-white font-semibold flex items-center gap-2">
+                <i class="fas fa-list-check text-purple-400"></i> Installed Models
+            </h3>
+            <div class="flex items-center gap-2">
+                <span class="text-xs text-gray-500">Default:</span>
+                <select id="defaultModelSelect" onchange="setDefaultModel(this.value)" class="input-field py-1.5 text-xs" style="width: 200px;">
+                    <option value="">Select model...</option>
                 </select>
-                <button type="submit" class="btn btn-primary"><i class="fas fa-download mr-2"></i>Download</button>
-            </form>
+            </div>
         </div>
+        <div id="installedModels" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+            <p class="text-gray-500 text-sm col-span-full text-center py-8"><i class="fas fa-spinner fa-spin mr-2"></i>Loading...</p>
+        </div>
+    </div>
 
-        <!-- Popular Models -->
-        <div class="border-t border-gray-700 pt-6 mt-6">
-            <h4 class="text-sm font-medium text-gray-300 mb-3">Popular Models (Small, ≤2GB)</h4>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <form method="POST" action="/models/huggingface/download" class="hidden"><input type="hidden" name="model_id" value="Qwen/Qwen2.5-0.5B-Instruct-GGUF"><input type="hidden" name="file_pattern" value="*q4*.gguf"></form>
-                {% set popular = [
-                    ("Qwen/Qwen2.5-0.5B-Instruct-GGUF", "Qwen 2.5 0.5B", "~250MB"),
-                    ("Qwen/Qwen2.5-1.5B-Instruct-GGUF", "Qwen 2.5 1.5B", "~900MB"),
-                    ("microsoft/Phi-3-mini-4k-instruct-gguf", "Phi-3 Mini", "~2GB"),
-                    ("TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF", "TinyLlama 1.1B", "~700MB"),
-                    ("TheBloke/CodeLlama-7B-GGUF", "CodeLlama 7B", "~4GB"),
-                    ("nomic-ai/nomic-embed-text-v1.5-GGUF", "Nomic Embed", "~270MB")
-                ] %}
-                {% for path, name, size in popular %}
-                <div class="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg border border-gray-700 hover:border-gray-600 transition">
-                    <div>
-                        <div class="text-sm text-white font-medium">{{ name }}</div>
-                        <div class="text-xs text-gray-500">{{ path }} | {{ size }}</div>
-                    </div>
-                    <form method="POST" action="/models/huggingface/download">
-                        <input type="hidden" name="model_id" value="{{ path }}">
-                        <input type="hidden" name="file_pattern" value="*q4*.gguf">
-                        <button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-download"></i></button>
-                    </form>
-                </div>
-                {% endfor %}
+    <!-- Pull Section -->
+    <div class="glass p-5">
+        <h3 class="text-white font-semibold flex items-center gap-2 mb-4">
+            <i class="fas fa-cloud-download-alt text-blue-400"></i> Pull Model from Ollama Library
+        </h3>
+        <div class="flex flex-col md:flex-row gap-3 mb-3">
+            <input type="text" id="pullInput" class="input-field flex-1" placeholder="Enter model name (e.g. llama3.2:3b, qwen2.5:7b, codellama:13b)">
+            <button onclick="pullModel()" id="pullBtn" class="btn btn-primary whitespace-nowrap"><i class="fas fa-download mr-1"></i> Pull</button>
+        </div>
+        <p class="text-xs text-gray-500 mb-3">Or browse by category:</p>
+        <div class="flex flex-wrap gap-2 mb-4" id="quickPulls"></div>
+        <div id="pullProgress" class="hidden mt-4">
+            <div class="flex items-center justify-between mb-2 text-sm">
+                <span id="pullStatus" class="text-gray-300">Starting...</span>
+                <span id="pullPercent" class="text-purple-400 font-mono">0%</span>
+            </div>
+            <div class="progress-bar"><div id="pullFill" style="width: 0%"></div></div>
+            <div id="pullDetail" class="text-xs text-gray-500 mt-2 font-mono"></div>
+        </div>
+    </div>
+</div>
+
+<!-- ============== TAB: Which Model for Which Task ============== -->
+<div id="panel-library" class="hidden space-y-6">
+    <div class="glass p-5">
+        <h3 class="text-white font-semibold mb-2 flex items-center gap-2"><i class="fas fa-lightbulb text-amber-400"></i> Pick the right model</h3>
+        <p class="text-sm text-gray-400 mb-5">Curated recommendations grouped by use case. Click <strong>Install</strong> to pull a model straight from Ollama.</p>
+        <div id="librarySections" class="space-y-5"></div>
+    </div>
+</div>
+
+<!-- ============== TAB: Online Models ============== -->
+<div id="panel-online" class="hidden space-y-6">
+    <div class="glass p-5">
+        <h3 class="text-white font-semibold flex items-center gap-2 mb-3"><i class="fab fa-hubspot text-orange-400"></i> Download from Hugging Face</h3>
+        <p class="text-sm text-gray-400 mb-4">Search and download GGUF models. They land in <code class="text-cyan-400">/www/AI_server/models/</code>.</p>
+
+        <div class="flex gap-3 mb-4">
+            <input type="text" id="hfSearch" class="input-field flex-1" placeholder="Search HF models (e.g. llama, qwen, code, vision)..." onkeydown="if(event.key==='Enter')searchHF()">
+            <button onclick="searchHF()" class="btn btn-primary"><i class="fas fa-search mr-1"></i> Search</button>
+        </div>
+        <div id="hfResults" class="space-y-2 mb-5"></div>
+
+        <div class="border-t border-gray-700 pt-4 mt-4">
+            <h4 class="text-sm font-medium text-gray-300 mb-3">Direct download</h4>
+            <div class="flex flex-col md:flex-row gap-3">
+                <input type="text" id="hfModelId" class="input-field flex-1" placeholder="org/model-name (e.g. Qwen/Qwen2.5-1.5B-Instruct-GGUF)">
+                <select id="hfPattern" class="input-field md:w-48">
+                    <option value="*q4*.gguf">GGUF Q4 (small)</option>
+                    <option value="*q5*.gguf">GGUF Q5 (balanced)</option>
+                    <option value="*q8*.gguf">GGUF Q8 (large)</option>
+                    <option value="*.gguf">Any GGUF</option>
+                </select>
+                <button onclick="downloadHF()" class="btn btn-primary"><i class="fas fa-download mr-1"></i> Download</button>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Upload Tab -->
+<!-- ============== TAB: Local Files ============== -->
+<div id="panel-local" class="hidden space-y-6">
+    <div class="glass p-5">
+        <h3 class="text-white font-semibold flex items-center gap-2 mb-4"><i class="fas fa-folder-open text-cyan-400"></i> Local Model Files</h3>
+        <p class="text-sm text-gray-400 mb-4">Models stored on disk under <code class="text-cyan-400">/www/AI_server/models/</code>.</p>
+        <div id="localFiles" class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <p class="text-gray-500 text-sm col-span-full text-center py-8"><i class="fas fa-spinner fa-spin mr-2"></i>Loading...</p>
+        </div>
+    </div>
+</div>
+
+<!-- ============== TAB: My Trained ============== -->
+<div id="panel-trained" class="hidden space-y-6">
+    <div class="glass p-5">
+        <h3 class="text-white font-semibold flex items-center gap-2 mb-2"><i class="fas fa-graduation-cap text-pink-400"></i> My Trained Models</h3>
+        <p class="text-sm text-gray-400 mb-5">Custom assistants built from your own knowledge base in the <a class="text-purple-400" href="/model-builder">Model Builder</a>.</p>
+        <div id="trainedList" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+            <p class="text-gray-500 text-sm col-span-full text-center py-8"><i class="fas fa-spinner fa-spin mr-2"></i>Loading...</p>
+        </div>
+    </div>
+</div>
+
+<!-- ============== TAB: Upload ============== -->
 <div id="panel-upload" class="hidden space-y-6">
-    <div class="card">
-        <h3 class="text-white font-semibold mb-4"><i class="fas fa-upload mr-2 text-purple-400"></i>Upload Model File</h3>
-        <p class="text-gray-400 text-sm mb-4">Upload a GGUF model file directly to your server.</p>
-        <form method="POST" action="/models/upload" enctype="multipart/form-data" class="space-y-4">
+    <div class="glass p-5">
+        <h3 class="text-white font-semibold flex items-center gap-2 mb-4"><i class="fas fa-upload text-purple-400"></i> Upload Model File</h3>
+        <p class="text-sm text-gray-400 mb-4">Upload a GGUF model file to <code class="text-cyan-400">/www/AI_server/models/</code>.</p>
+        <form id="uploadForm" class="space-y-3">
             <div>
-                <label class="block text-sm font-medium text-gray-300 mb-1.5">Model Name</label>
-                <input type="text" name="model_name" required class="input-field" placeholder="my-custom-model">
+                <label class="block text-sm font-medium text-gray-300 mb-1.5">Folder name</label>
+                <input type="text" id="uploadName" class="input-field" placeholder="my-custom-model" required>
             </div>
             <div>
-                <label class="block text-sm font-medium text-gray-300 mb-1.5">Model File (GGUF)</label>
-                <input type="file" name="model_file" required class="input-field" accept=".gguf,.bin,.safetensors,.pt,.pth">
-                <p class="text-xs text-gray-500 mt-1">Supported: .gguf, .bin, .safetensors, .pt, .pth</p>
+                <label class="block text-sm font-medium text-gray-300 mb-1.5">GGUF file</label>
+                <input type="file" id="uploadFile" class="input-field" accept=".gguf,.bin,.safetensors" required>
+                <p class="text-xs text-gray-500 mt-1">.gguf, .bin, .safetensors</p>
             </div>
-            <button type="submit" class="btn btn-primary w-full"><i class="fas fa-upload mr-2"></i>Upload & Register Model</button>
+            <div id="uploadProgress" class="hidden">
+                <div class="flex items-center justify-between mb-1 text-sm">
+                    <span class="text-gray-300">Uploading...</span>
+                    <span id="uploadPercent" class="text-purple-400 font-mono">0%</span>
+                </div>
+                <div class="progress-bar"><div id="uploadFill" style="width: 0%"></div></div>
+            </div>
+            <button type="submit" id="uploadBtn" class="btn btn-primary w-full"><i class="fas fa-upload mr-2"></i> Upload</button>
         </form>
     </div>
-
-    <!-- Uploaded Models -->
-    <div class="card">
-        <h3 class="text-white font-semibold mb-4"><i class="fas fa-folder-open mr-2 text-gray-400"></i>Uploaded Files</h3>
-        <div id="uploaded-list" class="space-y-2">
-            <p class="text-gray-500 text-sm text-center py-4">Check the Models tab for uploaded models.</p>
-        </div>
-    </div>
 </div>
 
-<!-- API Examples -->
-<div class="card mt-6">
-    <h3 class="text-white font-semibold mb-3"><i class="fas fa-code mr-2 text-gray-400"></i>Using Models via API</h3>
-    <pre class="bg-gray-900 rounded-lg p-4 overflow-x-auto text-sm"><code class="text-green-400">import openai
-openai.api_key = "sk-local-your-key"
-openai.api_base = "http://203.55.176.101:8000/v1"
+<div id="toastContainer"></div>
+{% endblock %}
 
-# List available models
-models = openai.Model.list()
-for m in models.data:
-    print(m.id)
-
-# Chat with any model
-response = openai.ChatCompletion.create(
-    model="qwen2.5:0.5b",
-    messages=[{"role":"user","content":"Hello!"}]
-)</code></pre>
-</div>
-
-<script>
-function showTab(name) {
-    document.querySelectorAll('[id^="panel-"]').forEach(p => p.classList.add('hidden'));
-    document.querySelectorAll('[id^="tab-"]').forEach(t => { t.classList.remove('bg-blue-600','text-white'); t.classList.add('text-gray-400'); });
-    document.getElementById('panel-' + name).classList.remove('hidden');
-    const tab = document.getElementById('tab-' + name);
-    tab.classList.add('bg-blue-600','text-white');
-    tab.classList.remove('text-gray-400');
-}
-
-function searchHF(e) { if (e.key === 'Enter') searchHFModels(); }
-
-async function searchHFModels() {
-    const q = document.getElementById('hf-search').value.trim();
-    if (!q) return;
-    const el = document.getElementById('hf-results');
-    el.classList.remove('hidden');
-    el.innerHTML = '<div class="flex items-center gap-2 text-gray-400 text-sm"><i class="fas fa-spinner fa-spin"></i> Searching Hugging Face...</div>';
-
-    try {
-        const resp = await fetch(`https://huggingface.co/api/models?search=${encodeURIComponent(q)}&filter=gguf&sort=downloads&direction=-1&limit=8`);
-        const data = await resp.json();
-
-        if (data.length === 0) {
-            el.innerHTML = '<p class="text-gray-500 text-sm">No models found.</p>';
-            return;
-        }
-
-        el.innerHTML = data.map(m => `
-            <div class="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg border border-gray-700">
-                <div class="min-w-0">
-                    <div class="text-sm text-white font-medium truncate">${m.id}</div>
-                    <div class="text-xs text-gray-500">${m.downloads || 0} downloads | ${m.likes || 0} likes</div>
-                </div>
-                <form method="POST" action="/models/huggingface/download" class="flex-shrink-0 ml-3">
-                    <input type="hidden" name="model_id" value="${m.id}">
-                    <input type="hidden" name="file_pattern" value="*q4*.gguf">
-                    <button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-download mr-1"></i>Get</button>
-                </form>
-            </div>
-        `).join('');
-    } catch (err) {
-        el.innerHTML = '<p class="text-red-400 text-sm">Search failed. Try direct model ID instead.</p>';
-    }
-}
-</script>
+{% block scripts %}
+<script src="/static/js/models.js"></script>
 {% endblock %}

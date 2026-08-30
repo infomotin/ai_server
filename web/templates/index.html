@@ -1,52 +1,159 @@
 {% extends "base.html" %}
-{% block title %}OpenLocalAI - Home{% endblock %}
-{% block header_title %}Home{% endblock %}
+{% block title %}OpenLocalAI - Self-Hosted AI{% endblock %}
+{% block sidebar %}{% endblock %}
+{% block header %}{% endblock %}
 
 {% block content %}
-<div class="text-center py-12">
-    <div class="w-20 h-20 bg-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
-        <i class="fas fa-robot text-white text-3xl"></i>
-    </div>
-    <h1 class="text-4xl font-bold text-white mb-3">Welcome to OpenLocalAI</h1>
-    <p class="text-gray-400 max-w-xl mx-auto mb-8">Self-hosted AI API server with OpenAI-compatible endpoints. Full control, your data stays private.</p>
-    <div class="flex justify-center gap-4">
-        <a href="/dashboard" class="btn btn-primary px-6 py-2.5"><i class="fas fa-th-large mr-2"></i>Go to Dashboard</a>
-        <a href="/chat" class="bg-gray-700 hover:bg-gray-600 text-white px-6 py-2.5 rounded-lg font-medium transition"><i class="fas fa-comments mr-2"></i>Open Chat</a>
-    </div>
-</div>
+<style>
+:root {
+    --glass-bg: rgba(30, 41, 59, 0.55);
+    --glass-border: rgba(148, 163, 184, 0.15);
+}
+.landing-hero { position: relative; min-height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+.hero-bg { position: absolute; inset: 0; background: radial-gradient(ellipse at 30% 20%, rgba(99, 102, 241, 0.12) 0%, transparent 50%), radial-gradient(ellipse at 70% 80%, rgba(6, 182, 212, 0.08) 0%, transparent 50%), #0f172a; z-index: 0; }
+.hero-glow { position: absolute; width: 600px; height: 600px; border-radius: 50%; filter: blur(120px); opacity: 0.15; pointer-events: none; }
+.hero-glow.g1 { top: -200px; left: -100px; background: #6366f1; }
+.hero-glow.g2 { bottom: -200px; right: -100px; background: #06b6d4; }
+.gradient-text { background: linear-gradient(135deg, #c4b5fd, #67e8f9, #fde68a); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.glass { background: var(--glass-bg); backdrop-filter: blur(14px); border: 1px solid var(--glass-border); border-radius: 14px; }
+.nav-landing { position: fixed; top: 0; left: 0; right: 0; z-index: 100; padding: 16px 32px; display: flex; align-items: center; justify-content: space-between; background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(12px); border-bottom: 1px solid rgba(51, 65, 85, 0.4); }
+.nav-landing a { text-decoration: none; }
+.btn { padding: 10px 20px; border-radius: 10px; font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.2s; border: none; display: inline-flex; align-items: center; gap: 8px; text-decoration: none; }
+.btn-primary { background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white; box-shadow: 0 4px 20px rgba(99,102,241,0.35); }
+.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(99,102,241,0.5); }
+.btn-outline { background: transparent; color: #c4b5fd; border: 1px solid rgba(139,92,246,0.4); }
+.btn-outline:hover { background: rgba(139,92,246,0.1); border-color: #8b5cf6; }
+.btn-white { background: white; color: #0f172a; }
+.btn-white:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(255,255,255,0.2); }
+.feat-card { padding: 28px; border-radius: 16px; background: var(--glass-bg); backdrop-filter: blur(14px); border: 1px solid var(--glass-border); transition: all 0.3s; }
+.feat-card:hover { transform: translateY(-4px); border-color: rgba(139, 92, 246, 0.4); box-shadow: 0 16px 40px rgba(0,0,0,0.3); }
+.stat-pill { display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: 999px; background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.3); font-size: 13px; color: #6ee7b7; }
+.code-block { background: #0a0e1a; border: 1px solid #1e293b; border-radius: 12px; padding: 20px; font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 13px; line-height: 1.6; overflow-x: auto; color: #e2e8f0; }
+.code-kw { color: #c4b5fd; }
+.code-str { color: #6ee7b7; }
+.code-cmt { color: #64748b; }
+.code-fn { color: #67e8f9; }
+</style>
 
-<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
-    <div class="card text-center p-6">
-        <div class="w-12 h-12 bg-blue-600/20 rounded-xl flex items-center justify-center mx-auto mb-4"><i class="fas fa-key text-blue-400 text-xl"></i></div>
-        <h3 class="text-white font-semibold mb-2">API Key Management</h3>
-        <p class="text-gray-400 text-sm">Generate and manage API keys with per-key rate limiting and scoping.</p>
+<!-- Top Nav -->
+<nav class="nav-landing">
+    <div class="flex items-center gap-3">
+        <div class="w-9 h-9 bg-indigo-600 rounded-lg flex items-center justify-center">
+            <i class="fas fa-robot text-white"></i>
+        </div>
+        <span class="text-white font-bold text-lg">OpenLocalAI</span>
     </div>
-    <div class="card text-center p-6">
-        <div class="w-12 h-12 bg-purple-600/20 rounded-xl flex items-center justify-center mx-auto mb-4"><i class="fas fa-cube text-purple-400 text-xl"></i></div>
-        <h3 class="text-white font-semibold mb-2">Multiple Models</h3>
-        <p class="text-gray-400 text-sm">Run Llama, Qwen, Phi, Mistral and more. Switch models instantly.</p>
+    <div class="flex items-center gap-3">
+        <a href="/login" class="btn btn-outline text-sm"><i class="fas fa-sign-in-alt"></i> Sign In</a>
+        <a href="/register" class="btn btn-primary text-sm"><i class="fas fa-user-plus"></i> Get Started</a>
     </div>
-    <div class="card text-center p-6">
-        <div class="w-12 h-12 bg-emerald-600/20 rounded-xl flex items-center justify-center mx-auto mb-4"><i class="fas fa-wand-magic-sparkles text-emerald-400 text-xl"></i></div>
-        <h3 class="text-white font-semibold mb-2">Skills & Agents</h3>
-        <p class="text-gray-400 text-sm">Create custom AI skills with system prompts and behavior control.</p>
+</nav>
+
+<!-- Hero -->
+<section class="landing-hero" style="padding-top: 120px;">
+    <div class="hero-bg">
+        <div class="hero-glow g1"></div>
+        <div class="hero-glow g2"></div>
     </div>
-</div>
+    <div class="relative z-10 flex-1 flex flex-col items-center justify-center px-6 text-center max-w-5xl mx-auto">
+        <div class="stat-pill mb-8">
+            <span class="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
+            OpenAI-compatible API running on your own hardware
+        </div>
+        <h1 class="text-5xl md:text-7xl font-bold leading-tight mb-6">
+            Your AI.<br>
+            <span class="gradient-text">Your Rules.</span>
+        </h1>
+        <p class="text-lg md:text-xl text-gray-400 max-w-2xl mb-10 leading-relaxed">
+            Run Llama, Qwen, Phi, Mistral and more locally. Full control over your data with OpenAI-compatible API keys, rate limiting, content firewall, and a coding agent — all self-hosted.
+        </p>
+        <div class="flex flex-col sm:flex-row gap-4 mb-16">
+            <a href="/register" class="btn btn-primary text-base px-8 py-3">
+                <i class="fas fa-rocket"></i> Start Free — No API Key Needed
+            </a>
+            <a href="http://203.55.176.101:8000/docs" target="_blank" class="btn btn-outline text-base px-8 py-3">
+                <i class="fas fa-book"></i> Read the Docs
+            </a>
+        </div>
 
-<div class="card mt-8">
-    <h3 class="text-white font-semibold mb-3">Quick Start (Python)</h3>
-    <pre class="bg-gray-900 rounded-lg p-4 overflow-x-auto text-sm"><code class="text-green-400">import openai
+        <!-- Features Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-5 w-full mb-16">
+            <div class="feat-card text-left">
+                <div class="w-11 h-11 rounded-xl bg-indigo-600/20 flex items-center justify-center mb-4">
+                    <i class="fas fa-key text-indigo-400 text-lg"></i>
+                </div>
+                <h3 class="text-white font-semibold mb-2">API Key Management</h3>
+                <p class="text-gray-400 text-sm leading-relaxed">Generate scoped keys with per-key rate limiting. Revoke instantly. Full usage analytics per key.</p>
+            </div>
+            <div class="feat-card text-left">
+                <div class="w-11 h-11 rounded-xl bg-purple-600/20 flex items-center justify-center mb-4">
+                    <i class="fas fa-cube text-purple-400 text-lg"></i>
+                </div>
+                <h3 class="text-white font-semibold mb-2">Multiple LLM Models</h3>
+                <p class="text-gray-400 text-sm leading-relaxed">Run Llama 3.2, Qwen 2.5, Phi-3, Mistral and dozens more. Switch models instantly. Pull from Ollama or Hugging Face.</p>
+            </div>
+            <div class="feat-card text-left">
+                <div class="w-11 h-11 rounded-xl bg-cyan-600/20 flex items-center justify-center mb-4">
+                    <i class="fas fa-shield-halved text-cyan-400 text-lg"></i>
+                </div>
+                <h3 class="text-white font-semibold mb-2">Content Firewall</h3>
+                <p class="text-gray-400 text-sm leading-relaxed">5 protection modes. Regex-based rules. PII detection. Block topics. Audit every request with full logging.</p>
+            </div>
+            <div class="feat-card text-left">
+                <div class="w-11 h-11 rounded-xl bg-emerald-600/20 flex items-center justify-center mb-4">
+                    <i class="fas fa-wand-magic-sparkles text-emerald-400 text-lg"></i>
+                </div>
+                <h3 class="text-white font-semibold mb-2">Skills & Custom Models</h3>
+                <p class="text-gray-400 text-sm leading-relaxed">Build domain-specific assistants with system prompts, knowledge injection, and topic restrictions. 12 built-in templates.</p>
+            </div>
+            <div class="feat-card text-left">
+                <div class="w-11 h-11 rounded-xl bg-amber-600/20 flex items-center justify-center mb-4">
+                    <i class="fas fa-robot text-amber-400 text-lg"></i>
+                </div>
+                <h3 class="text-white font-semibold mb-2">AI Assistants</h3>
+                <p class="text-gray-400 text-sm leading-relaxed">Create, customize, and converse with intelligent assistants. Email, WhatsApp, Code, Web Research, Data Analysis, and more.</p>
+            </div>
+            <div class="feat-card text-left">
+                <div class="w-11 h-11 rounded-xl bg-pink-600/20 flex items-center justify-center mb-4">
+                    <i class="fas fa-terminal text-pink-400 text-lg"></i>
+                </div>
+                <h3 class="text-white font-semibold mb-2">Coding Agent</h3>
+                <p class="text-gray-400 text-sm leading-relaxed">Plan and build mode. Read/write files, run commands, search code. Supports OpenAI, Anthropic, NVIDIA, Groq, DeepSeek and more.</p>
+            </div>
+        </div>
 
-openai.api_key = "sk-local-your-api-key"
-openai.api_base = "http://203.55.176.101:8000/v1"
+        <!-- Quick Start Code -->
+        <div class="w-full max-w-2xl mb-12">
+            <h3 class="text-white font-semibold mb-4 text-center">Works with the OpenAI SDK you already know</h3>
+            <div class="code-block">
+<span class="code-kw">import</span> openai
 
-response = openai.ChatCompletion.create(
-    model="llama3.2:1b",
-    messages=[
-        {"role": "system", "content": "You are helpful."},
-        {"role": "user", "content": "Hello!"}
-    ]
+openai.api_key = <span class="code-str">"sk-local-your-key"</span>
+openai.api_base = <span class="code-str">"http://YOUR-SERVER:8000/v1"</span>
+
+response = openai.ChatCompletion.<span class="code-fn">create</span>(
+    model=<span class="code-str">"llama3.2:1b"</span>,
+    messages=[{<span class="code-str">"role"</span>: <span class="code-str">"user"</span>, <span class="code-str">"content"</span>: <span class="code-str">"Hello!"</span>}]
 )
-print(response.choices[0].message.content)</code></pre>
-</div>
+<span class="code-cmt"># Switch models instantly, your data never leaves your server</span>
+print(response.choices[0].message.content)
+            </div>
+        </div>
+
+        <!-- CTA -->
+        <div class="glass p-8 w-full max-w-lg text-center mb-12">
+            <h3 class="text-xl font-bold text-white mb-2">Ready to take control?</h3>
+            <p class="text-gray-400 text-sm mb-5">Create your account in 30 seconds. No credit card. No cloud dependency.</p>
+            <a href="/register" class="btn btn-primary w-full justify-center text-base py-3">
+                <i class="fas fa-user-plus"></i> Create Free Account
+            </a>
+            <p class="text-xs text-gray-500 mt-3">Already have an account? <a href="/login" class="text-indigo-400 hover:text-indigo-300">Sign in</a></p>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="relative z-10 py-6 text-center text-xs text-gray-600">
+        OpenLocalAI &copy; 2024 &mdash; Self-hosted AI API Server &bull; Port 8000 (API) &bull; Port 5000 (Web)
+    </footer>
+</section>
 {% endblock %}

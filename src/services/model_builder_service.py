@@ -838,5 +838,30 @@ STRICT RULES - YOU MUST FOLLOW THESE:
             model.usage_count += 1
             db.commit()
 
+    def clone_model(self, db: Session, original: CustomModel, user_id: str, new_name: str) -> CustomModel:
+        cloned = CustomModel(
+            user_id=user_id,
+            name=new_name,
+            description=f"Cloned from {original.name}",
+            domain=original.domain,
+            base_model=original.base_model,
+            system_prompt=original.system_prompt,
+            knowledge_text=original.knowledge_text,
+            knowledge_chunks=original.knowledge_chunks,
+            restricted_topics=original.restricted_topics,
+            blocked_topics=original.blocked_topics,
+            temperature=original.temperature,
+            max_tokens=original.max_tokens,
+            is_public=False,
+            status="ready",
+            training_progress=100,
+            total_chars=original.total_chars,
+            chunk_count=original.chunk_count
+        )
+        db.add(cloned)
+        db.commit()
+        db.refresh(cloned)
+        return cloned
+
 
 model_builder_service = ModelBuilderService()

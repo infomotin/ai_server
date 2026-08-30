@@ -10,7 +10,7 @@ app:
     - "*"
 
 database:
-  url: "sqlite:///./openlocalai.db"
+  url: "mysql+pymysql://aiserver:aiserver@localhost:3306/aiserver?charset=utf8mb4"
   echo: false
 
 inference:

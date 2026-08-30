@@ -1,5 +1,6 @@
-from typing import List
+from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from src.models.engine import get_db_session
@@ -9,6 +10,11 @@ from src.middleware.auth_middleware import get_current_user
 from src.models.database import User
 
 router = APIRouter(prefix="/skills", tags=["Skills"])
+
+
+class SkillTestRequest(BaseModel):
+    test_input: str
+    model: Optional[str] = "llama3.2:1b"
 
 
 @router.post("", response_model=SkillResponse, status_code=201)
@@ -72,3 +78,55 @@ async def delete_skill(
     if not success:
         raise HTTPException(status_code=404, detail="Skill not found")
     return None
+
+
+@router.post("/{skill_id}/test")
+async def test_skill(
+    skill_id: str,
+    data: SkillTestRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db_session)
+):
+    skill = skill_service.get_skill(db, skill_id, current_user.id)
+    if not skill:
+        raise HTTPException(status_code=404, detail="Skill not found")
+
+    import requests as http_requests
+    import time
+
+    system_prompt = skill.system_prompt or "You are a helpful assistant."
+    user_message = data.test_input
+
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_message}
+    ]
+
+    model = data.model or "llama3.2:1b"
+    start = time.time()
+
+    try:
+        resp = http_requests.post(
+            "http://localhost:11434/api/chat",
+            json={"model": model, "messages": messages, "stream": False},
+            timeout=60
+        )
+        elapsed_ms = round((time.time() - start) * 1000)
+
+        if resp.status_code == 200:
+            result = resp.json()
+            reply = result.get("message", {}).get("content", "No response")
+            tokens = result.get("eval_count", 0)
+            return {
+                "success": True,
+                "response": reply,
+                "model": model,
+                "tokens": tokens,
+                "latency_ms": elapsed_ms,
+                "skill_name": skill.name,
+                "system_prompt": system_prompt
+            }
+        else:
+            return {"success": False, "error": f"Ollama error: {resp.status_code}", "latency_ms": elapsed_ms}
+    except Exception as e:
+        return {"success": False, "error": str(e)[:200], "latency_ms": round((time.time() - start) * 1000)}

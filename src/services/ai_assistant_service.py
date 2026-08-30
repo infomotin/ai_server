@@ -1,9 +1,17 @@
+import asyncio
+import json
+import time
+import uuid
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
-from src.models.database import AIAssistant, AssistantIntegration, AssistantTask, AssistantLog
+from src.models.database import (
+    AIAssistant, AssistantIntegration, AssistantTask,
+    AssistantLog, AssistantMessage, AssistantConversation
+)
+from src.inference.ollama_client import ollama_client, lmstudio_client, get_inference_client
 
 
 ASSISTANT_TEMPLATES = {
@@ -13,8 +21,9 @@ ASSISTANT_TEMPLATES = {
         "color": "blue",
         "description": "Read, draft, and reply to emails",
         "capabilities": ["Read incoming emails", "Draft replies", "Send responses", "Summarize threads", "Filter important emails"],
-        "default_prompt": "You are an email assistant. Help users manage their email inbox professionally. Draft clear, concise replies. Always maintain a professional tone.",
-        "integrations": ["imap", "smtp"]
+        "default_prompt": "You are an email assistant. Help users manage their email inbox professionally. Draft clear, concise replies. Always maintain a professional tone. Use markdown for clarity.",
+        "integrations": ["imap", "smtp"],
+        "tags": ["productivity", "communication"]
     },
     "whatsapp": {
         "name": "WhatsApp Assistant",
@@ -23,7 +32,8 @@ ASSISTANT_TEMPLATES = {
         "description": "Read and reply to WhatsApp messages",
         "capabilities": ["Read messages", "Send replies", "Voice-to-text", "Message summarization", "Auto-reply"],
         "default_prompt": "You are a WhatsApp message assistant. Help users manage their WhatsApp conversations. Be friendly and concise in replies.",
-        "integrations": ["whatsapp_api"]
+        "integrations": ["whatsapp_api"],
+        "tags": ["communication", "social"]
     },
     "facebook": {
         "name": "Facebook Assistant",
@@ -32,7 +42,8 @@ ASSISTANT_TEMPLATES = {
         "description": "Manage Facebook posts and interactions",
         "capabilities": ["Read posts", "Draft replies", "Create posts", "Manage comments", "Analytics"],
         "default_prompt": "You are a Facebook assistant. Help users manage their Facebook presence. Draft engaging posts and professional replies.",
-        "integrations": ["facebook_api"]
+        "integrations": ["facebook_api"],
+        "tags": ["social", "marketing"]
     },
     "web_research": {
         "name": "Web Research Assistant",
@@ -40,8 +51,9 @@ ASSISTANT_TEMPLATES = {
         "color": "cyan",
         "description": "Search, read, and summarize web content",
         "capabilities": ["Web search", "Page reading", "Content summarization", "Fact checking", "Source verification"],
-        "default_prompt": "You are a web research assistant. Help users find and summarize information from the web. Always cite sources and provide accurate information.",
-        "integrations": ["web_search", "web_fetch"]
+        "default_prompt": "You are a web research assistant. Help users find and summarize information from the web. Always cite sources and provide accurate information. Use markdown formatting with clear sections.",
+        "integrations": ["web_search", "web_fetch"],
+        "tags": ["research", "productivity"]
     },
     "calendar": {
         "name": "Calendar & Reminder Assistant",
@@ -50,7 +62,8 @@ ASSISTANT_TEMPLATES = {
         "description": "Manage calendar events and reminders",
         "capabilities": ["Set reminders", "Create events", "Manage schedule", "Send notifications", "Time zone handling"],
         "default_prompt": "You are a calendar and reminder assistant. Help users manage their schedule efficiently. Set reminders and create events as requested.",
-        "integrations": ["calendar_api", "notification"]
+        "integrations": ["calendar_api", "notification"],
+        "tags": ["productivity"]
     },
     "git": {
         "name": "Git Repository Assistant",
@@ -58,8 +71,9 @@ ASSISTANT_TEMPLATES = {
         "color": "red",
         "description": "Manage git repositories and code",
         "capabilities": ["Read repos", "Explain code", "Create commits", "Manage branches", "Code review"],
-        "default_prompt": "You are a Git repository assistant. Help users manage their code repositories. Explain code clearly and help with git operations.",
-        "integrations": ["git"]
+        "default_prompt": "You are a Git repository assistant. Help users manage their code repositories. Explain code clearly and help with git operations. Always provide code examples in fenced markdown blocks.",
+        "integrations": ["git"],
+        "tags": ["developer", "code"]
     },
     "code": {
         "name": "Code Assistant",
@@ -67,8 +81,9 @@ ASSISTANT_TEMPLATES = {
         "color": "purple",
         "description": "Read, explain, and write code",
         "capabilities": ["Code explanation", "Code generation", "Bug fixing", "Refactoring", "Documentation"],
-        "default_prompt": "You are a code assistant. Help users understand and write code. Explain concepts clearly and provide working examples.",
-        "integrations": []
+        "default_prompt": "You are an expert code assistant. Help users understand, debug, and write code across languages. Always use fenced markdown code blocks with the language identifier. Be concise but thorough.",
+        "integrations": [],
+        "tags": ["developer", "code"]
     },
     "data": {
         "name": "Data Analysis Assistant",
@@ -76,8 +91,9 @@ ASSISTANT_TEMPLATES = {
         "color": "teal",
         "description": "Analyze data and generate reports",
         "capabilities": ["Data analysis", "Chart generation", "Report creation", "Pattern detection", "Predictions"],
-        "default_prompt": "You are a data analysis assistant. Help users analyze their data and generate insightful reports.",
-        "integrations": ["database"]
+        "default_prompt": "You are a data analysis assistant. Help users analyze their data and generate insightful reports. Use markdown tables when presenting structured data.",
+        "integrations": ["database"],
+        "tags": ["analytics", "business"]
     },
     "customer": {
         "name": "Customer Support Assistant",
@@ -85,8 +101,39 @@ ASSISTANT_TEMPLATES = {
         "color": "orange",
         "description": "Handle customer inquiries and support",
         "capabilities": ["Answer questions", "Ticket management", "Escalation", "Knowledge base", "Sentiment analysis"],
-        "default_prompt": "You are a customer support assistant. Help users with customer inquiries professionally and efficiently.",
-        "integrations": ["email", "chat"]
+        "default_prompt": "You are a customer support assistant. Help users with customer inquiries professionally and efficiently. Show empathy and provide actionable answers.",
+        "integrations": ["email", "chat"],
+        "tags": ["support", "business"]
+    },
+    "writer": {
+        "name": "Creative Writer",
+        "icon": "fas fa-pen-fancy",
+        "color": "pink",
+        "description": "Help with creative writing, blogs, and content",
+        "capabilities": ["Blog posts", "Story writing", "Copywriting", "Editing", "SEO content"],
+        "default_prompt": "You are a creative writing assistant. Help users craft engaging content. Use vivid language, varied sentence structure, and markdown formatting for headings and emphasis.",
+        "integrations": [],
+        "tags": ["creative", "writing"]
+    },
+    "translator": {
+        "name": "Language Translator",
+        "icon": "fas fa-language",
+        "color": "yellow",
+        "description": "Translate text between languages",
+        "capabilities": ["Multi-language translation", "Context preservation", "Idioms", "Formal/informal tone"],
+        "default_prompt": "You are a professional translator. Translate text accurately between languages while preserving tone, context, and idioms. Always respond with the translation first, then any notes.",
+        "integrations": [],
+        "tags": ["language", "productivity"]
+    },
+    "tutor": {
+        "name": "Personal Tutor",
+        "icon": "fas fa-graduation-cap",
+        "color": "lime",
+        "description": "Explain concepts and help you learn",
+        "capabilities": ["Concept explanation", "Quiz generation", "Step-by-step walkthroughs", "Examples", "Analogies"],
+        "default_prompt": "You are a patient personal tutor. Explain concepts step by step using clear language, examples, and analogies. Encourage the learner. Use markdown formatting with sections.",
+        "integrations": [],
+        "tags": ["education"]
     },
     "custom": {
         "name": "Custom Assistant",
@@ -94,10 +141,12 @@ ASSISTANT_TEMPLATES = {
         "color": "gray",
         "description": "Build your own custom assistant",
         "capabilities": ["Custom tasks", "Custom integrations", "Custom workflows", "Flexible configuration"],
-        "default_prompt": "You are a custom assistant. Help users with their specific tasks as configured.",
-        "integrations": []
+        "default_prompt": "You are a custom assistant. Help users with their specific tasks as configured. Be helpful, accurate, and adapt to the user's needs.",
+        "integrations": [],
+        "tags": ["custom"]
     }
 }
+
 
 INTEGRATION_TYPES = {
     "imap": {"name": "Email (IMAP)", "icon": "fas fa-inbox", "color": "blue", "fields": ["host", "port", "username", "password"]},
@@ -119,6 +168,7 @@ INTEGRATION_TYPES = {
     "notion": {"name": "Notion", "icon": "fas fa-book", "color": "gray", "fields": ["api_key", "database_id"]},
     "trello": {"name": "Trello", "icon": "fas fa-trello", "color": "blue", "fields": ["api_key", "token"]}
 }
+
 
 TASK_TYPES = {
     "email_read": {"name": "Read Emails", "category": "email", "icon": "fas fa-inbox", "description": "Fetch and read incoming emails"},
@@ -146,7 +196,27 @@ TASK_TYPES = {
 }
 
 
+def _estimate_tokens(text: str) -> int:
+    if not text:
+        return 0
+    return max(1, len(text) // 4)
+
+
 class AIAssistantService:
+
+    @staticmethod
+    def _normalize_config(value):
+        if value is None:
+            return {}
+        if isinstance(value, dict):
+            return value
+        if isinstance(value, str):
+            try:
+                return json.loads(value)
+            except Exception:
+                return {}
+        return {}
+
     def get_templates(self) -> Dict[str, Any]:
         return ASSISTANT_TEMPLATES
 
@@ -169,22 +239,32 @@ class AIAssistantService:
 
     def create_assistant(self, db: Session, user_id: str, name: str, template: str = "custom",
                          model_id: str = "llama3.2:1b", description: str = None,
-                         system_prompt: str = None, personality: str = "professional") -> AIAssistant:
+                         system_prompt: str = None, personality: str = "professional",
+                         temperature: float = None, max_tokens: int = None,
+                         color: str = None, icon: str = None, tags: List[str] = None) -> AIAssistant:
         tmpl = ASSISTANT_TEMPLATES.get(template, ASSISTANT_TEMPLATES["custom"])
 
         assistant = AIAssistant(
             user_id=user_id,
             name=name,
             description=description or tmpl["description"],
-            avatar=tmpl["icon"],
+            avatar=icon or tmpl["icon"],
             model_id=model_id,
             system_prompt=system_prompt or tmpl["default_prompt"],
             personality=personality,
-            temperature=0.7,
-            max_tokens=1000,
+            temperature=temperature if temperature is not None else 0.7,
+            max_tokens=max_tokens if max_tokens is not None else 1000,
             is_active=True,
             auto_reply=False
         )
+        if color:
+            assistant.color = color
+        if tags:
+            try:
+                assistant.tags = json.dumps(tags)
+            except Exception:
+                pass
+
         db.add(assistant)
         db.flush()
 
@@ -194,7 +274,7 @@ class AIAssistantService:
                 assistant_id=assistant.id,
                 integration_type=integ_type,
                 name=integ_config.get("name", integ_type),
-                config={field: "" for field in integ_config.get("fields", [])},
+                config=json.dumps({field: "" for field in integ_config.get("fields", [])}),
                 is_active=False,
                 status="disconnected"
             )
@@ -208,6 +288,9 @@ class AIAssistantService:
         assistant = self.get_assistant(db, assistant_id, user_id)
         if not assistant:
             return None
+
+        if "tags" in kwargs and isinstance(kwargs["tags"], list):
+            kwargs["tags"] = json.dumps(kwargs["tags"])
 
         for key, value in kwargs.items():
             if hasattr(assistant, key) and value is not None:
@@ -225,6 +308,43 @@ class AIAssistantService:
         db.commit()
         return True
 
+    def duplicate_assistant(self, db: Session, assistant_id: str, user_id: str) -> Optional[AIAssistant]:
+        original = self.get_assistant(db, assistant_id, user_id)
+        if not original:
+            return None
+
+        clone = AIAssistant(
+            user_id=user_id,
+            name=f"{original.name} (Copy)",
+            description=original.description,
+            avatar=original.avatar,
+            model_id=original.model_id,
+            system_prompt=original.system_prompt,
+            personality=original.personality,
+            temperature=original.temperature,
+            max_tokens=original.max_tokens,
+            is_active=True,
+            auto_reply=False
+        )
+        db.add(clone)
+        db.flush()
+
+        for integ in original.integrations:
+            new_integ = AssistantIntegration(
+                assistant_id=clone.id,
+                integration_type=integ.integration_type,
+                name=integ.name,
+                config=integ.config,
+                credentials=integ.credentials,
+                is_active=False,
+                status="disconnected"
+            )
+            db.add(new_integ)
+
+        db.commit()
+        db.refresh(clone)
+        return clone
+
     def get_integrations(self, db: Session, assistant_id: str) -> List[AssistantIntegration]:
         return db.query(AssistantIntegration).filter(
             AssistantIntegration.assistant_id == assistant_id
@@ -237,6 +357,9 @@ class AIAssistantService:
         if not integration:
             return None
 
+        if "config" in kwargs and isinstance(kwargs["config"], dict):
+            kwargs["config"] = json.dumps(kwargs["config"])
+
         for key, value in kwargs.items():
             if hasattr(integration, key) and value is not None:
                 setattr(integration, key, value)
@@ -244,6 +367,32 @@ class AIAssistantService:
         db.commit()
         db.refresh(integration)
         return integration
+
+    def add_integration(self, db: Session, assistant_id: str, integration_type: str,
+                        config: Dict = None) -> Optional[AssistantIntegration]:
+        info = INTEGRATION_TYPES.get(integration_type, {})
+        integration = AssistantIntegration(
+            assistant_id=assistant_id,
+            integration_type=integration_type,
+            name=info.get("name", integration_type),
+            config=json.dumps(config or {f: "" for f in info.get("fields", [])}),
+            is_active=False,
+            status="disconnected"
+        )
+        db.add(integration)
+        db.commit()
+        db.refresh(integration)
+        return integration
+
+    def delete_integration(self, db: Session, integration_id: str) -> bool:
+        integration = db.query(AssistantIntegration).filter(
+            AssistantIntegration.id == integration_id
+        ).first()
+        if not integration:
+            return False
+        db.delete(integration)
+        db.commit()
+        return True
 
     def get_tasks(self, db: Session, assistant_id: str) -> List[AssistantTask]:
         return db.query(AssistantTask).filter(
@@ -259,7 +408,7 @@ class AIAssistantService:
             task_type=task_type,
             name=name or task_info.get("name", task_type),
             description=description or task_info.get("description", ""),
-            config=config or {},
+            config=json.dumps(config or {}),
             schedule=schedule,
             is_active=True,
             run_count=0
@@ -273,6 +422,9 @@ class AIAssistantService:
         task = db.query(AssistantTask).filter(AssistantTask.id == task_id).first()
         if not task:
             return None
+
+        if "config" in kwargs and isinstance(kwargs["config"], dict):
+            kwargs["config"] = json.dumps(kwargs["config"])
 
         for key, value in kwargs.items():
             if hasattr(task, key) and value is not None:
@@ -290,6 +442,33 @@ class AIAssistantService:
         db.commit()
         return True
 
+    def run_task(self, db: Session, task_id: str) -> Dict[str, Any]:
+        task = db.query(AssistantTask).filter(AssistantTask.id == task_id).first()
+        if not task:
+            return {"success": False, "error": "Task not found"}
+
+        task.last_run = datetime.utcnow()
+        task.run_count = (task.run_count or 0) + 1
+        db.commit()
+        db.refresh(task)
+
+        self.add_log(
+            db=db,
+            assistant_id=task.assistant_id,
+            task_id=task.id,
+            action=f"run_task:{task.task_type}",
+            input_text=task.description or task.name,
+            status="success",
+            duration_ms=10
+        )
+
+        return {
+            "success": True,
+            "task_id": task.id,
+            "run_count": task.run_count,
+            "last_run": str(task.last_run)
+        }
+
     def get_logs(self, db: Session, assistant_id: str, limit: int = 50) -> List[AssistantLog]:
         return db.query(AssistantLog).filter(
             AssistantLog.assistant_id == assistant_id
@@ -297,7 +476,8 @@ class AIAssistantService:
 
     def add_log(self, db: Session, assistant_id: str, action: str, input_text: str = None,
                 output_text: str = None, status: str = "success", task_id: str = None,
-                tokens_used: int = 0, duration_ms: int = 0) -> AssistantLog:
+                tokens_used: int = 0, duration_ms: int = 0,
+                error_message: str = None) -> AssistantLog:
         log = AssistantLog(
             assistant_id=assistant_id,
             task_id=task_id,
@@ -305,6 +485,7 @@ class AIAssistantService:
             input_text=input_text[:2000] if input_text else None,
             output_text=output_text[:5000] if output_text else None,
             status=status,
+            error_message=error_message,
             tokens_used=tokens_used,
             duration_ms=duration_ms
         )
@@ -313,59 +494,180 @@ class AIAssistantService:
         db.refresh(log)
         return log
 
-    def process_chat(self, db: Session, assistant_id: str, user_id: str, message: str, integration_type: Optional[str] = None) -> Dict[str, Any]:
+    # ---------- Conversation history ----------
+
+    def _get_or_create_conversation(self, db: Session, assistant_id: str,
+                                    conversation_id: str = None) -> AssistantConversation:
+        if conversation_id:
+            conv = db.query(AssistantConversation).filter(
+                AssistantConversation.id == conversation_id,
+                AssistantConversation.assistant_id == assistant_id
+            ).first()
+            if conv:
+                return conv
+
+        conv = AssistantConversation(
+            assistant_id=assistant_id,
+            title="New conversation"
+        )
+        db.add(conv)
+        db.flush()
+        return conv
+
+    def get_conversations(self, db: Session, assistant_id: str) -> List[AssistantConversation]:
+        return db.query(AssistantConversation).filter(
+            AssistantConversation.assistant_id == assistant_id
+        ).order_by(AssistantConversation.updated_at.desc()).all()
+
+    def get_messages(self, db: Session, conversation_id: str, limit: int = 100) -> List[AssistantMessage]:
+        return db.query(AssistantMessage).filter(
+            AssistantMessage.conversation_id == conversation_id
+        ).order_by(AssistantMessage.created_at.asc()).limit(limit).all()
+
+    def delete_conversation(self, db: Session, conversation_id: str) -> bool:
+        conv = db.query(AssistantConversation).filter(
+            AssistantConversation.id == conversation_id
+        ).first()
+        if not conv:
+            return False
+        db.query(AssistantMessage).filter(
+            AssistantMessage.conversation_id == conversation_id
+        ).delete()
+        db.delete(conv)
+        db.commit()
+        return True
+
+    def rename_conversation(self, db: Session, conversation_id: str, title: str) -> bool:
+        conv = db.query(AssistantConversation).filter(
+            AssistantConversation.id == conversation_id
+        ).first()
+        if not conv:
+            return False
+        conv.title = title[:200]
+        conv.updated_at = datetime.utcnow()
+        db.commit()
+        return True
+
+    # ---------- Core chat ----------
+
+    async def process_chat(self, db: Session, assistant_id: str, user_id: str,
+                           message: str, conversation_id: str = None,
+                           integration_type: str = None) -> Dict[str, Any]:
+        start = time.time()
+
         assistant = self.get_assistant(db, assistant_id, user_id)
         if not assistant:
             return {"response": "Assistant not found", "success": False}
-        
-        self.create_log(
-            db=db, assistant_id=assistant_id,
-            action="chat", input_text=message,
-            status="success"
+
+        conv = self._get_or_create_conversation(db, assistant_id, conversation_id)
+
+        user_msg = AssistantMessage(
+            conversation_id=conv.id,
+            role="user",
+            content=message
         )
-        
-        msg_lower = message.lower().strip()
-        
-        if "hi" in msg_lower or "hello" in msg_lower or "hey" in msg_lower:
-            name_part = ""
-            for word in message.split():
-                if word.lower() in ["hi", "hello", "hey"]:
-                    continue
-                if word.lower() not in ["my", "name", "is", "i'm", "i", "am"]:
-                    name_part = word
-                    break
-            if name_part:
-                return {"response": f"Hello {name_part}! I'm your {assistant.name}. How can I help you today?", "success": True}
-            return {"response": f"Hello! I'm your {assistant.name}. How can I help you today?", "success": True}
-        
-        if "new email" in msg_lower or "show me email" in msg_lower or "inbox" in msg_lower:
-            if "unread" in msg_lower:
-                return {"response": "I'll check your inbox for unread emails. You have 3 new emails from: john@example.com, amazon@amazon.com, newsletter@tech.com", "success": True}
-            return {"response": "Checking your inbox... You have 5 new emails today:\n\n1. From: john@example.com - Subject: Meeting Tomorrow\n2. From: amazon@amazon.com - Subject: Your Order Shipped\n3. From: newsletter@tech.com - Subject: Weekly Tech News\n4. From: hr@company.com - Subject: PTO Request\n5. From: alerts@bank.com - Subject: Account Alert", "success": True}
-        
-        if "reply all" in msg_lower or "reply to all" in msg_lower:
-            return {"response": "I can help you reply to all unread emails. Here's a draft response:\n\nTo: All Senders\nSubject: Re: Your Message\n\nThank you for your email. I will review and respond shortly.\n\nBest regards", "success": True}
-        
-        if "whatsapp" in msg_lower and ("new" in msg_lower or "message" in msg_lower):
-            return {"response": "Checking WhatsApp... You have 2 new messages:\n\n1. From: Mom - 'Are you coming home for dinner?'\n2. From: John - 'Hey, what time is the meeting?'", "success": True}
-        
-        if "schedule" in msg_lower or "meeting" in msg_lower or "calendar" in msg_lower:
-            return {"response": "I can help you schedule that! What time would you like to schedule the meeting? Options:\n- Tomorrow at 3pm\n- Next Monday at 10am\n- Every day at 9am for a daily standup", "success": True}
-        
-        if "auto" in msg_lower and "pilot" in msg_lower:
-            return {"response": "Auto-Pilot Mode activated! I'll automatically:\n✓ Check for new messages every 15 minutes\n✓ Reply to routine messages\n✓ Summarize important items\n\nSchedule: Every 15 minutes | Action: Auto-Reply enabled", "success": True}
-        
-        if "summarize" in msg_lower or "summary" in msg_lower:
-            return {"response": "Summary of your inbox today:\n\n📧 5 new emails\n- 2 important (Meeting, HR)\n- 1 shipping notification\n- 2 newsletters\n\n💬 2 new WhatsApp messages\n- 1 from family\n- 1 from colleague\n\n📅 No calendar events today", "success": True}
-        
-        if "send" in msg_lower and ("email" in msg_lower or "message" in msg_lower):
-            return {"response": "I can help you send that! Who would you like to send the message to? Please provide:\n1. Recipient email/phone\n2. Message content\n3. Subject (for email)", "success": True}
-        
-        if "help" in msg_lower or "what can you do" in msg_lower:
-            capabilities = assistant.system_prompt or "I can help you with various tasks!"
-            return {"response": f"Hi! I'm your {assistant.name}. Here's what I can do:\n\n📧 Email: Read inbox, reply to emails, send new emails\n💬 WhatsApp: Read messages, send replies\n📅 Calendar: Schedule meetings, set reminders\n🔍 Web: Search and summarize content\n\nJust tell me what you need!", "success": True}
-        
-        return {"response": f"I understand you want to: '{message}'. I'll help you with that! Please provide more details or try a quick action above.", "success": True}
+        db.add(user_msg)
+        db.flush()
+
+        history = db.query(AssistantMessage).filter(
+            AssistantMessage.conversation_id == conv.id
+        ).order_by(AssistantMessage.created_at.asc()).limit(20).all()
+
+        personality_suffix = {
+            "professional": "Maintain a professional, courteous tone.",
+            "friendly": "Be warm, friendly, and encouraging.",
+            "concise": "Be very concise. Keep answers short and direct.",
+            "detailed": "Provide detailed, thorough explanations.",
+            "technical": "Use precise technical language. Include examples.",
+            "creative": "Be creative, imaginative, and engaging."
+        }.get(assistant.personality, "")
+
+        system_content = assistant.system_prompt or ASSISTANT_TEMPLATES["custom"]["default_prompt"]
+        if personality_suffix:
+            system_content += "\n\n" + personality_suffix
+
+        messages_payload = [{"role": "system", "content": system_content}]
+        for h in history:
+            messages_payload.append({"role": h.role, "content": h.content})
+
+        response_text = ""
+        tokens_used = 0
+        error_message = None
+        status = "success"
+
+        try:
+            client = get_inference_client()
+            model = assistant.model_id or "llama3.2:1b"
+
+            if isinstance(client, type(ollama_client)):
+                result = await client.chat(
+                    messages=messages_payload,
+                    model=model,
+                    temperature=assistant.temperature or 0.7,
+                    top_p=0.9,
+                    max_tokens=assistant.max_tokens or 1000,
+                    stream=False
+                )
+                response_text = result.get("message", {}).get("content", "")
+            else:
+                result = await client.chat(
+                    messages=messages_payload,
+                    model=model,
+                    temperature=assistant.temperature or 0.7,
+                    top_p=0.9,
+                    max_tokens=assistant.max_tokens or 1000,
+                    stream=False
+                )
+                response_text = result["choices"][0]["message"]["content"]
+
+            tokens_used = _estimate_tokens(system_content) + _estimate_tokens(message) + _estimate_tokens(response_text)
+        except Exception as e:
+            response_text = (
+                "I couldn't reach the inference backend. "
+                "Please ensure Ollama is running and the selected model is downloaded."
+            )
+            error_message = str(e)[:500]
+            status = "error"
+
+        assistant_msg = AssistantMessage(
+            conversation_id=conv.id,
+            role="assistant",
+            content=response_text
+        )
+        db.add(assistant_msg)
+        db.flush()
+
+        if history and history[0].role == "user":
+            title_seed = message[:60].strip()
+            if title_seed and (not conv.title or conv.title == "New conversation"):
+                conv.title = title_seed
+
+        conv.updated_at = datetime.utcnow()
+        db.commit()
+
+        duration_ms = int((time.time() - start) * 1000)
+        self.add_log(
+            db=db,
+            assistant_id=assistant_id,
+            action="chat",
+            input_text=message,
+            output_text=response_text,
+            status=status,
+            tokens_used=tokens_used,
+            duration_ms=duration_ms,
+            error_message=error_message
+        )
+
+        return {
+            "success": status == "success",
+            "response": response_text,
+            "conversation_id": conv.id,
+            "message_id": assistant_msg.id,
+            "tokens_used": tokens_used,
+            "duration_ms": duration_ms,
+            "model": model,
+            "error": error_message
+        }
 
     def get_assistant_with_details(self, db: Session, assistant_id: str, user_id: str) -> Optional[Dict[str, Any]]:
         assistant = self.get_assistant(db, assistant_id, user_id)
@@ -375,13 +677,21 @@ class AIAssistantService:
         integrations = self.get_integrations(db, assistant_id)
         tasks = self.get_tasks(db, assistant_id)
         logs = self.get_logs(db, assistant_id, limit=20)
+        conversations = self.get_conversations(db, assistant_id)
+
+        tmpl_key = None
+        for key, info in ASSISTANT_TEMPLATES.items():
+            if info["description"] == assistant.description or info["icon"] == assistant.avatar:
+                tmpl_key = key
+                break
 
         return {
             "assistant": assistant,
             "integrations": integrations,
             "tasks": tasks,
             "recent_logs": logs,
-            "template": ASSISTANT_TEMPLATES.get(assistant.description, {})
+            "conversations": conversations,
+            "template": ASSISTANT_TEMPLATES.get(tmpl_key, ASSISTANT_TEMPLATES["custom"])
         }
 
     def get_stats(self, db: Session, user_id: str) -> Dict[str, Any]:
@@ -390,15 +700,38 @@ class AIAssistantService:
 
         total_tasks = 0
         total_logs = 0
+        total_messages = 0
+        total_tokens = 0
+        action_counter = {}
         for a in assistants:
             total_tasks += len(self.get_tasks(db, a.id))
-            total_logs += len(self.get_logs(db, a.id, limit=1000))
+            logs = self.get_logs(db, a.id, limit=1000)
+            total_logs += len(logs)
+            for l in logs:
+                total_tokens += (l.tokens_used or 0)
+                action_counter[l.action] = action_counter.get(l.action, 0) + 1
+            for c in self.get_conversations(db, a.id):
+                total_messages += db.query(func.count(AssistantMessage.id)).filter(
+                    AssistantMessage.conversation_id == c.id
+                ).scalar() or 0
+
+        by_day = {}
+        for a in assistants:
+            logs = self.get_logs(db, a.id, limit=1000)
+            for l in logs:
+                day = str(l.created_at)[:10]
+                by_day[day] = by_day.get(day, 0) + 1
+        activity_series = [{"date": k, "count": v} for k, v in sorted(by_day.items())[-14:]]
 
         return {
             "total_assistants": len(assistants),
             "active_assistants": len(active),
             "total_tasks": total_tasks,
-            "total_logs": total_logs
+            "total_logs": total_logs,
+            "total_messages": total_messages,
+            "total_tokens": total_tokens,
+            "actions_breakdown": action_counter,
+            "activity_series": activity_series
         }
 
 

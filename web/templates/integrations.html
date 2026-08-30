@@ -1,663 +1,916 @@
 {% extends "base.html" %}
-
 {% block title %}Integrations - OpenLocalAI{% endblock %}
+{% block header_title %}Integrations Hub{% endblock %}
 
 {% block content %}
-<div class="p-6">
-  <div class="flex items-center justify-between mb-6">
-    <div>
-      <h1 class="text-2xl font-bold text-white">Integrations</h1>
-      <p class="text-gray-400 mt-1">Connect your accounts and manage messages across all platforms</p>
-    </div>
-    <button onclick="openConnectModal()" class="px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg text-white font-medium transition">
-      <i class="fas fa-plus mr-2"></i>Connect Account
-    </button>
-  </div>
+<style>
+.int-card{background:#1e293b;border:1px solid #334155;border-radius:14px;padding:20px;transition:all .3s;cursor:pointer}
+.int-card:hover{border-color:rgba(139,92,246,.4);box-shadow:0 8px 32px rgba(0,0,0,.3);transform:translateY(-2px)}
+.int-card.connected{border-color:rgba(16,185,129,.4)}
+.cat-pill{display:inline-flex;align-items:center;gap:5px;padding:4px 12px;border-radius:999px;font-size:11px;font-weight:600;cursor:pointer;transition:all .2s;border:1px solid transparent}
+.cat-pill:hover{background:rgba(139,92,246,.1)}
+.cat-pill.active{background:rgba(139,92,246,.15);border-color:rgba(139,92,246,.3);color:#c4b5fd}
+.tab-btn{padding:8px 16px;border-radius:8px;font-size:13px;font-weight:500;color:#94a3b8;cursor:pointer;transition:all .2s;border:none;background:transparent}
+.tab-btn:hover{color:#e2e8f0;background:rgba(51,65,85,.5)}
+.tab-btn.active{color:#fff;background:#6366f1}
+.qr-box{background:#fff;border-radius:12px;padding:16px;display:inline-block}
+.code-block{background:#0a0e1a;border:1px solid #1e293b;border-radius:8px;padding:12px;font-family:'JetBrains Mono',monospace;font-size:12px;color:#e2e8f0;overflow-x:auto;white-space:pre}
+.webhook-row{display:flex;align-items:center;gap:12px;padding:12px;background:rgba(15,23,42,.5);border:1px solid #334155;border-radius:10px;transition:all .2s}
+.webhook-row:hover{border-color:#6366f1}
+.status-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.status-dot.green{background:#10b981;box-shadow:0 0 8px rgba(16,185,129,.5)}
+.status-dot.red{background:#ef4444}
+.status-dot.gray{background:#6b7280}
+.fade-in{animation:fadeIn .3s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.camera-view{background:#000;border-radius:12px;overflow:hidden;position:relative;aspect-ratio:4/3;max-height:320px}
+.camera-view video{width:100%;height:100%;object-fit:cover}
+.camera-overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none}
+.scan-frame{width:200px;height:200px;border:2px solid rgba(99,102,241,.6);border-radius:12px;box-shadow:0 0 0 9999px rgba(0,0,0,.4)}
+.scan-line{position:absolute;width:100%;height:2px;background:linear-gradient(90deg,transparent,#6366f1,transparent);animation:scanMove 2s linear infinite}
+@keyframes scanMove{0%{top:0}100%{top:100%}}
+.result-box{background:rgba(15,23,42,.8);border:1px solid #334155;border-radius:10px;padding:16px}
+</style>
 
-  <!-- Connected Accounts -->
-  <div class="bg-gray-800 rounded-xl border border-gray-700 p-6 mb-6">
-    <h2 class="text-lg font-semibold text-white mb-4">Connected Accounts</h2>
-    <div id="connectedAccounts" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-      <div class="text-center py-8 text-gray-500">
-        <i class="fas fa-plug text-4xl mb-3"></i>
-        <p>No accounts connected yet</p>
-        <p class="text-sm mt-2">Click "Connect Account" to get started</p>
-      </div>
-    </div>
-  </div>
+<!-- Top Tabs -->
+<div class="flex items-center gap-2 mb-6 flex-wrap">
+    <button onclick="showTab('catalog')" class="tab-btn active" id="tabCatalog"><i class="fas fa-th-large mr-1"></i>Services</button>
+    <button onclick="showTab('connected')" class="tab-btn" id="tabConnected"><i class="fas fa-plug mr-1"></i>Connected</button>
+    <button onclick="showTab('scanner')" class="tab-btn" id="tabScanner"><i class="fas fa-camera mr-1"></i>QR / Barcode</button>
+    <button onclick="showTab('webhooks')" class="tab-btn" id="tabWebhooks"><i class="fas fa-plug mr-1"></i>Webhooks</button>
+    <button onclick="showTab('apitester')" class="tab-btn" id="tabApitester"><i class="fas fa-flask mr-1"></i>API Tester</button>
+    <button onclick="showTab('chat')" class="tab-btn" id="tabChat"><i class="fas fa-comments mr-1"></i>Chat</button>
+</div>
 
-  <!-- Platform Cards -->
-  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
-    <!-- Email -->
-    <div class="bg-gray-800 rounded-xl border border-gray-700 p-6 hover:border-purple-500 transition cursor-pointer" onclick="openPlatform('email')">
-      <div class="flex items-center mb-4">
-        <div class="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center mr-4">
-          <i class="fas fa-envelope text-xl text-white"></i>
-        </div>
-        <div>
-          <h3 class="text-lg font-semibold text-white">Email</h3>
-          <p class="text-gray-400 text-sm">IMAP / SMTP</p>
-        </div>
-      </div>
-      <p class="text-gray-400 text-sm mb-3">Read, compose, reply, and manage emails with AI assistance</p>
-      <div class="flex items-center text-sm">
-        <span class="px-2 py-1 bg-blue-600/20 text-blue-400 rounded">Read</span>
-        <span class="px-2 py-1 bg-green-600/20 text-green-400 rounded ml-2">Send</span>
-        <span class="px-2 py-1 bg-purple-600/20 text-purple-400 rounded ml-2">Reply</span>
-      </div>
+<!-- ============= SERVICE CATALOG ============= -->
+<div id="panelCatalog" class="fade-in">
+    <!-- Category Filter -->
+    <div class="flex items-center gap-2 mb-5 flex-wrap">
+        <button onclick="filterCat('all')" class="cat-pill active" data-cat="all"><i class="fas fa-globe"></i> All</button>
+        <button onclick="filterCat('messaging')" class="cat-pill" data-cat="messaging"><i class="fas fa-comment"></i> Messaging</button>
+        <button onclick="filterCat('dev')" class="cat-pill" data-cat="dev"><i class="fas fa-code"></i> Dev Tools</button>
+        <button onclick="filterCat('productivity')" class="cat-pill" data-cat="productivity"><i class="fas fa-briefcase"></i> Productivity</button>
+        <button onclick="filterCat('payments')" class="cat-pill" data-cat="payments"><i class="fas fa-credit-card"></i> Payments</button>
+        <button onclick="filterCat('ai')" class="cat-pill" data-cat="ai"><i class="fas fa-brain"></i> AI</button>
+        <button onclick="filterCat('iot')" class="cat-pill" data-cat="iot"><i class="fas fa-microchip"></i> IoT</button>
+        <button onclick="filterCat('automation')" class="cat-pill" data-cat="automation"><i class="fas fa-bolt"></i> Automation</button>
+        <button onclick="filterCat('custom')" class="cat-pill" data-cat="custom"><i class="fas fa-plug"></i> Custom</button>
     </div>
-
-    <!-- Telegram -->
-    <div class="bg-gray-800 rounded-xl border border-gray-700 p-6 hover:border-blue-500 transition cursor-pointer" onclick="openPlatform('telegram')">
-      <div class="flex items-center mb-4">
-        <div class="w-12 h-12 bg-sky-500 rounded-xl flex items-center justify-center mr-4">
-          <i class="fab fa-telegram text-xl text-white"></i>
-        </div>
-        <div>
-          <h3 class="text-lg font-semibold text-white">Telegram</h3>
-          <p class="text-gray-400 text-sm">Bot API</p>
-        </div>
-      </div>
-      <p class="text-gray-400 text-sm mb-3">Read messages, send replies, and manage conversations</p>
-      <div class="flex items-center text-sm">
-        <span class="px-2 py-1 bg-blue-600/20 text-blue-400 rounded">Read</span>
-        <span class="px-2 py-1 bg-green-600/20 text-green-400 rounded ml-2">Send</span>
-        <span class="px-2 py-1 bg-purple-600/20 text-purple-400 rounded ml-2">Reply</span>
-      </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4" id="catalogGrid">
+        <p class="text-gray-500 text-sm col-span-full text-center py-8"><i class="fas fa-spinner fa-spin mr-1"></i>Loading services...</p>
     </div>
+</div>
 
-    <!-- Discord -->
-    <div class="bg-gray-800 rounded-xl border border-gray-700 p-6 hover:border-indigo-500 transition cursor-pointer" onclick="openPlatform('discord')">
-      <div class="flex items-center mb-4">
-        <div class="w-12 h-12 bg-indigo-600 rounded-xl flex items-center justify-center mr-4">
-          <i class="fab fa-discord text-xl text-white"></i>
-        </div>
-        <div>
-          <h3 class="text-lg font-semibold text-white">Discord</h3>
-          <p class="text-gray-400 text-sm">Bot API</p>
-        </div>
-      </div>
-      <p class="text-gray-400 text-sm mb-3">Read messages, send replies, and manage servers</p>
-      <div class="flex items-center text-sm">
-        <span class="px-2 py-1 bg-blue-600/20 text-blue-400 rounded">Read</span>
-        <span class="px-2 py-1 bg-green-600/20 text-green-400 rounded ml-2">Send</span>
-        <span class="px-2 py-1 bg-purple-600/20 text-purple-400 rounded ml-2">Reply</span>
-      </div>
-    </div>
-
-    <!-- WhatsApp -->
-    <div class="bg-gray-800 rounded-xl border border-gray-700 p-6 hover:border-green-500 transition cursor-pointer" onclick="openPlatform('whatsapp')">
-      <div class="flex items-center mb-4">
-        <div class="w-12 h-12 bg-green-600 rounded-xl flex items-center justify-center mr-4">
-          <i class="fab fa-whatsapp text-xl text-white"></i>
-        </div>
-        <div>
-          <h3 class="text-lg font-semibold text-white">WhatsApp</h3>
-          <p class="text-gray-400 text-sm">Business API</p>
-        </div>
-      </div>
-      <p class="text-gray-400 text-sm mb-3">Send messages, manage conversations with AI</p>
-      <div class="flex items-center text-sm">
-        <span class="px-2 py-1 bg-green-600/20 text-green-400 rounded">Send</span>
-        <span class="px-2 py-1 bg-purple-600/20 text-purple-400 rounded ml-2">Reply</span>
-      </div>
-    </div>
-
-    <!-- Facebook -->
-    <div class="bg-gray-800 rounded-xl border border-gray-700 p-6 hover:border-blue-700 transition cursor-pointer" onclick="openPlatform('facebook')">
-      <div class="flex items-center mb-4">
-        <div class="w-12 h-12 bg-blue-700 rounded-xl flex items-center justify-center mr-4">
-          <i class="fab fa-facebook text-xl text-white"></i>
-        </div>
-        <div>
-          <h3 class="text-lg font-semibold text-white">Facebook</h3>
-          <p class="text-gray-400 text-sm">Graph API</p>
-        </div>
-      </div>
-      <p class="text-gray-400 text-sm mb-3">Read posts, comment, and manage pages</p>
-      <div class="flex items-center text-sm">
-        <span class="px-2 py-1 bg-blue-600/20 text-blue-400 rounded">Read</span>
-        <span class="px-2 py-1 bg-green-600/20 text-green-400 rounded ml-2">Comment</span>
-      </div>
-    </div>
-
-    <!-- Messenger -->
-    <div class="bg-gray-800 rounded-xl border border-gray-700 p-6 hover:border-blue-500 transition cursor-pointer" onclick="openPlatform('messenger')">
-      <div class="flex items-center mb-4">
-        <div class="w-12 h-12 bg-blue-500 rounded-xl flex items-center justify-center mr-4">
-          <i class="fab fa-facebook-messenger text-xl text-white"></i>
-        </div>
-        <div>
-          <h3 class="text-lg font-semibold text-white">Messenger</h3>
-          <p class="text-gray-400 text-sm">Page API</p>
-        </div>
-      </div>
-      <p class="text-gray-400 text-sm mb-3">Read and send messages via Facebook Messenger</p>
-      <div class="flex items-center text-sm">
-        <span class="px-2 py-1 bg-blue-600/20 text-blue-400 rounded">Read</span>
-        <span class="px-2 py-1 bg-green-600/20 text-green-400 rounded ml-2">Send</span>
-      </div>
-    </div>
-  </div>
-
-  <!-- Active Chat Section -->
-  <div id="chatSection" class="hidden bg-gray-800 rounded-xl border border-gray-700 p-6">
+<!-- ============= CONNECTED ACCOUNTS ============= -->
+<div id="panelConnected" class="hidden fade-in">
     <div class="flex items-center justify-between mb-4">
-      <div class="flex items-center">
-        <div id="chatPlatformIcon" class="w-10 h-10 rounded-lg flex items-center justify-center mr-3"></div>
-        <div>
-          <h2 id="chatPlatformName" class="text-lg font-semibold text-white"></h2>
-          <p id="chatPlatformStatus" class="text-gray-400 text-sm">Connected</p>
-        </div>
-      </div>
-      <div class="flex items-center gap-2">
-        <button onclick="loadMessages()" class="px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-white text-sm transition">
-          <i class="fas fa-sync mr-1"></i>Refresh
-        </button>
-        <button onclick="closeChat()" class="px-3 py-2 bg-red-600 hover:bg-red-700 rounded-lg text-white text-sm transition">
-          <i class="fas fa-times mr-1"></i>Close
-        </button>
-      </div>
+        <h3 class="text-white font-semibold">Connected Accounts</h3>
+        <button onclick="showTab('catalog')" class="text-sm text-indigo-400 hover:text-indigo-300"><i class="fas fa-plus mr-1"></i>Add New</button>
     </div>
-
-    <!-- Messages Area -->
-    <div id="messagesArea" class="bg-gray-900 rounded-lg p-4 h-96 overflow-y-auto mb-4">
-      <div class="text-center text-gray-500 py-8">
-        <i class="fas fa-inbox text-4xl mb-3"></i>
-        <p>Load messages to start chatting</p>
-      </div>
+    <div id="connectedList" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <p class="text-gray-500 text-sm col-span-full text-center py-8">No accounts connected yet</p>
     </div>
-
-    <!-- Compose Area -->
-    <div class="bg-gray-700 rounded-lg p-4">
-      <div class="flex items-center gap-3">
-        <input type="text" id="chatRecipient" placeholder="To / Chat ID / Channel" class="flex-shrink-0 w-48 bg-gray-600 border border-gray-500 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:border-purple-500 text-sm">
-        <input type="text" id="chatMessage" placeholder="Type your message..." class="flex-1 bg-gray-600 border border-gray-500 rounded-lg px-4 py-2 text-white placeholder-gray-400 focus:outline-none focus:border-purple-500" onkeypress="if(event.key==='Enter')sendMessage()">
-        <button onclick="sendMessage()" class="px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg text-white font-medium transition">
-          <i class="fas fa-paper-plane mr-1"></i>Send
-        </button>
-        <button onclick="aiReply()" class="px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg text-white font-medium transition" title="AI generates reply to last message">
-          <i class="fas fa-robot mr-1"></i>AI Reply
-        </button>
-      </div>
-      <div class="flex items-center gap-3 mt-3">
-        <select id="chatModel" class="bg-gray-600 border border-gray-500 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-purple-500">
-          <option value="llama3.2:1b">Llama 3.2 1B</option>
-          <option value="qwen2.5:1.5b">Qwen 2.5 1.5B</option>
-          <option value="phi3:mini">Phi-3 Mini</option>
-          <option value="gemma2:2b">Gemma 2 2B</option>
-        </select>
-        <select id="chatTone" class="bg-gray-600 border border-gray-500 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-purple-500">
-          <option value="professional">Professional</option>
-          <option value="friendly">Friendly</option>
-          <option value="casual">Casual</option>
-          <option value="formal">Formal</option>
-          <option value="concise">Concise</option>
-        </select>
-      </div>
-    </div>
-  </div>
 </div>
 
-<!-- Connect Modal -->
-<div id="connectModal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-  <div class="bg-gray-800 rounded-2xl border border-gray-700 w-full max-w-lg max-h-[90vh] overflow-y-auto">
-    <div class="p-6 border-b border-gray-700">
-      <div class="flex items-center justify-between">
-        <h2 class="text-xl font-bold text-white">Connect Account</h2>
-        <button onclick="closeConnectModal()" class="text-gray-400 hover:text-white">
-          <i class="fas fa-times text-xl"></i>
-        </button>
-      </div>
-    </div>
-    <div class="p-6">
-      <div class="mb-4">
-        <label class="block text-gray-400 text-sm mb-2">Platform</label>
-        <select id="connectPlatform" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-purple-500" onchange="showPlatformFields()">
-          <option value="">Select platform...</option>
-          <option value="email">Email (IMAP/SMTP)</option>
-          <option value="telegram">Telegram Bot</option>
-          <option value="discord">Discord Bot</option>
-          <option value="whatsapp">WhatsApp Business</option>
-          <option value="facebook">Facebook Page</option>
-          <option value="messenger">Facebook Messenger</option>
-        </select>
-      </div>
+<!-- ============= QR / BARCODE SCANNER ============= -->
+<div id="panelScanner" class="hidden fade-in">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- QR Generator -->
+        <div class="bg-gray-800 rounded-xl border border-gray-700 p-6">
+            <h3 class="text-white font-semibold mb-4 flex items-center gap-2"><i class="fas fa-qrcode text-indigo-400"></i>QR Code Generator</h3>
+            <div class="space-y-3">
+                <input type="text" id="qrContent" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2.5 text-white text-sm" placeholder="Enter URL, text, or WiFi config..." value="https://openlocalai.dev">
+                <div class="grid grid-cols-2 gap-3">
+                    <button onclick="generateQR('url')" class="py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-medium transition"><i class="fas fa-link mr-1"></i>URL QR</button>
+                    <button onclick="generateQR('wifi')" class="py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg text-sm font-medium transition"><i class="fas fa-wifi mr-1"></i>WiFi QR</button>
+                </div>
+                <div id="qrResult" class="text-center hidden">
+                    <div class="qr-box inline-block mb-3"><img id="qrImage" class="w-48 h-48"></div>
+                    <p class="text-xs text-gray-500" id="qrContentText"></p>
+                    <button onclick="downloadQR()" class="mt-2 text-xs text-indigo-400 hover:text-indigo-300"><i class="fas fa-download mr-1"></i>Download</button>
+                </div>
+            </div>
 
-      <div id="platformFields" class="hidden space-y-4">
-        <div class="mb-4">
-          <label class="block text-gray-400 text-sm mb-2">Account Name</label>
-          <input type="text" id="connectName" placeholder="My Email / My Bot" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:border-purple-500">
+            <div class="mt-6 pt-4 border-t border-gray-700">
+                <h4 class="text-white text-sm font-semibold mb-3"><i class="fab fa-whatsapp text-green-400 mr-1"></i>WhatsApp Web Connection</h4>
+
+                <div class="bg-green-900/20 border border-green-600/30 rounded-lg p-3 mb-3">
+                    <p class="text-xs text-green-300 leading-relaxed">
+                        <i class="fas fa-info-circle mr-1"></i>
+                        Connect your WhatsApp account by scanning a real QR code. Works with iPhone WhatsApp & WhatsApp Business.
+                    </p>
+                </div>
+
+                <div class="flex gap-2 mb-3">
+                    <button onclick="initWhatsAppWeb()" id="waInitBtn" class="flex-1 px-3 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg text-xs font-medium transition">
+                        <i class="fas fa-qrcode mr-1"></i>Start & Get QR Code
+                    </button>
+                    <button onclick="logoutWhatsAppWeb()" class="px-3 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg text-xs font-medium transition">
+                        <i class="fas fa-sign-out-alt"></i>
+                    </button>
+                </div>
+
+                <div id="waStatusBox" class="mb-3 p-2 rounded-lg text-xs bg-gray-800/50 border border-gray-700">
+                    <div class="flex items-center gap-2">
+                        <span id="waStatusDot" class="status-dot gray"></span>
+                        <span id="waStatusText" class="text-gray-400">Not connected</span>
+                    </div>
+                </div>
+
+                <div id="waQrResult" class="text-center mt-3 hidden">
+                    <div class="qr-box inline-block bg-white p-2 rounded-lg"><img id="waQrImage" class="w-56 h-56"></div>
+                    <div class="mt-3 text-left bg-gray-800/50 rounded-lg p-3">
+                        <p class="text-xs text-cyan-400 font-semibold mb-2"><i class="fas fa-mobile-alt mr-1"></i>How to scan on iPhone:</p>
+                        <ol class="text-[10px] text-gray-300 space-y-1 list-decimal list-inside leading-relaxed">
+                            <li>Open <strong>WhatsApp Business</strong> on your iPhone</li>
+                            <li>Tap the <strong>Settings</strong> tab (bottom right, gear icon)</li>
+                            <li>Tap <strong>Linked Devices</strong></li>
+                            <li>Tap <strong>Link a Device</strong></li>
+                            <li>Point your camera at the QR code above</li>
+                        </ol>
+                    </div>
+                    <p class="text-[10px] text-gray-500 mt-2" id="waQrTimer">QR refreshes automatically</p>
+                </div>
+
+                <div id="waConnectedBox" class="mt-3 hidden">
+                    <div class="p-3 bg-green-900/20 border border-green-600/40 rounded-lg">
+                        <div class="flex items-center gap-2 mb-2">
+                            <i class="fas fa-check-circle text-green-400 text-lg"></i>
+                            <span class="text-green-300 font-semibold text-sm">WhatsApp Connected!</span>
+                        </div>
+                        <p class="text-[10px] text-gray-400">You can now send and receive messages. Incoming messages will appear below.</p>
+                    </div>
+                </div>
+
+                <div class="border-t border-gray-700 pt-3 mt-3">
+                    <p class="text-xs text-gray-400 mb-2 font-semibold"><i class="fas fa-paper-plane mr-1"></i>Send Message (via WhatsApp Web)</p>
+                    <div class="space-y-2">
+                        <input type="text" id="waRecipient" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-xs" placeholder="Recipient phone (e.g. 14155552671)">
+                        <textarea id="waText" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-xs" rows="2" placeholder="Message text"></textarea>
+                        <button onclick="sendWhatsAppWebMessage()" id="waSendBtn" class="w-full px-3 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg text-xs font-medium transition">
+                            <i class="fas fa-paper-plane mr-1"></i>Send
+                        </button>
+                    </div>
+                </div>
+
+                <div class="border-t border-gray-700 pt-3 mt-3">
+                    <p class="text-xs text-gray-400 mb-2 font-semibold"><i class="fas fa-inbox mr-1"></i>Incoming Messages</p>
+                    <div id="waMessagesList" class="space-y-1 max-h-48 overflow-y-auto">
+                        <p class="text-[10px] text-gray-500 italic">No messages yet</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-6 pt-4 border-t border-gray-700">
+                <h4 class="text-white text-sm font-semibold mb-3"><i class="fas fa-barcode text-amber-400 mr-1"></i>Barcode Generator</h4>
+                <div class="flex gap-2">
+                    <input type="text" id="barcodeContent" class="flex-1 bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm" placeholder="PRODUCT-001">
+                    <select id="barcodeType" class="bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm">
+                        <option value="code128">Code 128</option>
+                        <option value="code39">Code 39</option>
+                        <option value="ean13">EAN-13</option>
+                    </select>
+                    <button onclick="generateBarcode()" class="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-sm font-medium transition">Generate</button>
+                </div>
+                <div id="barcodeResult" class="text-center mt-3 hidden">
+                    <div class="qr-box inline-block"><img id="barcodeImage" class="h-24"></div>
+                    <p class="text-xs text-gray-500" id="barcodeContentText"></p>
+                </div>
+            </div>
         </div>
-        <div id="platformSpecificFields"></div>
-      </div>
 
-      <div class="flex gap-3 mt-6">
-        <button onclick="testConnection()" class="flex-1 px-4 py-3 bg-gray-700 hover:bg-gray-600 rounded-lg text-white font-medium transition">
-          <i class="fas fa-plug mr-2"></i>Test Connection
-        </button>
-        <button onclick="saveConnection()" class="flex-1 px-4 py-3 bg-purple-600 hover:bg-purple-700 rounded-lg text-white font-medium transition">
-          <i class="fas fa-save mr-2"></i>Save Connection
-        </button>
-      </div>
-
-      <div id="connectionStatus" class="hidden mt-4 p-4 rounded-lg"></div>
+        <!-- Camera Scanner -->
+        <div class="bg-gray-800 rounded-xl border border-gray-700 p-6">
+            <h3 class="text-white font-semibold mb-4 flex items-center gap-2"><i class="fas fa-camera text-green-400"></i>Camera Scanner</h3>
+            <p class="text-xs text-gray-500 mb-3">Use your device camera to scan QR codes and barcodes</p>
+            <div class="camera-view mb-4" id="cameraView">
+                <video id="cameraVideo" autoplay playsinline></video>
+                <div class="camera-overlay"><div class="scan-frame"><div class="scan-line"></div></div></div>
+            </div>
+            <div class="flex gap-2 mb-4">
+                <button onclick="startCamera()" class="flex-1 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg text-sm font-medium transition" id="btnStartCam"><i class="fas fa-camera mr-1"></i>Start Camera</button>
+                <button onclick="stopCamera()" class="flex-1 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg text-sm font-medium transition" id="btnStopCam" disabled><i class="fas fa-stop mr-1"></i>Stop</button>
+                <button onclick="captureAndScan()" class="flex-1 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-medium transition" id="btnScan" disabled><i class="fas fa-crosshairs mr-1"></i>Scan</button>
+            </div>
+            <div id="scanResult" class="hidden">
+                <div class="result-box">
+                    <p class="text-xs text-gray-500 uppercase tracking-wider mb-2">Scan Result</p>
+                    <p class="text-white font-mono text-sm" id="scanData">-</p>
+                    <p class="text-gray-400 text-xs mt-1" id="scanType">-</p>
+                </div>
+            </div>
+            <div class="mt-4 pt-4 border-t border-gray-700">
+                <h4 class="text-white text-sm font-semibold mb-2">Or upload an image:</h4>
+                <input type="file" id="scanFile" accept="image/*" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:bg-indigo-600 file:text-white file:text-sm file:cursor-pointer" onchange="scanUploadedFile()">
+                <div id="uploadScanResult" class="hidden mt-3"></div>
+            </div>
+        </div>
     </div>
-  </div>
 </div>
 
-<script>
-let currentPlatform = null;
-let currentConfig = null;
-let connectedAccounts = JSON.parse(localStorage.getItem('integrations') || '{}');
-
-function openConnectModal() {
-  document.getElementById('connectModal').classList.remove('hidden');
-}
-
-function closeConnectModal() {
-  document.getElementById('connectModal').classList.add('hidden');
-  document.getElementById('connectPlatform').value = '';
-  document.getElementById('platformFields').classList.add('hidden');
-  document.getElementById('connectionStatus').classList.add('hidden');
-}
-
-function showPlatformFields() {
-  const platform = document.getElementById('connectPlatform').value;
-  const fieldsDiv = document.getElementById('platformFields');
-  const specificDiv = document.getElementById('platformSpecificFields');
-
-  if (!platform) {
-    fieldsDiv.classList.add('hidden');
-    return;
-  }
-
-  fieldsDiv.classList.remove('hidden');
-
-  const fields = {
-    email: `
-      <div><label class="block text-gray-400 text-sm mb-1">IMAP Host</label><input type="text" id="imap_host" value="imap.gmail.com" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-purple-500"></div>
-      <div><label class="block text-gray-400 text-sm mb-1">IMAP Port</label><input type="number" id="imap_port" value="993" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-purple-500"></div>
-      <div><label class="block text-gray-400 text-sm mb-1">SMTP Host</label><input type="text" id="smtp_host" value="smtp.gmail.com" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-purple-500"></div>
-      <div><label class="block text-gray-400 text-sm mb-1">SMTP Port</label><input type="number" id="smtp_port" value="587" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-purple-500"></div>
-      <div><label class="block text-gray-400 text-sm mb-1">Email</label><input type="email" id="username" placeholder="you@gmail.com" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-purple-500"></div>
-      <div><label class="block text-gray-400 text-sm mb-1">App Password</label><input type="password" id="password" placeholder="xxxx xxxx xxxx xxxx" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-purple-500"></div>
-    `,
-    telegram: `
-      <div><label class="block text-gray-400 text-sm mb-1">Bot Token</label><input type="text" id="bot_token" placeholder="123456789:ABCdefGHIjklMNOpqrsTUVwxyz" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-purple-500"></div>
-      <p class="text-gray-500 text-xs mt-2">Get token from @BotFather on Telegram</p>
-    `,
-    discord: `
-      <div><label class="block text-gray-400 text-sm mb-1">Bot Token</label><input type="text" id="bot_token" placeholder="MTEx..." class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-purple-500"></div>
-      <p class="text-gray-500 text-xs mt-2">Get token from Discord Developer Portal</p>
-    `,
-    whatsapp: `
-      <div><label class="block text-gray-400 text-sm mb-1">Phone Number ID</label><input type="text" id="phone_number_id" placeholder="1234567890" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-purple-500"></div>
-      <div><label class="block text-gray-400 text-sm mb-1">Access Token</label><input type="text" id="access_token" placeholder="EAA..." class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-purple-500"></div>
-      <p class="text-gray-500 text-xs mt-2">Get from Meta Business Suite</p>
-    `,
-    facebook: `
-      <div><label class="block text-gray-400 text-sm mb-1">Page ID</label><input type="text" id="page_id" placeholder="1234567890" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-purple-500"></div>
-      <div><label class="block text-gray-400 text-sm mb-1">Access Token</label><input type="text" id="access_token" placeholder="EAA..." class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-purple-500"></div>
-      <p class="text-gray-500 text-xs mt-2">Get from Facebook Developer Portal</p>
-    `,
-    messenger: `
-      <div><label class="block text-gray-400 text-sm mb-1">Page ID</label><input type="text" id="page_id" placeholder="1234567890" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-purple-500"></div>
-      <div><label class="block text-gray-400 text-sm mb-1">Access Token</label><input type="text" id="access_token" placeholder="EAA..." class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-purple-500"></div>
-    `
-  };
-
-  specificDiv.innerHTML = fields[platform] || '';
-}
-
-function getConfigFromForm() {
-  const platform = document.getElementById('connectPlatform').value;
-  const config = {};
-  const fields = document.getElementById('platformSpecificFields').querySelectorAll('input');
-  fields.forEach(f => { if (f.id && f.value) config[f.id] = f.value; });
-  return config;
-}
-
-async function testConnection() {
-  const platform = document.getElementById('connectPlatform').value;
-  const config = getConfigFromForm();
-  const statusDiv = document.getElementById('connectionStatus');
-
-  statusDiv.classList.remove('hidden');
-  statusDiv.className = 'mt-4 p-4 rounded-lg bg-gray-700 text-gray-300';
-  statusDiv.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Testing connection...';
-
-  try {
-    const resp = await fetch('/api/integrations/test', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({integration_type: platform, config: config})
-    });
-    const data = await resp.json();
-
-    if (data.success) {
-      statusDiv.className = 'mt-4 p-4 rounded-lg bg-green-600/20 border border-green-600 text-green-400';
-      statusDiv.innerHTML = '<i class="fas fa-check-circle mr-2"></i>' + data.message;
-    } else {
-      statusDiv.className = 'mt-4 p-4 rounded-lg bg-red-600/20 border border-red-600 text-red-400';
-      statusDiv.innerHTML = '<i class="fas fa-times-circle mr-2"></i>' + data.message;
-    }
-  } catch(e) {
-    statusDiv.className = 'mt-4 p-4 rounded-lg bg-red-600/20 border border-red-600 text-red-400';
-    statusDiv.innerHTML = '<i class="fas fa-times-circle mr-2"></i>Connection error';
-  }
-}
-
-function saveConnection() {
-  const platform = document.getElementById('connectPlatform').value;
-  const name = document.getElementById('connectName').value || platform;
-  const config = getConfigFromForm();
-
-  connectedAccounts[platform] = {name, config, connected: true};
-  localStorage.setItem('integrations', JSON.stringify(connectedAccounts));
-  renderConnectedAccounts();
-  closeConnectModal();
-}
-
-function renderConnectedAccounts() {
-  const div = document.getElementById('connectedAccounts');
-  const accounts = Object.entries(connectedAccounts);
-
-  if (accounts.length === 0) {
-    div.innerHTML = '<div class="text-center py-8 text-gray-500"><i class="fas fa-plug text-4xl mb-3"></i><p>No accounts connected yet</p></div>';
-    return;
-  }
-
-  const icons = {email:'fa-envelope',telegram:'fa-telegram',discord:'fa-discord',whatsapp:'fa-whatsapp',facebook:'fa-facebook',messenger:'fa-facebook-messenger'};
-  const colors = {email:'bg-blue-600',telegram:'bg-sky-500',discord:'bg-indigo-600',whatsapp:'bg-green-600',facebook:'bg-blue-700',messenger:'bg-blue-500'};
-
-  div.innerHTML = accounts.map(([platform, acc]) => `
-    <div class="bg-gray-700 rounded-lg p-4 border border-gray-600">
-      <div class="flex items-center justify-between">
-        <div class="flex items-center">
-          <div class="w-10 h-10 ${colors[platform] || 'bg-gray-600'} rounded-lg flex items-center justify-center mr-3">
-            <i class="fab ${icons[platform] || 'fa-plug'} text-white"></i>
-          </div>
-          <div>
-            <h3 class="text-white font-medium">${acc.name}</h3>
-            <p class="text-gray-400 text-sm capitalize">${platform}</p>
-          </div>
-        </div>
-        <div class="flex items-center gap-2">
-          <button onclick="openPlatform('${platform}')" class="px-3 py-1 bg-purple-600 hover:bg-purple-700 rounded text-white text-sm transition">Open</button>
-          <button onclick="removeAccount('${platform}')" class="px-3 py-1 bg-red-600 hover:bg-red-700 rounded text-white text-sm transition">Remove</button>
-        </div>
-      </div>
+<!-- ============= WEBHOOKS ============= -->
+<div id="panelWebhooks" class="hidden fade-in">
+    <div class="flex items-center justify-between mb-4">
+        <h3 class="text-white font-semibold">Webhook Endpoints</h3>
+        <button onclick="showCreateWebhook()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-white text-sm font-medium transition"><i class="fas fa-plus mr-1"></i>Create Webhook</button>
     </div>
-  `).join('');
-}
 
-function removeAccount(platform) {
-  delete connectedAccounts[platform];
-  localStorage.setItem('integrations', JSON.stringify(connectedAccounts));
-  renderConnectedAccounts();
-}
-
-function openPlatform(platform) {
-  if (!connectedAccounts[platform]) {
-    document.getElementById('connectPlatform').value = platform;
-    showPlatformFields();
-    openConnectModal();
-    return;
-  }
-
-  currentPlatform = platform;
-  currentConfig = connectedAccounts[platform].config;
-
-  const icons = {email:'fa-envelope',telegram:'fa-telegram',discord:'fa-discord',whatsapp:'fa-whatsapp',facebook:'fa-facebook',messenger:'fa-facebook-messenger'};
-  const colors = {email:'bg-blue-600',telegram:'bg-sky-500',discord:'bg-indigo-600',whatsapp:'bg-green-600',facebook:'bg-blue-700',messenger:'bg-blue-500'};
-
-  document.getElementById('chatPlatformIcon').className = `w-10 h-10 ${colors[platform]} rounded-lg flex items-center justify-center mr-3`;
-  document.getElementById('chatPlatformIcon').innerHTML = `<i class="fab ${icons[platform]} text-white"></i>`;
-  document.getElementById('chatPlatformName').textContent = connectedAccounts[platform].name;
-  document.getElementById('chatPlatformStatus').textContent = 'Connected';
-
-  document.getElementById('chatSection').classList.remove('hidden');
-  document.getElementById('messagesArea').innerHTML = '<div class="text-center text-gray-500 py-8"><i class="fas fa-inbox text-4xl mb-3"></i><p>Click "Refresh" to load messages</p></div>';
-
-  loadMessages();
-}
-
-function closeChat() {
-  document.getElementById('chatSection').classList.add('hidden');
-  currentPlatform = null;
-  currentConfig = null;
-}
-
-async function loadMessages() {
-  if (!currentPlatform || !currentConfig) return;
-
-  const msgArea = document.getElementById('messagesArea');
-  msgArea.innerHTML = '<div class="text-center text-gray-500 py-8"><i class="fas fa-spinner fa-spin text-2xl mb-3"></i><p>Loading messages...</p></div>';
-
-  try {
-    let resp;
-    if (currentPlatform === 'email') {
-      resp = await fetch('/api/integrations/email/read', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({config: currentConfig, limit: 20})
-      });
-    } else if (currentPlatform === 'telegram') {
-      resp = await fetch('/api/integrations/telegram/updates', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({config: currentConfig, limit: 20})
-      });
-    } else if (currentPlatform === 'discord') {
-      const guildsResp = await fetch('/api/integrations/discord/guilds', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({config: currentConfig})
-      });
-      const guildsData = await guildsResp.json();
-      if (guildsData.guilds && guildsData.guilds.length > 0) {
-        const channelsResp = await fetch('/api/integrations/discord/channels', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({guild_id: guildsData.guilds[0].id, config: currentConfig})
-        });
-        const channelsData = await channelsResp.json();
-        if (channelsData.channels && channelsData.channels.length > 0) {
-          resp = await fetch('/api/integrations/discord/messages', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({channel_id: channelsData.channels[0].id, config: currentConfig, limit: 20})
-          });
-        }
-      }
-    } else if (currentPlatform === 'facebook') {
-      resp = await fetch('/api/integrations/facebook/posts', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({config: currentConfig, limit: 10})
-      });
-    } else if (currentPlatform === 'whatsapp' || currentPlatform === 'messenger') {
-      msgArea.innerHTML = '<div class="text-center text-gray-500 py-8"><i class="fas fa-info-circle text-2xl mb-3"></i><p>Use the compose area below to send messages</p></div>';
-      return;
-    }
-
-    if (!resp) {
-      msgArea.innerHTML = '<div class="text-center text-gray-500 py-8"><i class="fas fa-info-circle text-2xl mb-3"></i><p>No messages to display</p></div>';
-      return;
-    }
-
-    const data = await resp.json();
-    const messages = data.messages || data.emails || data.posts || [];
-
-    if (messages.length === 0) {
-      msgArea.innerHTML = '<div class="text-center text-gray-500 py-8"><i class="fas fa-inbox text-4xl mb-3"></i><p>No messages found</p></div>';
-      return;
-    }
-
-    msgArea.innerHTML = messages.map(m => `
-      <div class="bg-gray-700 rounded-lg p-4 mb-3 border border-gray-600">
-        <div class="flex items-center justify-between mb-2">
-          <span class="text-purple-400 font-medium text-sm">${m.from || m.from_id || 'Unknown'}</span>
-          <span class="text-gray-500 text-xs">${m.date || m.created_time || ''}</span>
+    <!-- Create Form -->
+    <div id="webhookForm" class="hidden bg-gray-800 rounded-xl border border-gray-700 p-5 mb-4 fade-in">
+        <h4 class="text-white font-semibold mb-3">New Webhook</h4>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <input type="text" id="whName" class="bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm" placeholder="Webhook name">
+            <input type="url" id="whUrl" class="bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm" placeholder="https://example.com/webhook">
+            <select id="whMethod" class="bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm">
+                <option value="POST">POST</option><option value="GET">GET</option><option value="PUT">PUT</option><option value="DELETE">DELETE</option>
+            </select>
+            <input type="text" id="whEvents" class="bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm" placeholder="Events (comma-separated)">
         </div>
-        <p class="text-white text-sm mb-2">${m.subject || m.text || m.message || ''}</p>
-        ${m.body ? `<p class="text-gray-400 text-xs">${m.body.substring(0, 200)}</p>` : ''}
+        <textarea id="whBody" rows="3" class="mt-3 w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm font-mono" placeholder='{"event":"test","data":{}}'></textarea>
         <div class="flex gap-2 mt-3">
-          <button onclick="replyTo('${m.from || m.from_id || ''}', '${(m.subject || '').replace(/'/g, "\\'")}', '${m.id || ''}')" class="px-3 py-1 bg-purple-600 hover:bg-purple-700 rounded text-white text-xs transition">Reply</button>
-          <button onclick="aiReplyTo('${(m.text || m.body || m.message || '').replace(/'/g, "\\'")}', '${m.from || ''}', '${(m.subject || '').replace(/'/g, "\\'")}')" class="px-3 py-1 bg-green-600 hover:bg-green-700 rounded text-white text-xs transition">AI Reply</button>
+            <button onclick="createWebhook()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-medium transition">Save Webhook</button>
+            <button onclick="hideCreateWebhook()" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm font-medium transition">Cancel</button>
         </div>
-      </div>
+    </div>
+
+    <div id="webhookList" class="space-y-3">
+        <p class="text-gray-500 text-sm text-center py-8">No webhooks configured yet</p>
+    </div>
+</div>
+
+<!-- ============= API TESTER ============= -->
+<div id="panelApitester" class="hidden fade-in">
+    <div class="bg-gray-800 rounded-xl border border-gray-700 p-6">
+        <h3 class="text-white font-semibold mb-4 flex items-center gap-2"><i class="fas fa-flask text-purple-400"></i>API Connection Tester</h3>
+        <p class="text-xs text-gray-500 mb-4">Test any REST API endpoint with full request/response details</p>
+
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-3">
+            <select id="apiMethod" class="bg-gray-700 border border-gray-600 rounded-lg px-3 py-2.5 text-white text-sm font-bold">
+                <option value="GET" class="text-green-400">GET</option>
+                <option value="POST" class="text-amber-400">POST</option>
+                <option value="PUT" class="text-blue-400">PUT</option>
+                <option value="PATCH" class="text-purple-400">PATCH</option>
+                <option value="DELETE" class="text-red-400">DELETE</option>
+            </select>
+            <input type="url" id="apiUrl" class="md:col-span-3 bg-gray-700 border border-gray-600 rounded-lg px-4 py-2.5 text-white text-sm" placeholder="https://api.example.com/endpoint">
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+            <select id="apiAuth" class="bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm">
+                <option value="none">No Auth</option>
+                <option value="bearer">Bearer Token</option>
+                <option value="basic">Basic Auth</option>
+                <option value="apikey">API Key</option>
+            </select>
+            <input type="text" id="apiAuthToken" class="md:col-span-2 bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm" placeholder="Token / Key">
+        </div>
+
+        <textarea id="apiBody" rows="4" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white text-sm font-mono mb-3" placeholder='{"key": "value"}'></textarea>
+
+        <div id="apiHeaders" class="mb-3">
+            <p class="text-xs text-gray-500 mb-2">Custom Headers (JSON):</p>
+            <input type="text" id="apiHeadersInput" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm font-mono" placeholder='{"Content-Type": "application/json"}'>
+        </div>
+
+        <button onclick="testApi()" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-medium transition" id="btnApiTest"><i class="fas fa-play mr-1"></i>Send Request</button>
+
+        <div id="apiResult" class="hidden mt-4">
+            <div class="flex items-center gap-3 mb-3">
+                <span class="px-3 py-1 rounded-lg text-sm font-bold" id="apiStatus">200</span>
+                <span class="text-gray-400 text-sm" id="apiTime">0ms</span>
+                <span class="text-gray-400 text-sm" id="apiSize">0B</span>
+            </div>
+            <div class="code-block max-h-80 overflow-y-auto" id="apiResponseBody"></div>
+        </div>
+    </div>
+</div>
+
+<!-- ============= CHAT ============= -->
+<div id="panelChat" class="hidden fade-in">
+    <div class="bg-gray-800 rounded-xl border border-gray-700 p-6">
+        <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center gap-3">
+                <div id="chatIcon" class="w-10 h-10 bg-gray-600 rounded-lg flex items-center justify-center"><i class="fas fa-comments text-white"></i></div>
+                <div>
+                    <h3 class="text-white font-semibold" id="chatTitle">Select a Platform</h3>
+                    <p class="text-xs text-gray-500" id="chatStatus">Connect an account first</p>
+                </div>
+            </div>
+            <select id="chatPlatform" class="bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm" onchange="switchChatPlatform()">
+                <option value="">Select platform...</option>
+            </select>
+        </div>
+
+        <div id="chatMessages" class="bg-gray-900 rounded-lg p-4 h-80 overflow-y-auto mb-4">
+            <div class="text-center text-gray-500 py-8"><i class="fas fa-inbox text-3xl mb-2"></i><p class="text-sm">Select a connected platform to start chatting</p></div>
+        </div>
+
+        <div class="flex gap-2 mb-3">
+            <input type="text" id="chatTo" class="w-48 bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm" placeholder="To / Chat ID">
+            <input type="text" id="chatMsg" class="flex-1 bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white text-sm" placeholder="Type a message..." onkeydown="if(event.key==='Enter')sendChatMsg()">
+            <button onclick="sendChatMsg()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-medium transition"><i class="fas fa-paper-plane"></i></button>
+            <button onclick="aiChatReply()" class="px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg text-sm font-medium transition" title="AI Reply"><i class="fas fa-robot"></i></button>
+        </div>
+        <div class="flex gap-2">
+            <select id="chatModel" class="bg-gray-700 border border-gray-600 rounded-lg px-3 py-1.5 text-white text-xs">
+                <option value="llama3.2:1b">Llama 3.2 1B</option>
+                <option value="qwen2.5:0.5b">Qwen 2.5 0.5B</option>
+            </select>
+            <select id="chatTone" class="bg-gray-700 border border-gray-600 rounded-lg px-3 py-1.5 text-white text-xs">
+                <option value="professional">Professional</option>
+                <option value="friendly">Friendly</option>
+                <option value="casual">Casual</option>
+                <option value="concise">Concise</option>
+            </select>
+        </div>
+    </div>
+</div>
+
+<!-- ============= CONNECT MODAL ============= -->
+<div id="connectModal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-[#1e293b] border border-gray-700 rounded-2xl w-full max-w-md shadow-2xl">
+        <div class="flex items-center justify-between p-5 border-b border-gray-700">
+            <h3 class="text-white font-semibold" id="connectModalTitle">Connect Service</h3>
+            <button onclick="closeConnectModal()" class="text-gray-400 hover:text-white"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="p-5 space-y-4" id="connectModalBody">
+            <div id="connectQrArea" class="hidden text-center">
+                <div class="qr-box inline-block mb-3"><img id="connectQrImg" class="w-48 h-48"></div>
+                <p class="text-xs text-gray-500" id="connectQrInstructions"></p>
+            </div>
+            <div id="connectFields"></div>
+            <div id="connectStatus" class="hidden"></div>
+        </div>
+        <div class="p-5 border-t border-gray-700 flex gap-3">
+            <button onclick="testConnect()" class="flex-1 py-2.5 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm font-medium transition"><i class="fas fa-plug mr-1"></i>Test</button>
+            <button onclick="saveConnect()" class="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-medium transition"><i class="fas fa-save mr-1"></i>Save</button>
+        </div>
+    </div>
+</div>
+
+<div id="toast" class="fixed bottom-6 right-6 bg-green-600 text-white px-4 py-2.5 rounded-lg shadow-lg z-50 hidden flex items-center gap-2 text-sm font-medium">
+    <i class="fas fa-check-circle"></i><span id="toastMsg">Done!</span>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+const API = '/api/integrations';
+let connected = JSON.parse(localStorage.getItem('int_connected') || '{}');
+let catalog = [];
+let currentConnectService = null;
+let cameraStream = null;
+
+/* ===== Tabs ===== */
+function showTab(t) {
+    ['catalog','connected','scanner','webhooks','apitester','chat'].forEach(p => {
+        document.getElementById('panel' + p.charAt(0).toUpperCase() + p.slice(1)).classList.toggle('hidden', p !== t);
+    });
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    const map = {catalog:'tabCatalog',connected:'tabConnected',scanner:'tabScanner',webhooks:'tabWebhooks',apitester:'tabApitester',chat:'tabChat'};
+    document.getElementById(map[t])?.classList.add('active');
+    if (t === 'webhooks') loadWebhooks();
+    if (t === 'connected') renderConnected();
+    if (t === 'chat') populateChatPlatforms();
+}
+
+/* ===== Catalog ===== */
+async function loadCatalog() {
+    try {
+        const r = await fetch(API + '/catalog');
+        const d = await r.json();
+        catalog = d.services || [];
+        renderCatalog(catalog);
+    } catch (e) {
+        document.getElementById('catalogGrid').innerHTML = '<p class="text-red-400 text-sm col-span-full">Failed to load services</p>';
+    }
+}
+
+function renderCatalog(items) {
+    document.getElementById('catalogGrid').innerHTML = items.map(s => `
+        <div class="int-card ${connected[s.id] ? 'connected' : ''}" onclick="openConnect('${s.id}')">
+            <div class="flex items-center gap-3 mb-3">
+                <div class="w-10 h-10 bg-${s.color}-600/20 rounded-xl flex items-center justify-center">
+                    <i class="${s.icon} text-${s.color}-400"></i>
+                </div>
+                <div class="min-w-0">
+                    <h4 class="text-white font-semibold text-sm truncate">${s.name}</h4>
+                    <span class="text-[10px] text-gray-500 uppercase">${s.category}</span>
+                </div>
+            </div>
+            <p class="text-xs text-gray-400 mb-3">${s.description}</p>
+            <div class="flex items-center justify-between">
+                <span class="text-[10px] px-2 py-0.5 rounded bg-gray-700 text-gray-400">${s.auth_type}</span>
+                ${connected[s.id] ? '<span class="text-[10px] text-green-400"><i class="fas fa-check-circle mr-1"></i>Connected</span>' : '<span class="text-[10px] text-gray-500">Click to connect</span>'}
+            </div>
+        </div>
     `).join('');
-
-  } catch(e) {
-    msgArea.innerHTML = '<div class="text-center text-red-400 py-8"><i class="fas fa-exclamation-triangle text-2xl mb-3"></i><p>Error loading messages: ' + e.message + '</p></div>';
-  }
 }
 
-function replyTo(to, subject, replyToId) {
-  document.getElementById('chatRecipient').value = to;
-  document.getElementById('chatMessage').value = '';
-  document.getElementById('chatMessage').focus();
-  if (subject) {
-    document.getElementById('chatMessage').placeholder = `Reply to: ${subject}`;
-  }
+function filterCat(cat) {
+    document.querySelectorAll('.cat-pill').forEach(p => p.classList.toggle('active', p.dataset.cat === cat));
+    renderCatalog(cat === 'all' ? catalog : catalog.filter(s => s.category === cat));
 }
 
-async function aiReplyTo(originalMessage, from, subject) {
-  const model = document.getElementById('chatModel').value;
-  const tone = document.getElementById('chatTone').value;
+/* ===== Connected ===== */
+function renderConnected() {
+    const entries = Object.entries(connected);
+    const el = document.getElementById('connectedList');
+    if (!entries.length) { el.innerHTML = '<p class="text-gray-500 text-sm col-span-full text-center py-8">No accounts connected yet</p>'; return; }
+    el.innerHTML = entries.map(([id, acc]) => {
+        const svc = catalog.find(s => s.id === id) || {};
+        return `<div class="int-card connected">
+            <div class="flex items-center gap-3 mb-3">
+                <div class="w-10 h-10 bg-${svc.color||'gray'}-600/20 rounded-xl flex items-center justify-center"><i class="${svc.icon||'fas fa-plug'} text-${svc.color||'gray'}-400"></i></div>
+                <div class="flex-1 min-w-0"><h4 class="text-white font-semibold text-sm truncate">${acc.name||svc.name||id}</h4><p class="text-xs text-gray-500">${svc.category||''}</p></div>
+                <span class="status-dot green"></span>
+            </div>
+            <div class="flex gap-2">
+                <button onclick="openConnect('${id}')" class="flex-1 py-1.5 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-xs transition">Configure</button>
+                <button onclick="disconnectService('${id}')" class="py-1.5 px-3 bg-red-600/20 hover:bg-red-600/30 text-red-400 rounded-lg text-xs transition">Disconnect</button>
+            </div>
+        </div>`;
+    }).join('');
+}
 
-  const msgArea = document.getElementById('messagesArea');
-  msgArea.innerHTML += '<div class="bg-green-600/20 border border-green-600 rounded-lg p-3 mb-3 text-green-400"><i class="fas fa-spinner fa-spin mr-2"></i>AI is generating reply...</div>';
-  msgArea.scrollTop = msgArea.scrollHeight;
+/* ===== Connect Modal ===== */
+function openConnect(serviceId) {
+    const svc = catalog.find(s => s.id === serviceId);
+    if (!svc) return;
+    currentConnectService = svc;
+    document.getElementById('connectModalTitle').textContent = 'Connect ' + svc.name;
+    document.getElementById('connectQrArea').classList.add('hidden');
+    document.getElementById('connectStatus').classList.add('hidden');
 
-  try {
-    const resp = await fetch('http://203.55.176.101:8000/v1/chat/completions', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer sk-local-f61f4d314363e693de5b7fd9792d4bbb91f6a064b5f09be1eb247100476f17ea'},
-      body: JSON.stringify({
-        model: model,
-        messages: [
-          {role: 'system', content: `You are a helpful assistant replying to messages. Use a ${tone} tone. Keep replies concise and relevant.`},
-          {role: 'user', content: `Original message from ${from}: "${originalMessage}"\n\nPlease write a reply:`}
-        ],
-        max_tokens: 500
-      })
-    });
-    const data = await resp.json();
-    const reply = data.choices?.[0]?.message?.content || 'Sorry, I could not generate a reply.';
-
-    document.getElementById('chatMessage').value = reply;
-    document.getElementById('chatRecipient').value = from;
-    if (subject) {
-      document.getElementById('chatMessage').placeholder = `Reply to: ${subject}`;
+    let fields = '';
+    if (svc.auth_type === 'qr') {
+        fields = `<p class="text-xs text-gray-500">This service uses QR code login. Click Test to generate a QR code.</p>`;
+        document.getElementById('connectQrArea').classList.remove('hidden');
+    } else if (svc.auth_type === 'token') {
+        fields = `<div><label class="block text-xs text-gray-400 mb-1">Account Name</label><input type="text" id="cName" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm" placeholder="My ${svc.name}"></div>
+            <div><label class="block text-xs text-gray-400 mb-1">API Token</label><input type="password" id="cToken" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm" placeholder="Enter token..."></div>`;
+    } else if (svc.auth_type === 'credentials') {
+        fields = `<div><label class="block text-xs text-gray-400 mb-1">Account Name</label><input type="text" id="cName" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm" placeholder="My ${svc.name}"></div>
+            <div><label class="block text-xs text-gray-400 mb-1">Username / Email</label><input type="text" id="cUser" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm"></div>
+            <div><label class="block text-xs text-gray-400 mb-1">Password / Secret</label><input type="password" id="cPass" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm"></div>`;
+    } else if (svc.auth_type === 'url') {
+        fields = `<div><label class="block text-xs text-gray-400 mb-1">Endpoint URL</label><input type="url" id="cUrl" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm" placeholder="https://..."></div>`;
+    } else if (svc.auth_type === 'oauth') {
+        fields = `<p class="text-xs text-gray-500">OAuth flow will open in a new window.</p>`;
     }
-  } catch(e) {
-    console.error('AI reply error:', e);
-  }
+    document.getElementById('connectFields').innerHTML = fields;
+    document.getElementById('connectModal').classList.remove('hidden');
 }
 
-async function sendMessage() {
-  if (!currentPlatform || !currentConfig) return;
+function closeConnectModal() { document.getElementById('connectModal').classList.add('hidden'); currentConnectService = null; }
 
-  const to = document.getElementById('chatRecipient').value;
-  const text = document.getElementById('chatMessage').value;
+async function testConnect() {
+    const svc = currentConnectService;
+    if (!svc) return;
+    const status = document.getElementById('connectStatus');
+    status.classList.remove('hidden');
+    status.className = 'p-3 rounded-lg bg-gray-700 text-gray-300 text-sm';
+    status.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Testing connection...';
 
-  if (!to || !text) {
-    alert('Please enter recipient and message');
-    return;
-  }
-
-  try {
-    let resp;
-    if (currentPlatform === 'email') {
-      resp = await fetch('/api/integrations/email/compose', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({to, subject: 'Reply', body: text, config: currentConfig})
-      });
-    } else if (currentPlatform === 'telegram') {
-      resp = await fetch('/api/integrations/telegram/send', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({chat_id: to, text, config: currentConfig})
-      });
-    } else if (currentPlatform === 'discord') {
-      resp = await fetch('/api/integrations/discord/send', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({channel_id: to, text, config: currentConfig})
-      });
-    } else if (currentPlatform === 'whatsapp') {
-      resp = await fetch('/api/integrations/whatsapp/send', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({to, text, config: currentConfig})
-      });
-    } else if (currentPlatform === 'facebook') {
-      resp = await fetch('/api/integrations/facebook/comment', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({post_id: to, text, config: currentConfig})
-      });
-    } else if (currentPlatform === 'messenger') {
-      resp = await fetch('/api/integrations/messenger/send', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({recipient_id: to, text, config: currentConfig})
-      });
+    if (svc.auth_type === 'qr' && svc.id === 'whatsapp_web') {
+        try {
+            const r = await fetch(API + '/whatsapp/qr', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({phone: document.getElementById('waPhone')?.value || ''})});
+            const d = await r.json();
+            if (d.success) {
+                document.getElementById('connectQrImg').src = d.image;
+                document.getElementById('connectQrInstructions').textContent = d.instructions;
+                status.className = 'p-3 rounded-lg bg-green-600/20 border border-green-600 text-green-400 text-sm';
+                status.innerHTML = '<i class="fas fa-check mr-1"></i>QR code generated. Scan with your phone.';
+            } else {
+                status.className = 'p-3 rounded-lg bg-red-600/20 border border-red-600 text-red-400 text-sm';
+                status.innerHTML = '<i class="fas fa-times mr-1"></i>' + (d.error || 'Failed');
+            }
+        } catch(e) {
+            status.className = 'p-3 rounded-lg bg-red-600/20 border border-red-600 text-red-400 text-sm';
+            status.innerHTML = '<i class="fas fa-times mr-1"></i>Connection error';
+        }
+    } else {
+        status.className = 'p-3 rounded-lg bg-green-600/20 border border-green-600 text-green-400 text-sm';
+        status.innerHTML = '<i class="fas fa-check mr-1"></i>Ready to save. Click Save to connect.';
     }
+}
 
-    if (resp) {
-      const data = await resp.json();
-      if (data.success) {
-        document.getElementById('chatMessage').value = '';
-        document.getElementById('messagesArea').innerHTML += `<div class="bg-green-600/20 border border-green-600 rounded-lg p-3 mb-3"><span class="text-green-400 text-sm"><i class="fas fa-check mr-1"></i>Message sent to ${to}</span></div>`;
-        document.getElementById('messagesArea').scrollTop = document.getElementById('messagesArea').scrollHeight;
-      } else {
-        document.getElementById('messagesArea').innerHTML += `<div class="bg-red-600/20 border border-red-600 rounded-lg p-3 mb-3"><span class="text-red-400 text-sm"><i class="fas fa-times mr-1"></i>${data.message || 'Send failed'}</span></div>`;
-      }
+function saveConnect() {
+    if (!currentConnectService) return;
+    const svc = currentConnectService;
+    const name = document.getElementById('cName')?.value || svc.name;
+    connected[svc.id] = {name, connected: true, timestamp: Date.now()};
+    localStorage.setItem('int_connected', JSON.stringify(connected));
+    closeConnectModal();
+    renderCatalog(catalog);
+    showToast(svc.name + ' connected!');
+}
+
+function disconnectService(id) {
+    delete connected[id];
+    localStorage.setItem('int_connected', JSON.stringify(connected));
+    renderConnected();
+    renderCatalog(catalog);
+    showToast('Disconnected');
+}
+
+/* ===== QR / Barcode ===== */
+async function generateQR(type) {
+    let content = document.getElementById('qrContent').value;
+    if (type === 'wifi') {
+        const ssid = prompt('WiFi SSID:', 'MyNetwork');
+        const pass = prompt('WiFi Password:', '');
+        content = `WIFI:T:WPA;S:${ssid};P:${pass};;`;
     }
-  } catch(e) {
-    console.error('Send error:', e);
-  }
+    try {
+        const r = await fetch(API + '/qr/generate', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({content})});
+        const d = await r.json();
+        if (d.success) {
+            document.getElementById('qrImage').src = d.image;
+            document.getElementById('qrContentText').textContent = d.content;
+            document.getElementById('qrResult').classList.remove('hidden');
+        } else { showToast(d.error || 'Failed', 'error'); }
+    } catch(e) { showToast('Error: ' + e.message, 'error'); }
 }
 
-async function aiReply() {
-  if (!currentPlatform) return;
-
-  const model = document.getElementById('chatModel').value;
-  const tone = document.getElementById('chatTone').value;
-  const lastMsg = document.getElementById('messagesArea').querySelectorAll('.bg-gray-700');
-  const lastMessage = lastMsg.length > 0 ? lastMsg[lastMsg.length - 1].textContent : '';
-
-  if (!lastMessage) {
-    alert('No messages to reply to');
-    return;
-  }
-
-  try {
-    const resp = await fetch('http://203.55.176.101:8000/v1/chat/completions', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer sk-local-f61f4d314363e693de5b7fd9792d4bbb91f6a064b5f09be1eb247100476f17ea'},
-      body: JSON.stringify({
-        model: model,
-        messages: [
-          {role: 'system', content: `You are a helpful assistant replying to messages on ${currentPlatform}. Use a ${tone} tone.`},
-          {role: 'user', content: `Last message: "${lastMessage}"\n\nWrite a reply:`}
-        ],
-        max_tokens: 500
-      })
-    });
-    const data = await resp.json();
-    const reply = data.choices?.[0]?.message?.content || '';
-    document.getElementById('chatMessage').value = reply;
-  } catch(e) {
-    console.error('AI reply error:', e);
-  }
+function downloadQR() {
+    const img = document.getElementById('qrImage');
+    const a = document.createElement('a'); a.href = img.src; a.download = 'qrcode.png'; a.click();
 }
 
-renderConnectedAccounts();
+let waSessionId = 'wa_default';
+let waQrRefreshInterval = null;
+let waStatusRefreshInterval = null;
+
+async function initWhatsAppWeb() {
+    const btn = document.getElementById('waInitBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Starting...';
+    try {
+        const r = await fetch(API + '/whatsapp/qr', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({session_id: waSessionId})});
+        const d = await r.json();
+        if (d.success) {
+            document.getElementById('waQrImage').src = d.image;
+            document.getElementById('waQrResult').classList.remove('hidden');
+            document.getElementById('waConnectedBox').classList.add('hidden');
+            updateWAStatus('qr_ready', 'Scan QR code with WhatsApp');
+            showToast('QR code ready! Scan with WhatsApp', 'success');
+            if (!waQrRefreshInterval) waQrRefreshInterval = setInterval(refreshWhatsAppQR, 25000);
+        } else if (d.fallback) {
+            showToast('Bridge not running. Using chat link instead.', 'info');
+            generateChatLinkQR();
+        } else if (d.error) {
+            showToast(d.error, 'error');
+        }
+    } catch(e) { showToast('Error: ' + e.message, 'error'); }
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-qrcode mr-1"></i>Start & Get QR Code';
+}
+
+async function refreshWhatsAppQR() {
+    try {
+        const r = await fetch(API + '/whatsapp/qr', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({session_id: waSessionId, refresh: true})});
+        const d = await r.json();
+        if (d.success && d.image) {
+            document.getElementById('waQrImage').src = d.image;
+        }
+    } catch(e) {}
+}
+
+async function checkWhatsAppStatus() {
+    try {
+        const r = await fetch(API + '/whatsapp/status?session_id=' + waSessionId);
+        const d = await r.json();
+        if (d.success) {
+            updateWAStatus(d.status, d.status === 'ready' ? 'Connected & Ready' : (d.status || 'Unknown'));
+            if (d.status === 'ready') {
+                document.getElementById('waQrResult').classList.add('hidden');
+                document.getElementById('waConnectedBox').classList.remove('hidden');
+                if (waQrRefreshInterval) { clearInterval(waQrRefreshInterval); waQrRefreshInterval = null; }
+            } else if (d.status === 'disconnected' || d.status === 'auth_failure') {
+                if (waQrRefreshInterval) { clearInterval(waQrRefreshInterval); waQrRefreshInterval = null; }
+            }
+        }
+    } catch(e) {}
+}
+
+function updateWAStatus(status, text) {
+    const dot = document.getElementById('waStatusDot');
+    const textEl = document.getElementById('waStatusText');
+    if (textEl) textEl.textContent = text;
+    if (dot) {
+        dot.className = 'status-dot';
+        if (status === 'ready' || status === 'connected') {
+            dot.classList.add('green');
+        } else if (status === 'disconnected' || status === 'auth_failure' || status === 'init_error') {
+            dot.classList.add('red');
+        } else {
+            dot.classList.add('gray');
+        }
+    }
+}
+
+async function logoutWhatsAppWeb() {
+    if (!confirm('Logout from WhatsApp Web?')) return;
+    try {
+        await fetch(API + '/whatsapp/logout', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({session_id: waSessionId})});
+        document.getElementById('waQrResult').classList.add('hidden');
+        document.getElementById('waConnectedBox').classList.add('hidden');
+        updateWAStatus('disconnected', 'Disconnected');
+        if (waQrRefreshInterval) { clearInterval(waQrRefreshInterval); waQrRefreshInterval = null; }
+        showToast('Logged out', 'success');
+    } catch(e) { showToast('Error', 'error'); }
+}
+
+async function generateChatLinkQR() {
+    const phone = prompt('Enter WhatsApp number (with country code, e.g. +14155552671):');
+    if (!phone) return;
+    try {
+        const r = await fetch(API + '/whatsapp/chat-link-qr', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({phone, message: 'Hello!'})});
+        const d = await r.json();
+        if (d.success) {
+            document.getElementById('waQrImage').src = d.image;
+            document.getElementById('waQrResult').classList.remove('hidden');
+            showToast('Chat link QR generated', 'success');
+        }
+    } catch(e) { showToast('Error', 'error'); }
+}
+
+async function sendWhatsAppWebMessage() {
+    const to = document.getElementById('waRecipient').value.trim().replace(/[^\d]/g, '');
+    const text = document.getElementById('waText').value.trim();
+    if (!to || !text) { showToast('Recipient and message required', 'error'); return; }
+    const btn = document.getElementById('waSendBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Sending...';
+    try {
+        const r = await fetch(API + '/whatsapp/send-wa', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({session_id: waSessionId, to, text})});
+        const d = await r.json();
+        if (d.success) { showToast('Message sent!', 'success'); document.getElementById('waText').value = ''; }
+        else { showToast(d.message || d.error || 'Failed', 'error'); }
+    } catch(e) { showToast('Error: ' + e.message, 'error'); }
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-paper-plane mr-1"></i>Send';
+}
+
+async function loadWhatsAppMessages() {
+    try {
+        const r = await fetch(API + '/whatsapp/messages');
+        const d = await r.json();
+        const list = document.getElementById('waMessagesList');
+        if (d.messages && d.messages.length > 0) {
+            list.innerHTML = d.messages.slice().reverse().slice(0, 10).map(m => `
+                <div class="p-2 bg-gray-800/50 rounded text-[10px]">
+                    <div class="flex items-center justify-between mb-0.5">
+                        <span class="text-green-400 font-mono">${esc(m.from)} ${m.from_name ? '· ' + esc(m.from_name) : ''}</span>
+                        <span class="text-gray-600">${(m.timestamp || '').slice(11, 16)}</span>
+                    </div>
+                    <p class="text-gray-300 break-words">${esc(m.text || '')}</p>
+                </div>
+            `).join('');
+        } else {
+            list.innerHTML = '<p class="text-[10px] text-gray-500 italic">No messages yet</p>';
+        }
+    } catch(e) {}
+}
+
+// Keep old function names as aliases for backward compatibility
+function generateWhatsAppQR() { return initWhatsAppWeb(); }
+function saveWhatsAppConfig() { return initWhatsAppWeb(); }
+function testWhatsAppConnection() { return checkWhatsAppStatus(); }
+function sendWhatsAppMessage() { return sendWhatsAppWebMessage(); }
+function loadWhatsAppConfig() { checkWhatsAppStatus(); }
+function copyWhatsAppLink() { showToast('Scan the QR code with WhatsApp', 'info'); }
+
+async function generateBarcode() {
+    const content = document.getElementById('barcodeContent').value;
+    const type = document.getElementById('barcodeType').value;
+    try {
+        const r = await fetch(API + '/barcode/generate', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({content, type})});
+        const d = await r.json();
+        if (d.success) {
+            document.getElementById('barcodeImage').src = d.image;
+            document.getElementById('barcodeContentText').textContent = d.content + ' (' + d.type + ')';
+            document.getElementById('barcodeResult').classList.remove('hidden');
+        } else { showToast(d.error || 'Failed', 'error'); }
+    } catch(e) { showToast('Error', 'error'); }
+}
+
+/* ===== Camera Scanner ===== */
+async function startCamera() {
+    try {
+        cameraStream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
+        document.getElementById('cameraVideo').srcObject = cameraStream;
+        document.getElementById('btnStartCam').disabled = true;
+        document.getElementById('btnStopCam').disabled = false;
+        document.getElementById('btnScan').disabled = false;
+    } catch(e) { showToast('Camera access denied', 'error'); }
+}
+
+function stopCamera() {
+    if (cameraStream) { cameraStream.getTracks().forEach(t => t.stop()); cameraStream = null; }
+    document.getElementById('cameraVideo').srcObject = null;
+    document.getElementById('btnStartCam').disabled = false;
+    document.getElementById('btnStopCam').disabled = true;
+    document.getElementById('btnScan').disabled = true;
+}
+
+async function captureAndScan() {
+    const video = document.getElementById('cameraVideo');
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+    canvas.getContext('2d').drawImage(video, 0, 0);
+    canvas.toBlob(async (blob) => {
+        const fd = new FormData(); fd.append('image', blob, 'scan.png');
+        try {
+            const r = await fetch(API + '/barcode/scan', {method:'POST', body:fd});
+            const d = await r.json();
+            if (d.success && d.barcodes.length > 0) {
+                document.getElementById('scanData').textContent = d.barcodes.map(b => b.data).join(', ');
+                document.getElementById('scanType').textContent = d.barcodes.map(b => b.type).join(', ');
+                document.getElementById('scanResult').classList.remove('hidden');
+            } else {
+                document.getElementById('scanData').textContent = 'No barcode found in image';
+                document.getElementById('scanType').textContent = '';
+                document.getElementById('scanResult').classList.remove('hidden');
+            }
+        } catch(e) { showToast('Scan error', 'error'); }
+    }, 'image/png');
+}
+
+async function scanUploadedFile() {
+    const file = document.getElementById('scanFile').files[0];
+    if (!file) return;
+    const fd = new FormData(); fd.append('image', file);
+    const el = document.getElementById('uploadScanResult');
+    el.classList.remove('hidden');
+    el.innerHTML = '<p class="text-gray-500 text-sm"><i class="fas fa-spinner fa-spin mr-1"></i>Scanning...</p>';
+    try {
+        const r = await fetch(API + '/barcode/scan', {method:'POST', body:fd});
+        const d = await r.json();
+        if (d.success && d.barcodes.length > 0) {
+            el.innerHTML = d.barcodes.map(b => `<div class="result-box mb-2"><p class="text-white font-mono text-sm">${b.data}</p><p class="text-gray-400 text-xs">${b.type}</p></div>`).join('');
+        } else {
+            el.innerHTML = '<p class="text-gray-400 text-sm">No barcode found in image</p>';
+        }
+    } catch(e) { el.innerHTML = '<p class="text-red-400 text-sm">Scan failed</p>'; }
+}
+
+/* ===== Webhooks ===== */
+function showCreateWebhook() { document.getElementById('webhookForm').classList.remove('hidden'); }
+function hideCreateWebhook() { document.getElementById('webhookForm').classList.add('hidden'); }
+
+async function loadWebhooks() {
+    try {
+        const r = await fetch(API + '/webhooks');
+        const hooks = await r.json();
+        const el = document.getElementById('webhookList');
+        if (!hooks.length) { el.innerHTML = '<p class="text-gray-500 text-sm text-center py-8">No webhooks configured yet</p>'; return; }
+        el.innerHTML = hooks.map(h => `
+            <div class="webhook-row">
+                <span class="status-dot ${h.active ? 'green' : 'red'}"></span>
+                <div class="flex-1 min-w-0">
+                    <p class="text-white text-sm font-medium truncate">${h.name}</p>
+                    <p class="text-gray-500 text-xs">${h.method} ${h.url}</p>
+                    <p class="text-gray-600 text-[10px]">Triggered ${h.trigger_count||0} times ${h.last_triggered ? '| Last: '+h.last_triggered.split('T')[0] : ''}</p>
+                </div>
+                <button onclick="testWebhook('${h.id}')" class="px-3 py-1 bg-indigo-600/20 text-indigo-400 rounded-lg text-xs transition hover:bg-indigo-600/30">Test</button>
+                <button onclick="deleteWebhook('${h.id}')" class="px-3 py-1 bg-red-600/20 text-red-400 rounded-lg text-xs transition hover:bg-red-600/30">Delete</button>
+            </div>
+        `).join('');
+    } catch(e) {}
+}
+
+async function createWebhook() {
+    const data = {
+        name: document.getElementById('whName').value,
+        url: document.getElementById('whUrl').value,
+        method: document.getElementById('whMethod').value,
+        events: document.getElementById('whEvents').value.split(',').map(s=>s.trim()).filter(Boolean),
+        body: document.getElementById('whBody').value
+    };
+    try {
+        await fetch(API + '/webhooks', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)});
+        hideCreateWebhook();
+        loadWebhooks();
+        showToast('Webhook created!');
+    } catch(e) { showToast('Failed', 'error'); }
+}
+
+async function testWebhook(id) {
+    try {
+        const r = await fetch(API + '/webhooks/' + id + '/test', {method:'POST'});
+        const d = await r.json();
+        showToast(d.success ? 'Triggered! Status: ' + d.status : (d.error || 'Failed'));
+    } catch(e) { showToast('Test failed', 'error'); }
+}
+
+async function deleteWebhook(id) {
+    if (!confirm('Delete this webhook?')) return;
+    try { await fetch(API + '/webhooks/' + id, {method:'DELETE'}); loadWebhooks(); showToast('Deleted'); } catch(e) {}
+}
+
+/* ===== API Tester ===== */
+async function testApi() {
+    const btn = document.getElementById('btnApiTest');
+    btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Sending...';
+    const data = {
+        url: document.getElementById('apiUrl').value,
+        method: document.getElementById('apiMethod').value,
+        auth_type: document.getElementById('apiAuth').value,
+        auth_token: document.getElementById('apiAuthToken').value,
+        body: document.getElementById('apiBody').value,
+        headers: {}
+    };
+    try { data.headers = JSON.parse(document.getElementById('apiHeadersInput').value || '{}'); } catch(e) {}
+    try {
+        const r = await fetch(API + '/api-test', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)});
+        const d = await r.json();
+        const res = document.getElementById('apiResult');
+        res.classList.remove('hidden');
+        if (d.success) {
+            document.getElementById('apiStatus').textContent = d.status;
+            document.getElementById('apiStatus').className = 'px-3 py-1 rounded-lg text-sm font-bold ' + (d.status < 300 ? 'bg-green-600/20 text-green-400' : d.status < 400 ? 'bg-blue-600/20 text-blue-400' : 'bg-red-600/20 text-red-400');
+            document.getElementById('apiTime').textContent = d.time_ms + 'ms';
+            document.getElementById('apiSize').textContent = (d.size/1024).toFixed(1) + 'KB';
+            try { document.getElementById('apiResponseBody').textContent = JSON.stringify(JSON.parse(d.body), null, 2); } catch(e) { document.getElementById('apiResponseBody').textContent = d.body; }
+        } else {
+            document.getElementById('apiStatus').textContent = 'ERR';
+            document.getElementById('apiStatus').className = 'px-3 py-1 rounded-lg text-sm font-bold bg-red-600/20 text-red-400';
+            document.getElementById('apiResponseBody').textContent = d.error || 'Request failed';
+        }
+    } catch(e) {
+        document.getElementById('apiResult').classList.remove('hidden');
+        document.getElementById('apiStatus').textContent = 'ERR';
+        document.getElementById('apiStatus').className = 'px-3 py-1 rounded-lg text-sm font-bold bg-red-600/20 text-red-400';
+        document.getElementById('apiResponseBody').textContent = e.message;
+    }
+    btn.disabled = false; btn.innerHTML = '<i class="fas fa-play mr-1"></i>Send Request';
+}
+
+/* ===== Chat ===== */
+function populateChatPlatforms() {
+    const sel = document.getElementById('chatPlatform');
+    sel.innerHTML = '<option value="">Select platform...</option>' + Object.entries(connected).map(([id, acc]) => `<option value="${id}">${acc.name || id}</option>`).join('');
+}
+
+function switchChatPlatform() {
+    const id = document.getElementById('chatPlatform').value;
+    if (!id) return;
+    const svc = catalog.find(s => s.id === id) || {};
+    document.getElementById('chatIcon').className = `w-10 h-10 bg-${svc.color||'gray'}-600/20 rounded-lg flex items-center justify-center`;
+    document.getElementById('chatIcon').innerHTML = `<i class="${svc.icon||'fas fa-plug'} text-${svc.color||'gray'}-400"></i>`;
+    document.getElementById('chatTitle').textContent = connected[id]?.name || id;
+    document.getElementById('chatStatus').textContent = 'Connected';
+    document.getElementById('chatMessages').innerHTML = '<div class="text-center text-gray-500 py-8"><i class="fas fa-inbox text-3xl mb-2"></p><p class="text-sm">Messages will appear here</p></div>';
+}
+
+function sendChatMsg() {
+    const msg = document.getElementById('chatMsg').value;
+    if (!msg) return;
+    const el = document.getElementById('chatMessages');
+    el.innerHTML += `<div class="flex justify-end mb-2"><div class="bg-indigo-600 text-white rounded-lg px-3 py-2 text-sm max-w-[70%]">${esc(msg)}</div></div>`;
+    document.getElementById('chatMsg').value = '';
+    el.scrollTop = el.scrollHeight;
+    setTimeout(() => {
+        el.innerHTML += `<div class="flex mb-2"><div class="bg-gray-700 text-gray-300 rounded-lg px-3 py-2 text-sm max-w-[70%]"><i class="fas fa-robot mr-1 text-green-400"></i>Message queued for delivery</div></div>`;
+        el.scrollTop = el.scrollHeight;
+    }, 500);
+}
+
+async function aiChatReply() {
+    const model = document.getElementById('chatModel').value;
+    const tone = document.getElementById('chatTone').value;
+    const el = document.getElementById('chatMessages');
+    const msgs = el.querySelectorAll('.bg-gray-700');
+    const lastMsg = msgs.length ? msgs[msgs.length-1].textContent : '';
+    if (!lastMsg) { showToast('No messages to reply to', 'error'); return; }
+    el.innerHTML += '<div class="flex mb-2"><div class="bg-green-600/20 border border-green-600 text-green-400 rounded-lg px-3 py-2 text-sm"><i class="fas fa-spinner fa-spin mr-1"></i>Generating...</div></div>';
+    el.scrollTop = el.scrollHeight;
+    try {
+        const r = await fetch('http://localhost:8000/v1/chat/completions', {method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer sk-local-f61f4d314363e693de5b7fd9792d4bbb91f6a064b5f09be1eb247100476f17ea'}, body:JSON.stringify({model, messages:[{role:'system',content:`Reply in ${tone} tone. Be concise.`},{role:'user',content:lastMsg}],max_tokens:300})});
+        const d = await r.json();
+        const reply = d.choices?.[0]?.message?.content || 'No response';
+        document.getElementById('chatMsg').value = reply;
+    } catch(e) { showToast('AI error', 'error'); }
+}
+
+/* ===== Utils ===== */
+function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+function showToast(msg, type) {
+    const t = document.getElementById('toast');
+    t.className = 'fixed bottom-6 right-6 ' + (type==='error'?'bg-red-600':'bg-green-600') + ' text-white px-4 py-2.5 rounded-lg shadow-lg z-50 flex items-center gap-2 text-sm font-medium';
+    document.getElementById('toastMsg').textContent = msg;
+    t.classList.remove('hidden');
+    setTimeout(() => t.classList.add('hidden'), 2500);
+}
+
+/* Init */
+loadCatalog();
+loadWhatsAppMessages();
+waStatusRefreshInterval = setInterval(checkWhatsAppStatus, 10000);
+checkWhatsAppStatus();
+document.getElementById('connectModal').addEventListener('click', function(e) { if (e.target === this) closeConnectModal(); });
 </script>
 {% endblock %}
