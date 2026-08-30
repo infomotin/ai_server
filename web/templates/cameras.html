@@ -1,0 +1,1103 @@
+{% extends "base.html" %}
+{% block title %}OpenLocalAI - Cameras{% endblock %}
+{% block header_title %}Cameras & Surveillance{% endblock %}
+
+{% block content %}
+<style>
+    .cam-card { background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(71, 85, 105, 0.3); border-radius: 16px; transition: all .25s; overflow: hidden; }
+    .cam-card:hover { border-color: rgba(59, 130, 246, 0.4); }
+    .cam-card.recording { border-color: rgba(239, 68, 68, 0.5); box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.2); }
+    .live-video { background: #000; position: relative; aspect-ratio: 16/9; overflow: hidden; }
+    .live-video img, .live-video video { width: 100%; height: 100%; object-fit: contain; }
+    .live-overlay { position: absolute; top: 8px; left: 8px; right: 8px; display: flex; justify-content: space-between; align-items: center; pointer-events: none; }
+    .live-overlay > * { pointer-events: auto; }
+    .rec-badge { background: rgba(239, 68, 68, 0.9); padding: 2px 8px; border-radius: 6px; color: white; font-size: 10px; font-weight: 700; display: flex; align-items: center; gap: 4px; animation: pulse-red 2s infinite; }
+    @keyframes pulse-red { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+    .live-badge { background: rgba(34, 197, 94, 0.9); padding: 2px 8px; border-radius: 6px; color: white; font-size: 10px; font-weight: 700; }
+    .offline-badge { background: rgba(100, 116, 139, 0.7); padding: 2px 8px; border-radius: 6px; color: white; font-size: 10px; font-weight: 700; }
+    .rec-pulse { width: 8px; height: 8px; border-radius: 50%; background: #fff; }
+    .cam-thumb { aspect-ratio: 16/9; background: linear-gradient(135deg, #1e293b, #0f172a); display: flex; align-items: center; justify-content: center; cursor: pointer; position: relative; overflow: hidden; }
+    .cam-thumb img { width: 100%; height: 100%; object-fit: cover; transition: transform .3s; }
+    .cam-thumb:hover img { transform: scale(1.05); }
+    .object-tag { display: inline-block; background: rgba(34, 197, 94, 0.2); color: #4ade80; padding: 2px 8px; border-radius: 4px; font-size: 10px; margin: 2px; border: 1px solid rgba(34, 197, 94, 0.3); }
+    .object-tag.conf-very-high { background: rgba(239, 68, 68, 0.2); color: #fca5a5; border-color: rgba(239, 68, 68, 0.3); }
+    .object-tag.conf-high { background: rgba(245, 158, 11, 0.2); color: #fcd34d; border-color: rgba(245, 158, 11, 0.3); }
+    .ptz-pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; width: 80px; }
+    .ptz-btn { width: 24px; height: 24px; border-radius: 4px; background: rgba(59, 130, 246, 0.8); border: none; color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 10px; }
+    .ptz-btn:hover { background: rgba(59, 130, 246, 1); }
+    .ptz-btn:active { background: rgba(59, 130, 246, 0.6); }
+    .grid-1 { grid-template-columns: 1fr; }
+    .grid-2 { grid-template-columns: repeat(2, 1fr); }
+    .grid-3 { grid-template-columns: repeat(3, 1fr); }
+    .grid-4 { grid-template-columns: repeat(4, 1fr); }
+    .config-panel { background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(71, 85, 105, 0.5); border-radius: 12px; }
+</style>
+
+<div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+    <div class="stat-card">
+        <div class="flex items-center justify-between mb-2">
+            <span class="text-gray-400 text-sm">Total Cameras</span>
+            <i class="fas fa-video text-blue-400"></i>
+        </div>
+        <p class="text-2xl font-bold text-white" id="camTotalCount">0</p>
+        <p class="text-xs text-gray-500 mt-1">All accessible</p>
+    </div>
+    <div class="stat-card">
+        <div class="flex items-center justify-between mb-2">
+            <span class="text-gray-400 text-sm">Online</span>
+            <i class="fas fa-signal text-green-400"></i>
+        </div>
+        <p class="text-2xl font-bold text-green-400" id="camOnlineCount">0</p>
+        <p class="text-xs text-gray-500 mt-1">Streaming now</p>
+    </div>
+    <div class="stat-card">
+        <div class="flex items-center justify-between mb-2">
+            <span class="text-gray-400 text-sm">Recording</span>
+            <i class="fas fa-circle text-red-400" style="animation: pulse-red 2s infinite"></i>
+        </div>
+        <p class="text-2xl font-bold text-red-400" id="camRecordingCount">0</p>
+        <p class="text-xs text-gray-500 mt-1">Active sessions</p>
+    </div>
+    <div class="stat-card">
+        <div class="flex items-center justify-between mb-2">
+            <span class="text-gray-400 text-sm">Storage Used</span>
+            <i class="fas fa-hdd text-purple-400"></i>
+        </div>
+        <p class="text-2xl font-bold text-purple-400" id="camStorageUsed">0 MB</p>
+        <p class="text-xs text-gray-500 mt-1" id="camStorageRecordings">0 recordings</p>
+    </div>
+</div>
+
+<!-- Tab Navigation -->
+<div class="flex items-center gap-1 mb-6 border-b border-gray-700 pb-1">
+    <button onclick="showCamTab('live')" id="cam-tab-live" class="px-4 py-2 rounded-lg text-sm font-medium text-white bg-gray-700/50 transition"><i class="fas fa-broadcast-tower mr-1"></i>Live View</button>
+    <button onclick="showCamTab('cameras')" id="cam-tab-cameras" class="px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white transition"><i class="fas fa-video mr-1"></i>My Cameras</button>
+    <button onclick="showCamTab('recordings')" id="cam-tab-recordings" class="px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white transition"><i class="fas fa-film mr-1"></i>Recordings</button>
+    <button onclick="showCamTab('analysis')" id="cam-tab-analysis" class="px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white transition"><i class="fas fa-search mr-1"></i>Analysis</button>
+    <button onclick="showCamTab('config')" id="cam-tab-config" class="px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white transition"><i class="fas fa-cog mr-1"></i>Configuration</button>
+    <button onclick="showCamTab('roles')" id="cam-tab-roles" class="px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white transition ml-auto"><i class="fas fa-user-shield mr-1"></i>Roles</button>
+</div>
+
+<!-- ============== LIVE VIEW TAB ============== -->
+<div id="cam-panel-live" class="space-y-4">
+    <div class="flex items-center justify-between flex-wrap gap-2">
+        <h2 class="text-lg font-bold text-white"><i class="fas fa-broadcast-tower text-red-400 mr-2"></i>Live Camera Feeds</h2>
+        <div class="flex items-center gap-2">
+            <div class="flex items-center gap-1 bg-gray-800 rounded-lg p-1">
+                <button onclick="setGridSize(1)" id="grid-1" class="px-2 py-1 text-xs rounded hover:bg-gray-700 text-gray-400"><i class="fas fa-expand"></i></button>
+                <button onclick="setGridSize(2)" id="grid-2" class="px-2 py-1 text-xs rounded hover:bg-gray-700 text-gray-400"><i class="fas fa-th-large"></i></button>
+                <button onclick="setGridSize(3)" id="grid-3" class="px-2 py-1 text-xs rounded hover:bg-gray-700 text-white bg-gray-600"><i class="fas fa-th"></i></button>
+                <button onclick="setGridSize(4)" id="grid-4" class="px-2 py-1 text-xs rounded hover:bg-gray-700 text-gray-400"><i class="fas fa-th"></i>4</button>
+            </div>
+            <button onclick="refreshCameras()" class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-white text-xs rounded-lg transition"><i class="fas fa-sync mr-1"></i>Refresh</button>
+        </div>
+    </div>
+    <div id="liveGrid" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="col-span-full text-center text-gray-500 py-12">
+            <i class="fas fa-video text-4xl mb-3 opacity-30"></i>
+            <p>Loading cameras...</p>
+        </div>
+    </div>
+</div>
+
+<!-- ============== MY CAMERAS TAB ============== -->
+<div id="cam-panel-cameras" class="hidden space-y-6">
+    <div class="flex items-center justify-between flex-wrap gap-2">
+        <h2 class="text-lg font-bold text-white"><i class="fas fa-video text-blue-400 mr-2"></i>Camera Management</h2>
+        <div class="flex items-center gap-2">
+            <button onclick="showAddCameraForm()" id="addCamBtn" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-sm rounded-lg transition"><i class="fas fa-plus mr-1"></i>Add Camera</button>
+        </div>
+    </div>
+
+    <!-- Add Camera Form -->
+    <div id="addCamForm" class="card hidden">
+        <h3 class="text-white font-semibold mb-4 flex items-center gap-2"><i class="fas fa-plus-circle text-blue-400"></i> Add New Camera</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+                <label class="block text-xs text-gray-400 mb-1">Name *</label>
+                <input type="text" id="newCamName" class="input-field text-sm" placeholder="Living Room Cam">
+            </div>
+            <div>
+                <label class="block text-xs text-gray-400 mb-1">Brand</label>
+                <select id="newCamBrand" class="input-field text-sm" onchange="updateStreamUrlPlaceholder()">
+                    <option value="imou">Imou Life</option>
+                    <option value="imou_cloud">Imou Cloud (API)</option>
+                    <option value="hikvision">Hikvision</option>
+                    <option value="dahua">Dahua</option>
+                    <option value="reolink">Reolink</option>
+                    <option value="tp-link">TP-Link Tapo</option>
+                    <option value="ezviz">Ezviz</option>
+                    <option value="onvif">ONVIF Generic</option>
+                    <option value="custom">Custom RTSP/HLS</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs text-gray-400 mb-1">Location</label>
+                <input type="text" id="newCamLocation" class="input-field text-sm" placeholder="Front Door, Garage, etc.">
+            </div>
+            <div>
+                <label class="block text-xs text-gray-400 mb-1">Stream Type</label>
+                <select id="newCamStreamType" class="input-field text-sm" onchange="updateStreamUrlPlaceholder()">
+                    <option value="rtsp">RTSP</option>
+                    <option value="hls">HLS</option>
+                    <option value="mjpeg">MJPEG</option>
+                    <option value="webrtc">WebRTC</option>
+                </select>
+            </div>
+            <div class="md:col-span-2">
+                <label class="block text-xs text-gray-400 mb-1">Stream URL *</label>
+                <input type="text" id="newCamStreamUrl" class="input-field text-sm font-mono" placeholder="rtsp://user:pass@192.168.1.100:554/...">
+                <p class="text-[10px] text-gray-500 mt-1" id="streamUrlHint">Use format from your camera's RTSP guide</p>
+            </div>
+            <div>
+                <label class="block text-xs text-gray-400 mb-1">Username</label>
+                <input type="text" id="newCamUser" class="input-field text-sm" placeholder="admin">
+            </div>
+            <div>
+                <label class="block text-xs text-gray-400 mb-1">Password</label>
+                <input type="password" id="newCamPass" class="input-field text-sm" placeholder="••••••••">
+            </div>
+            <div>
+                <label class="block text-xs text-gray-400 mb-1">Port (default 554)</label>
+                <input type="number" id="newCamPort" class="input-field text-sm" placeholder="554" value="554">
+            </div>
+            <div>
+                <label class="block text-xs text-gray-400 mb-1">Channel (for DVR/NVR)</label>
+                <input type="number" id="newCamChannel" class="input-field text-sm" placeholder="1" value="1">
+            </div>
+            <div class="md:col-span-2 flex items-center gap-4">
+                <label class="flex items-center gap-2 text-xs text-gray-300">
+                    <input type="checkbox" id="newCamPublic" class="rounded bg-gray-700 border-gray-600">
+                    <span>Public (visible to all users)</span>
+                </label>
+                <label class="flex items-center gap-2 text-xs text-gray-300">
+                    <input type="checkbox" id="newCamMotion" class="rounded bg-gray-700 border-gray-600" checked>
+                    <span>Motion detection</span>
+                </label>
+                <label class="flex items-center gap-2 text-xs text-gray-300">
+                    <input type="checkbox" id="newCamPTZ" class="rounded bg-gray-700 border-gray-600">
+                    <span>Has PTZ</span>
+                </label>
+            </div>
+        </div>
+        <div class="flex gap-2 mt-4">
+            <button onclick="createCamera()" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm rounded-lg font-medium"><i class="fas fa-plus mr-1"></i>Add Camera</button>
+            <button onclick="document.getElementById('addCamForm').classList.add('hidden')" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white text-sm rounded-lg">Cancel</button>
+        </div>
+    </div>
+
+    <!-- Camera List -->
+    <div id="camList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div class="col-span-full text-center text-gray-500 py-12">
+            <i class="fas fa-spinner fa-spin text-2xl mb-3"></i>
+            <p>Loading cameras...</p>
+        </div>
+    </div>
+</div>
+
+<!-- ============== RECORDINGS TAB ============== -->
+<div id="cam-panel-recordings" class="hidden space-y-4">
+    <div class="flex items-center justify-between flex-wrap gap-2">
+        <h2 class="text-lg font-bold text-white"><i class="fas fa-film text-purple-400 mr-2"></i>All Recordings</h2>
+        <button onclick="loadAllRecordings()" class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-white text-xs rounded-lg"><i class="fas fa-sync mr-1"></i>Refresh</button>
+    </div>
+    <div id="recordingsList" class="space-y-2">
+        <div class="text-center text-gray-500 py-12">
+            <i class="fas fa-spinner fa-spin text-2xl mb-3"></i>
+            <p>Loading recordings...</p>
+        </div>
+    </div>
+</div>
+
+<!-- ============== ANALYSIS TAB ============== -->
+<div id="cam-panel-analysis" class="hidden space-y-4">
+    <div class="flex items-center justify-between flex-wrap gap-2">
+        <h2 class="text-lg font-bold text-white"><i class="fas fa-search text-cyan-400 mr-2"></i>Object Analysis</h2>
+        <p class="text-xs text-gray-500">Detect objects (person, car, etc.) in recordings</p>
+    </div>
+    <div id="analysisList" class="space-y-2">
+        <p class="text-center text-gray-500 text-sm py-8">Go to Recordings tab, then click Analyze on a recording</p>
+    </div>
+</div>
+
+<!-- ============== CONFIGURATION TAB ============== -->
+<div id="cam-panel-config" class="hidden space-y-6">
+    <div class="flex items-center justify-between flex-wrap gap-2">
+        <h2 class="text-lg font-bold text-white"><i class="fas fa-cog text-amber-400 mr-2"></i>Camera Configuration</h2>
+    </div>
+
+    <!-- Imou Cloud API Settings -->
+    <div class="config-panel p-6">
+        <h3 class="text-white font-semibold mb-4 flex items-center gap-2">
+            <i class="fas fa-cloud text-blue-400"></i> Imou Life Cloud API
+        </h3>
+        <p class="text-xs text-gray-400 mb-4">Connect to Imou Life cloud to sync devices and access cloud features. Get App ID and App Secret from <a href="https://open.imoulife.com" target="_blank" class="text-blue-400 hover:underline">Imou Open Platform</a>.</p>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-xs text-gray-400 mb-1">App ID</label>
+                <input type="text" id="imouAppId" class="input-field text-sm font-mono" placeholder="Your Imou App ID">
+            </div>
+            <div>
+                <label class="block text-xs text-gray-400 mb-1">App Secret</label>
+                <input type="password" id="imouAppSecret" class="input-field text-sm font-mono" placeholder="Your Imou App Secret">
+            </div>
+        </div>
+        <div class="flex gap-2 mt-4">
+            <button onclick="saveImouConfig()" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm rounded-lg font-medium"><i class="fas fa-save mr-1"></i>Save & Connect</button>
+            <button onclick="syncImouDevices()" class="px-4 py-2 bg-green-600 hover:bg-green-500 text-white text-sm rounded-lg font-medium"><i class="fas fa-sync mr-1"></i>Sync Devices</button>
+        </div>
+        <div id="imouStatus" class="mt-3 text-xs text-gray-500"></div>
+    </div>
+
+    <!-- Brand Presets -->
+    <div class="config-panel p-6">
+        <h3 class="text-white font-semibold mb-4 flex items-center gap-2">
+            <i class="fas fa-info-circle text-cyan-400"></i> RTSP URL Patterns by Brand
+        </h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
+            <div class="bg-gray-800/50 p-3 rounded-lg">
+                <p class="text-white font-medium mb-1">Imou Life</p>
+                <code class="text-gray-400">rtsp://user:pass@ip:554/live</code>
+            </div>
+            <div class="bg-gray-800/50 p-3 rounded-lg">
+                <p class="text-white font-medium mb-1">Hikvision</p>
+                <code class="text-gray-400">rtsp://user:pass@ip:554/Streaming/Channels/101</code>
+            </div>
+            <div class="bg-gray-800/50 p-3 rounded-lg">
+                <p class="text-white font-medium mb-1">Dahua</p>
+                <code class="text-gray-400">rtsp://user:pass@ip:554/cam/realmonitor?channel=1&subtype=0</code>
+            </div>
+            <div class="bg-gray-800/50 p-3 rounded-lg">
+                <p class="text-white font-medium mb-1">Reolink</p>
+                <code class="text-gray-400">rtsp://user:pass@ip:554/h264Main</code>
+            </div>
+            <div class="bg-gray-800/50 p-3 rounded-lg">
+                <p class="text-white font-medium mb-1">TP-Link Tapo</p>
+                <code class="text-gray-400">rtsp://user:pass@ip:554/stream1</code>
+            </div>
+            <div class="bg-gray-800/50 p-3 rounded-lg">
+                <p class="text-white font-medium mb-1">Ezviz</p>
+                <code class="text-gray-400">rtsp://user:pass@ip:554/LiveMedia/channels/MEDIA000</code>
+            </div>
+        </div>
+    </div>
+
+    <!-- Global Settings -->
+    <div class="config-panel p-6">
+        <h3 class="text-white font-semibold mb-4 flex items-center gap-2">
+            <i class="fas fa-sliders-h text-purple-400"></i> Global Settings
+        </h3>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+                <label class="block text-xs text-gray-400 mb-1">Default Stream Quality</label>
+                <select id="defaultQuality" class="input-field text-sm">
+                    <option value="流畅">流畅 (Low)</option>
+                    <option value="均衡" selected>均衡 (Balanced)</option>
+                    <option value="高清">高清 (HD)</option>
+                    <option value="超清">超清 (FHD)</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs text-gray-400 mb-1">Snapshot Interval (seconds)</label>
+                <input type="number" id="snapshotInterval" class="input-field text-sm" value="5" min="1" max="60">
+            </div>
+            <div>
+                <label class="block text-xs text-gray-400 mb-1">Max Concurrent Streams</label>
+                <input type="number" id="maxStreams" class="input-field text-sm" value="9" min="1" max="36">
+            </div>
+        </div>
+        <div class="flex gap-2 mt-4">
+            <button onclick="saveGlobalSettings()" class="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-sm rounded-lg font-medium"><i class="fas fa-save mr-1"></i>Save Settings</button>
+        </div>
+    </div>
+</div>
+
+<!-- ============== ROLES TAB ============== -->
+<div id="cam-panel-roles" class="hidden space-y-4">
+    <div class="flex items-center justify-between flex-wrap gap-2">
+        <h2 class="text-lg font-bold text-white"><i class="fas fa-user-shield text-amber-400 mr-2"></i>User Roles & Permissions</h2>
+        <div class="flex items-center gap-2">
+            <span class="text-xs text-gray-500">Your role:</span>
+            <span id="myRoleBadge" class="px-2 py-1 bg-amber-600/30 text-amber-300 text-xs rounded font-semibold">viewer</span>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="card border-blue-500/30">
+            <h3 class="text-white font-semibold mb-2 flex items-center gap-2"><i class="fas fa-eye text-blue-400"></i>Viewer</h3>
+            <p class="text-xs text-gray-400 mb-2">Can view live feeds and recordings</p>
+            <ul class="text-[11px] text-gray-500 space-y-0.5 list-disc list-inside">
+                <li>View cameras</li>
+                <li>Watch recordings</li>
+                <li>View analysis</li>
+            </ul>
+        </div>
+        <div class="card border-cyan-500/30">
+            <h3 class="text-white font-semibold mb-2 flex items-center gap-2"><i class="fas fa-record-vinyl text-cyan-400"></i>Operator</h3>
+            <p class="text-xs text-gray-400 mb-2">Can record, analyze, and share</p>
+            <ul class="text-[11px] text-gray-500 space-y-0.5 list-disc list-inside">
+                <li>All Viewer perms</li>
+                <li>Start/stop recording</li>
+                <li>Run object analysis</li>
+                <li>Share recordings</li>
+            </ul>
+        </div>
+        <div class="card border-amber-500/30">
+            <h3 class="text-white font-semibold mb-2 flex items-center gap-2"><i class="fas fa-crown text-amber-400"></i>Admin</h3>
+            <p class="text-xs text-gray-400 mb-2">Full control over cameras and users</p>
+            <ul class="text-[11px] text-gray-500 space-y-0.5 list-disc list-inside">
+                <li>All Operator perms</li>
+                <li>Add/remove cameras</li>
+                <li>Grant/revoke access</li>
+                <li>Manage user roles</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="card" id="adminUserList" style="display:none">
+        <h3 class="text-white font-semibold mb-3"><i class="fas fa-users text-amber-400 mr-1"></i>User Management (Admin only)</h3>
+        <div id="userList" class="space-y-2"></div>
+    </div>
+</div>
+
+<!-- Camera Detail Modal -->
+<div id="camDetailModal" class="hidden fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
+    <div class="bg-gray-800 rounded-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+        <div class="p-4 border-b border-gray-700 flex items-center justify-between">
+            <h3 id="camDetailTitle" class="text-lg font-bold text-white">Camera Details</h3>
+            <button onclick="closeCamDetail()" class="text-gray-400 hover:text-white"><i class="fas fa-times text-xl"></i></button>
+        </div>
+        <div class="p-4" id="camDetailContent"></div>
+    </div>
+</div>
+
+<!-- PTZ Control Modal -->
+<div id="ptzModal" class="hidden fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
+    <div class="bg-gray-800 rounded-xl w-full max-w-md">
+        <div class="p-4 border-b border-gray-700 flex items-center justify-between">
+            <h3 id="ptzTitle" class="text-lg font-bold text-white">PTZ Control</h3>
+            <button onclick="closePtzModal()" class="text-gray-400 hover:text-white"><i class="fas fa-times text-xl"></i></button>
+        </div>
+        <div class="p-6 flex items-center justify-center gap-8">
+            <div class="ptz-pad">
+                <div></div>
+                <button class="ptz-btn" onclick="ptzMove('up')"><i class="fas fa-chevron-up"></i></button>
+                <div></div>
+                <button class="ptz-btn" onclick="ptzMove('left')"><i class="fas fa-chevron-left"></i></button>
+                <button class="ptz-btn" onclick="ptzMove('center')"><i class="fas fa-crosshairs"></i></button>
+                <button class="ptz-btn" onclick="ptzMove('right')"><i class="fas fa-chevron-right"></i></button>
+                <div></div>
+                <button class="ptz-btn" onclick="ptzMove('down')"><i class="fas fa-chevron-down"></i></button>
+                <div></div>
+            </div>
+            <div class="ptz-pad">
+                <button class="ptz-btn" onclick="ptzMove('zoom_in')"><i class="fas fa-search-plus"></i></button>
+                <div></div>
+                <button class="ptz-btn" onclick="ptzMove('zoom_out')"><i class="fas fa-search-minus"></i></button>
+            </div>
+        </div>
+        <div class="p-4 border-t border-gray-700">
+            <p class="text-xs text-gray-500 text-center">Use buttons to pan, tilt, and zoom</p>
+        </div>
+    </div>
+</div>
+
+<!-- Toast -->
+<div id="camToast" class="fixed bottom-6 right-6 bg-green-600 text-white px-4 py-2.5 rounded-lg shadow-lg z-50 hidden flex items-center gap-2 text-sm font-medium">
+    <i class="fas fa-check-circle"></i>
+    <span id="camToastMsg">Done!</span>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+let allCameras = [];
+let allRecordings = [];
+let liveRefreshInterval = null;
+let currentUserRole = 'viewer';
+let brandPresets = {};
+let currentGridSize = 3;
+let currentPtzCamId = null;
+
+// ============== Tab Navigation ==============
+function showCamTab(tab) {
+    document.querySelectorAll('[id^="cam-panel-"]').forEach(p => p.classList.add('hidden'));
+    document.querySelectorAll('[id^="cam-tab-"]').forEach(t => {
+        t.classList.remove('text-white', 'bg-gray-700/50');
+        t.classList.add('text-gray-400');
+    });
+    document.getElementById(`cam-panel-${tab}`).classList.remove('hidden');
+    document.getElementById(`cam-tab-${tab}`).classList.add('text-white', 'bg-gray-700/50');
+    document.getElementById(`cam-tab-${tab}`).classList.remove('text-gray-400');
+    if (tab === 'live') {
+        startLiveRefresh();
+        setTimeout(initHlsPlayers, 100);
+    } else {
+        pauseHlsPlayers();
+    }
+    if (tab === 'recordings') loadAllRecordings();
+    if (tab === 'roles') loadRoles();
+    if (tab === 'cameras') loadCamerasList();
+    if (tab === 'config') loadConfig();
+}
+
+function pauseHlsPlayers() {
+    Object.values(hlsPlayers).forEach(hls => {
+        if (hls && hls.media) {
+            hls.media.pause();
+        }
+    });
+}
+
+// ============== Grid Size ==============
+function setGridSize(size) {
+    currentGridSize = size;
+    const grid = document.getElementById('liveGrid');
+    grid.className = `grid grid-cols-1 md:grid-cols-${Math.min(size, 3)} gap-4`;
+    document.querySelectorAll('[id^="grid-"]').forEach((btn, i) => {
+        btn.classList.remove('bg-gray-600', 'text-white');
+        btn.classList.add('text-gray-400');
+    });
+    document.getElementById(`grid-${size}`).classList.remove('text-gray-400');
+    document.getElementById(`grid-${size}`).classList.add('bg-gray-600', 'text-white');
+    renderLiveGrid();
+}
+
+// ============== Init ==============
+document.addEventListener('DOMContentLoaded', async () => {
+    await loadMyRole();
+    await loadBrandPresets();
+    await loadCameras();
+    startLiveRefresh();
+    initHlsPlayers();
+});
+
+let hlsPlayers = {};
+
+function initHlsPlayers() {
+    allCameras.forEach(cam => {
+        if (cam.stream_type === 'hls') {
+            const videoEl = document.getElementById('hls-' + cam.id);
+            if (videoEl && typeof Hls !== 'undefined') {
+                if (Hls.isSupported()) {
+                    const hls = new Hls({ enableWorker: true, lowLatencyMode: true, startLevel: -1 });
+                    hls.loadSource(`/api/cameras/${cam.id}/live.m3u8`);
+                    hls.attachMedia(videoEl);
+                    hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                        videoEl.play().catch(e => console.log('Auto-play prevented:', e.message));
+                    });
+                    hls.on(Hls.Events.ERROR, (event, data) => {
+                        if (data.fatal) {
+                            console.error('HLS fatal error:', data.type, data.details);
+                            switch (data.type) {
+                                case Hls.ErrorTypes.NETWORK_ERROR: hls.startLoad(); break;
+                                case Hls.ErrorTypes.MEDIA_ERROR: hls.recoverMediaError(); break;
+                                default: hls.destroy(); break;
+                            }
+                        }
+                    });
+                    hlsPlayers[cam.id] = hls;
+                } else if (videoEl.canPlayType('application/vnd.apple.mpegurl')) {
+                    videoEl.src = `/api/cameras/${cam.id}/live.m3u8`;
+                    videoEl.play().catch(e => console.log('Auto-play prevented:', e.message));
+                }
+            }
+        }
+    });
+}
+
+function stopHlsPlayers() {
+    Object.values(hlsPlayers).forEach(hls => { if (hls) hls.destroy(); });
+    hlsPlayers = {};
+}
+
+// ============== Toast ==============
+function camToast(msg, type) {
+    const t = document.getElementById('camToast');
+    document.getElementById('camToastMsg').textContent = msg;
+    t.className = `fixed bottom-6 right-6 ${type === 'error' ? 'bg-red-600' : 'bg-green-600'} text-white px-4 py-2.5 rounded-lg shadow-lg z-50 flex items-center gap-2 text-sm font-medium`;
+    t.classList.remove('hidden');
+    setTimeout(() => t.classList.add('hidden'), 3000);
+}
+
+// ============== Role ==============
+async function loadMyRole() {
+    try {
+        const r = await fetch('/api/cameras/roles/me');
+        const d = await r.json();
+        currentUserRole = d.role || 'viewer';
+        const badge = document.getElementById('myRoleBadge');
+        if (badge) {
+            badge.textContent = d.is_super_admin ? 'SUPER ADMIN' : d.role;
+            badge.className = `px-2 py-1 text-xs rounded font-semibold ${d.is_super_admin ? 'bg-red-600/30 text-red-300' : d.role === 'admin' ? 'bg-amber-600/30 text-amber-300' : d.role === 'operator' ? 'bg-cyan-600/30 text-cyan-300' : 'bg-blue-600/30 text-blue-300'}`;
+        }
+        if (d.is_super_admin || d.role === 'admin') {
+            document.getElementById('adminUserList').style.display = 'block';
+            loadAdminUsers();
+        }
+    } catch (e) { console.error(e); }
+}
+
+async function loadRoles() {
+    await loadMyRole();
+    if (currentUserRole === 'admin' || currentUserRole === 'super_admin') {
+        loadAdminUsers();
+    }
+}
+
+async function loadAdminUsers() {
+    try {
+        const r = await fetch('/api/cameras/admin/users');
+        const d = await r.json();
+        const list = document.getElementById('userList');
+        if (!d.users || !d.users.length) { list.innerHTML = '<p class="text-gray-500 text-sm">No users found</p>'; return; }
+        list.innerHTML = d.users.map(u => `
+            <div class="flex items-center gap-2 p-2 bg-gray-800/40 rounded-lg border border-gray-700/30">
+                <div class="flex-1 min-w-0">
+                    <p class="text-sm text-white">${escHtml(u.email)}</p>
+                    <p class="text-[10px] text-gray-500">${u.is_active ? 'Active' : 'Inactive'} • Created ${new Date(u.created_at).toLocaleDateString()}</p>
+                </div>
+                <select onchange="setUserRole('${u.id}', this.value)" class="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs text-white">
+                    <option value="viewer" ${u.role === 'viewer' ? 'selected' : ''}>Viewer</option>
+                    <option value="operator" ${u.role === 'operator' ? 'selected' : ''}>Operator</option>
+                    <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>Admin</option>
+                </select>
+            </div>
+        `).join('');
+    } catch (e) { console.error(e); }
+}
+
+async function setUserRole(userId, role) {
+    try {
+        await fetch('/api/cameras/admin/users/role', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({user_id: userId, role, is_super_admin: false})
+        });
+        camToast('Role updated to ' + role);
+    } catch (e) { camToast('Failed: ' + e.message, 'error'); }
+}
+
+// ============== Brand presets ==============
+async function loadBrandPresets() {
+    try {
+        const r = await fetch('/api/cameras/brands/presets');
+        brandPresets = await r.json();
+    } catch (e) { console.error(e); }
+}
+
+function updateStreamUrlPlaceholder() {
+    const brand = document.getElementById('newCamBrand').value;
+    const st = document.getElementById('newCamStreamType').value;
+    const hint = document.getElementById('streamUrlHint');
+    const url = document.getElementById('newCamStreamUrl');
+    if (brandPresets[brand] && st === 'rtsp') {
+        url.placeholder = brandPresets[brand].rtsp_pattern || brandPresets[brand].rtsp_url || 'rtsp://user:pass@ip:554/...';
+        hint.textContent = brand === 'imou' ? 'Imou example: ' + url.placeholder : 'RTSP URL for ' + brand;
+    } else if (brandPresets[brand] && st === 'hls') {
+        url.placeholder = brandPresets[brand].hls_pattern || 'https://camera-ip/livestream/...';
+        hint.textContent = 'HLS URL from your camera';
+    } else {
+        url.placeholder = 'rtsp://user:pass@192.168.1.100:554/...';
+        hint.textContent = 'Full RTSP/HLS URL';
+    }
+}
+
+function showAddCameraForm() {
+    document.getElementById('addCamForm').classList.remove('hidden');
+    updateStreamUrlPlaceholder();
+}
+
+// ============== Cameras ==============
+async function loadCameras() {
+    try {
+        const r = await fetch('/api/cameras');
+        const d = await r.json();
+        allCameras = d.cameras || [];
+        updateCamStats();
+        renderLiveGrid();
+        renderCamList();
+        return allCameras;
+    } catch (e) {
+        console.error('loadCameras', e);
+        return [];
+    }
+}
+
+async function refreshCameras() {
+    await loadCameras();
+    camToast('Cameras refreshed');
+}
+
+function updateCamStats() {
+    const total = allCameras.length;
+    const online = allCameras.filter(c => c.status === 'online').length;
+    const recording = allCameras.filter(c => c.is_recording).length;
+    document.getElementById('camTotalCount').textContent = total;
+    document.getElementById('camOnlineCount').textContent = online;
+    document.getElementById('camRecordingCount').textContent = recording;
+}
+
+function renderLiveGrid() {
+    const grid = document.getElementById('liveGrid');
+    if (!allCameras.length) {
+        grid.innerHTML = `<div class="col-span-full text-center text-gray-500 py-12">
+            <i class="fas fa-video-slash text-4xl mb-3 opacity-30"></i>
+            <p class="mb-3">No cameras available</p>
+            <button onclick="showCamTab('cameras')" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-sm rounded-lg">Add Camera</button>
+        </div>`;
+        return;
+    }
+    grid.innerHTML = allCameras.map(cam => {
+        const isRecording = cam.is_recording;
+        const isOnline = cam.status === 'online';
+        const cardClass = isRecording ? 'cam-card recording' : 'cam-card';
+        return `
+        <div class="${cardClass}" onclick="showCamDetail('${cam.id}')">
+            <div class="live-video" id="live-${cam.id}">
+                ${cam.stream_type === 'mjpeg' || cam.stream_type === 'rtsp'
+                    ? `<img src="/api/cameras/${cam.id}/mjpeg" alt="${escHtml(cam.name)}" style="width:100%;height:100%;object-fit:contain;" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">`
+                    : cam.stream_type === 'hls'
+                    ? `<video id="hls-${cam.id}" style="width:100%;height:100%;object-fit:contain;" muted autoplay playsinline></video>`
+                    : `<img src="/api/cameras/${cam.id}/snapshot.jpg?t=${Date.now()}" alt="${escHtml(cam.name)}" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">`
+                }
+                <div class="text-center text-gray-600" style="display:none; flex-direction:column; align-items:center; justify-content:center; position:absolute; inset:0;">
+                    <i class="fas fa-video-slash text-3xl mb-2 opacity-50"></i>
+                    <p class="text-sm">Stream unavailable</p>
+                </div>
+                <div class="live-overlay">
+                    <div class="flex gap-1">
+                        ${isRecording ? '<span class="rec-badge"><span class="rec-pulse"></span>REC</span>' : ''}
+                        <span class="${isOnline ? 'live-badge' : 'offline-badge'}">${isOnline ? '● LIVE' : cam.status.toUpperCase()}</span>
+                    </div>
+                    <div class="text-[10px] text-white bg-black/50 px-2 py-0.5 rounded">${escHtml(cam.name)}</div>
+                </div>
+            </div>
+            <div class="p-3">
+                <div class="flex items-center justify-between mb-2">
+                    <div>
+                        <p class="text-sm font-semibold text-white truncate">${escHtml(cam.name)}</p>
+                        <p class="text-[10px] text-gray-500">${escHtml(cam.location || cam.brand || 'Camera')} • ${escHtml(cam.stream_type.toUpperCase())}</p>
+                    </div>
+                    <div class="flex gap-1">
+                        ${cam.has_ptz ? `<button onclick="event.stopPropagation();showPtzControl('${cam.id}','${escHtml(cam.name)}')" class="text-[10px] px-1.5 py-1 bg-purple-700 hover:bg-purple-600 text-white rounded" title="PTZ"><i class="fas fa-arrows-alt"></i></button>` : ''}
+                        <button onclick="event.stopPropagation();takeSnap('${cam.id}')" class="text-[10px] px-1.5 py-1 bg-gray-700 hover:bg-gray-600 text-white rounded" title="Snapshot"><i class="fas fa-camera"></i></button>
+                        ${isRecording
+                            ? `<button onclick="event.stopPropagation();stopRecording('${cam.id}')" class="text-[10px] px-2 py-1 bg-red-600 hover:bg-red-500 text-white rounded font-semibold"><i class="fas fa-stop mr-1"></i>Stop</button>`
+                            : `<button onclick="event.stopPropagation();startRecording('${cam.id}')" class="text-[10px] px-2 py-1 bg-red-600/20 hover:bg-red-600/40 text-red-300 rounded border border-red-600/30" title="Record"><i class="fas fa-record-vinyl"></i></button>`
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+async function renderCamList() {
+    const list = document.getElementById('camList');
+    if (!allCameras.length) {
+        list.innerHTML = `<div class="col-span-full text-center text-gray-500 py-12">
+            <i class="fas fa-video text-4xl mb-3 opacity-30"></i>
+            <p>No cameras. Click "Add Camera" to get started.</p>
+        </div>`;
+        return;
+    }
+    list.innerHTML = allCameras.map(cam => {
+        const isOwner = cam.owner_id === window.currentUserId;
+        return `
+        <div class="cam-card p-4">
+            <div class="flex items-center justify-between mb-2">
+                <div>
+                    <p class="text-white font-semibold">${escHtml(cam.name)}</p>
+                    <p class="text-[10px] text-gray-500">${escHtml(cam.location || '')}</p>
+                </div>
+                <span class="text-[10px] px-1.5 py-0.5 rounded ${cam.status === 'online' ? 'bg-green-900/30 text-green-300' : 'bg-gray-700 text-gray-400'}">${cam.status.toUpperCase()}</span>
+            </div>
+            <div class="cam-thumb mb-2" onclick="testCamera('${cam.id}')">
+                <img src="/api/cameras/${cam.id}/snapshot.jpg?t=${Date.now()}" alt="thumb" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                <div class="text-center text-gray-600" style="display:none; flex-direction:column; align-items:center; justify-content:center; position:absolute; inset:0;">
+                    <i class="fas fa-video text-2xl opacity-30 mb-1"></i>
+                    <p class="text-[10px]">Click to test</p>
+                </div>
+            </div>
+            <div class="text-[10px] text-gray-500 mb-2">
+                <i class="fas fa-${cam.brand === 'imou' ? 'shield-alt' : 'video'} mr-1"></i>${escHtml(cam.brand || 'custom')} • ${escHtml(cam.stream_type.toUpperCase())}${cam.is_public ? ' • <i class="fas fa-globe text-blue-400"></i> Public' : ''}${cam.has_ptz ? ' • <i class="fas fa-arrows-alt text-purple-400"></i> PTZ' : ''}
+            </div>
+            <div class="flex gap-1">
+                <button onclick="testCamera('${cam.id}')" class="flex-1 text-[10px] px-2 py-1 bg-blue-600/20 hover:bg-blue-600/40 text-blue-300 rounded border border-blue-600/30"><i class="fas fa-plug mr-1"></i>Test</button>
+                <button onclick="viewRecordings('${cam.id}')" class="flex-1 text-[10px] px-2 py-1 bg-purple-600/20 hover:bg-purple-600/40 text-purple-300 rounded border border-purple-600/30"><i class="fas fa-film mr-1"></i>Recordings</button>
+                ${isOwner ? `<button onclick="deleteCamera('${cam.id}')" class="text-[10px] px-2 py-1 bg-red-600/20 hover:bg-red-600/40 text-red-300 rounded border border-red-600/30"><i class="fas fa-trash"></i></button>` : ''}
+            </div>
+        </div>`;
+    }).join('');
+}
+
+async function createCamera() {
+    const data = {
+        name: document.getElementById('newCamName').value.trim(),
+        brand: document.getElementById('newCamBrand').value,
+        location: document.getElementById('newCamLocation').value.trim(),
+        stream_type: document.getElementById('newCamStreamType').value,
+        stream_url: document.getElementById('newCamStreamUrl').value.trim(),
+        username: document.getElementById('newCamUser').value.trim(),
+        password: document.getElementById('newCamPass').value,
+        port: parseInt(document.getElementById('newCamPort').value) || 554,
+        channel: parseInt(document.getElementById('newCamChannel').value) || 1,
+        is_public: document.getElementById('newCamPublic').checked,
+        motion_detection: document.getElementById('newCamMotion').checked,
+        has_ptz: document.getElementById('newCamPTZ').checked,
+    };
+    if (!data.name || !data.stream_url) { camToast('Name and Stream URL are required', 'error'); return; }
+    try {
+        const r = await fetch('/api/cameras', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data)
+        });
+        const cam = await r.json();
+        if (cam.id) {
+            camToast('Camera added: ' + cam.name);
+            document.getElementById('addCamForm').classList.add('hidden');
+            ['newCamName','newCamLocation','newCamStreamUrl','newCamUser','newCamPass'].forEach(id => document.getElementById(id).value = '');
+            document.getElementById('newCamPublic').checked = false;
+            document.getElementById('newCamMotion').checked = false;
+            document.getElementById('newCamPTZ').checked = false;
+            await loadCameras();
+        } else {
+            camToast('Failed: ' + (cam.error || 'Unknown error'), 'error');
+        }
+    } catch (e) { camToast('Error: ' + e.message, 'error'); }
+}
+
+async function deleteCamera(id) {
+    if (!confirm('Delete this camera and all its recordings?')) return;
+    try {
+        const r = await fetch(`/api/cameras/${id}`, {method: 'DELETE'});
+        const d = await r.json();
+        if (d.success) {
+            camToast('Camera deleted');
+            await loadCameras();
+        } else {
+            camToast('Failed to delete', 'error');
+        }
+    } catch (e) { camToast('Error: ' + e.message, 'error'); }
+}
+
+async function testCamera(id) {
+    camToast('Testing connection...');
+    try {
+        const r = await fetch(`/api/cameras/${id}/test`, {method: 'POST'});
+        const d = await r.json();
+        if (d.success) camToast('✓ Camera is online!');
+        else camToast('Test failed: ' + (d.error || ''), 'error');
+        await loadCameras();
+    } catch (e) { camToast('Error: ' + e.message, 'error'); }
+}
+
+async function takeSnap(id) {
+    try {
+        const r = await fetch(`/api/cameras/${id}/snapshot`, {method: 'POST'});
+        const d = await r.json();
+        if (d.success) camToast('Snapshot saved');
+        else camToast('Snapshot failed: ' + (d.error || ''), 'error');
+    } catch (e) { camToast('Error: ' + e.message, 'error'); }
+}
+
+// ============== Camera Detail Modal ==============
+async function showCamDetail(camId) {
+    const cam = allCameras.find(c => c.id === camId);
+    if (!cam) return;
+    document.getElementById('camDetailTitle').textContent = cam.name;
+    document.getElementById('camDetailContent').innerHTML = `
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div>
+                <p class="text-xs text-gray-400 mb-1">Status</p>
+                <p class="text-white">${cam.status.toUpperCase()}</p>
+            </div>
+            <div>
+                <p class="text-xs text-gray-400 mb-1">Brand</p>
+                <p class="text-white">${escHtml(cam.brand || 'Custom')}</p>
+            </div>
+            <div>
+                <p class="text-xs text-gray-400 mb-1">Stream Type</p>
+                <p class="text-white">${escHtml(cam.stream_type.toUpperCase())}</p>
+            </div>
+            <div>
+                <p class="text-xs text-gray-400 mb-1">Location</p>
+                <p class="text-white">${escHtml(cam.location || 'Not set')}</p>
+            </div>
+            <div class="md:col-span-2">
+                <p class="text-xs text-gray-400 mb-1">Stream URL</p>
+                <p class="text-white text-xs font-mono break-all">${escHtml(cam.stream_url || 'N/A')}</p>
+            </div>
+        </div>
+        <div class="flex gap-2 flex-wrap">
+            <button onclick="testCamera('${cam.id}')" class="px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm rounded-lg"><i class="fas fa-plug mr-1"></i>Test Connection</button>
+            ${cam.has_ptz ? `<button onclick="showPtzControl('${cam.id}','${escHtml(cam.name)}')" class="px-3 py-2 bg-purple-600 hover:bg-purple-500 text-white text-sm rounded-lg"><i class="fas fa-arrows-alt mr-1"></i>PTZ Control</button>` : ''}
+            <button onclick="takeSnap('${cam.id}')" class="px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white text-sm rounded-lg"><i class="fas fa-camera mr-1"></i>Snapshot</button>
+        </div>
+    `;
+    document.getElementById('camDetailModal').classList.remove('hidden');
+}
+
+function closeCamDetail() {
+    document.getElementById('camDetailModal').classList.add('hidden');
+}
+
+// ============== PTZ Control ==============
+function showPtzControl(camId, camName) {
+    currentPtzCamId = camId;
+    document.getElementById('ptzTitle').textContent = 'PTZ - ' + camName;
+    document.getElementById('ptzModal').classList.remove('hidden');
+}
+
+function closePtzModal() {
+    document.getElementById('ptzModal').classList.add('hidden');
+    currentPtzCamId = null;
+}
+
+async function ptzMove(direction) {
+    if (!currentPtzCamId) return;
+    try {
+        const r = await fetch(`/api/cameras/${currentPtzCamId}/ptz`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({action: direction})
+        });
+        const d = await r.json();
+        if (d.success) camToast('PTZ: ' + direction);
+        else camToast('PTZ failed: ' + (d.error || ''), 'error');
+    } catch (e) { camToast('Error: ' + e.message, 'error'); }
+}
+
+// ============== Recording ==============
+async function startRecording(id) {
+    camToast('Starting recording...');
+    try {
+        const r = await fetch(`/api/cameras/${id}/record/start`, {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({fps: 15, width: 1280, height: 720, crf: 28, preset: 'ultrafast', bitrate_kbps: 1000})
+        });
+        const d = await r.json();
+        if (d.success) {
+            camToast('Recording started');
+            await loadCameras();
+        } else {
+            camToast('Record failed: ' + (d.error || ''), 'error');
+        }
+    } catch (e) { camToast('Error: ' + e.message, 'error'); }
+}
+
+async function stopRecording(id) {
+    try {
+        const r = await fetch(`/api/cameras/${id}/record/stop`, {method: 'POST'});
+        const d = await r.json();
+        if (d.success) camToast('Recording stopped. File: ' + Math.round((d.file_size || 0)/1024) + ' KB');
+        await loadCameras();
+    } catch (e) { camToast('Error: ' + e.message, 'error'); }
+}
+
+async function loadAllRecordings() {
+    try {
+        const r = await fetch('/api/cameras/recordings/all?limit=100');
+        const d = await r.json();
+        allRecordings = d.recordings || [];
+        renderRecordingsList();
+        updateStorageStats();
+    } catch (e) { console.error(e); }
+}
+
+function updateStorageStats() {
+    const totalSize = allRecordings.reduce((s, r) => s + (r.file_size || 0), 0);
+    const mb = totalSize / (1024 * 1024);
+    let display = '';
+    if (mb > 1024) display = (mb / 1024).toFixed(2) + ' GB';
+    else display = mb.toFixed(2) + ' MB';
+    document.getElementById('camStorageUsed').textContent = display;
+    document.getElementById('camStorageRecordings').textContent = allRecordings.length + ' recordings';
+}
+
+function renderRecordingsList() {
+    const list = document.getElementById('recordingsList');
+    if (!allRecordings.length) {
+        list.innerHTML = `<div class="text-center text-gray-500 py-8">
+            <i class="fas fa-film text-4xl mb-3 opacity-30"></i>
+            <p>No recordings yet. Start recording from the Live View tab.</p>
+        </div>`;
+        return;
+    }
+    list.innerHTML = allRecordings.map(r => {
+        const sizeMb = (r.file_size / (1024 * 1024)).toFixed(2);
+        const dur = r.duration_sec ? `${Math.floor(r.duration_sec / 60)}m ${Math.floor(r.duration_sec % 60)}s` : 'recording...';
+        return `
+        <div class="card flex items-center gap-3 flex-wrap" id="rec-${r.id}">
+            <div class="flex items-center gap-2 flex-1 min-w-0">
+                <div class="w-10 h-10 bg-purple-600/20 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <i class="fas fa-video text-purple-400"></i>
+                </div>
+                <div class="min-w-0 flex-1">
+                    <p class="text-sm text-white font-semibold truncate">${escHtml(r.camera_name)}</p>
+                    <p class="text-[10px] text-gray-500">${new Date(r.started_at).toLocaleString()} • ${dur} • ${sizeMb} MB</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-1 flex-wrap">
+                <button onclick="playRecording('${r.id}')" class="text-[10px] px-2 py-1 bg-blue-600/30 hover:bg-blue-600/50 text-blue-300 rounded border border-blue-600/30"><i class="fas fa-play mr-1"></i>Play</button>
+                <button onclick="analyzeRecording('${r.id}')" class="text-[10px] px-2 py-1 bg-cyan-600/30 hover:bg-cyan-600/50 text-cyan-300 rounded border border-cyan-600/30"><i class="fas fa-search mr-1"></i>Analyze</button>
+                <a href="/api/cameras/recordings/${r.id}/download" class="text-[10px] px-2 py-1 bg-purple-600/30 hover:bg-purple-600/50 text-purple-300 rounded border border-purple-600/30"><i class="fas fa-download mr-1"></i>Download</a>
+                <button onclick="deleteRecording('${r.id}')" class="text-[10px] px-2 py-1 bg-red-600/30 hover:bg-red-600/50 text-red-300 rounded border border-red-600/30"><i class="fas fa-trash"></i></button>
+            </div>
+        </div>
+        ${currentPlayingRec === r.id ? renderPlayer(r) : ''}`;
+    }).join('');
+}
+
+let currentPlayingRec = null;
+
+function renderPlayer(r) {
+    return `
+    <div class="card mt-3">
+        <div class="flex items-center justify-between mb-2">
+            <h4 class="text-white font-semibold"><i class="fas fa-play-circle text-blue-400 mr-1"></i> ${escHtml(r.camera_name)} - ${new Date(r.started_at).toLocaleString()}</h4>
+            <button onclick="closePlayer('${r.id}')" class="text-gray-500 hover:text-white"><i class="fas fa-times"></i></button>
+        </div>
+        <video controls autoplay class="w-full max-h-[500px] bg-black rounded-lg" id="player-${r.id}">
+            <source src="/api/cameras/recordings/${r.id}/stream" type="video/mp4">
+            Your browser does not support video.
+        </video>
+    </div>`;
+}
+
+function playRecording(id) {
+    if (currentPlayingRec === id) { closePlayer(id); return; }
+    currentPlayingRec = id;
+    renderRecordingsList();
+    setTimeout(() => {
+        const el = document.getElementById('player-' + id);
+        if (el) el.scrollIntoView({behavior: 'smooth', block: 'center'});
+    }, 100);
+}
+
+function closePlayer(id) {
+    currentPlayingRec = null;
+    renderRecordingsList();
+}
+
+async function deleteRecording(id) {
+    if (!confirm('Delete this recording?')) return;
+    try {
+        const r = await fetch(`/api/cameras/recordings/${id}`, {method: 'DELETE'});
+        const d = await r.json();
+        if (d.success) { camToast('Recording deleted'); await loadAllRecordings(); }
+    } catch (e) { camToast('Error: ' + e.message, 'error'); }
+}
+
+async function analyzeRecording(id) {
+    camToast('Analyzing... this may take a moment');
+    try {
+        const r = await fetch(`/api/cameras/recordings/${id}/analyze`, {method: 'POST', timeout: 180000});
+        const d = await r.json();
+        if (d.success) {
+            camToast(`Analysis complete: ${d.object_count} objects found`);
+            currentPlayingRec = id;
+            await loadAllRecordings();
+        } else {
+            camToast('Analysis failed: ' + (d.error || ''), 'error');
+        }
+    } catch (e) { camToast('Error: ' + e.message, 'error'); }
+}
+
+function viewRecordings(camId) {
+    showCamTab('recordings');
+    loadAllRecordings();
+}
+
+// ============== Config ==============
+async function loadConfig() {
+    try {
+        const r = await fetch('/api/cameras/config');
+        const d = await r.json();
+        if (d.imou_app_id) document.getElementById('imouAppId').value = d.imou_app_id;
+        if (d.default_quality) document.getElementById('defaultQuality').value = d.default_quality;
+        if (d.snapshot_interval) document.getElementById('snapshotInterval').value = d.snapshot_interval;
+        if (d.max_streams) document.getElementById('maxStreams').value = d.max_streams;
+    } catch (e) { console.error(e); }
+}
+
+async function saveImouConfig() {
+    const appId = document.getElementById('imouAppId').value.trim();
+    const appSecret = document.getElementById('imouAppSecret').value;
+    if (!appId || !appSecret) { camToast('App ID and Secret are required', 'error'); return; }
+    try {
+        const r = await fetch('/api/cameras/config/imou', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({app_id: appId, app_secret: appSecret})
+        });
+        const d = await r.json();
+        if (d.success) {
+            camToast('Imou configuration saved');
+            document.getElementById('imouStatus').textContent = 'Connected to Imou Cloud';
+        } else {
+            camToast('Failed: ' + (d.error || ''), 'error');
+        }
+    } catch (e) { camToast('Error: ' + e.message, 'error'); }
+}
+
+async function syncImouDevices() {
+    camToast('Syncing Imou devices...');
+    try {
+        const r = await fetch('/api/cameras/config/imou/sync', {method: 'POST'});
+        const d = await r.json();
+        if (d.success) {
+            camToast(`Synced ${d.count} devices from Imou Cloud`);
+            await loadCameras();
+        } else {
+            camToast('Sync failed: ' + (d.error || ''), 'error');
+        }
+    } catch (e) { camToast('Error: ' + e.message, 'error'); }
+}
+
+async function saveGlobalSettings() {
+    const data = {
+        default_quality: document.getElementById('defaultQuality').value,
+        snapshot_interval: parseInt(document.getElementById('snapshotInterval').value),
+        max_streams: parseInt(document.getElementById('maxStreams').value)
+    };
+    try {
+        const r = await fetch('/api/cameras/config', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data)
+        });
+        if (r.ok) { camToast('Settings saved'); loadCameras(); }
+        else camToast('Failed to save settings', 'error');
+    } catch (e) { camToast('Error: ' + e.message, 'error'); }
+}
+
+// ============== Live refresh ==============
+function startLiveRefresh() {
+    if (liveRefreshInterval) clearInterval(liveRefreshInterval);
+    liveRefreshInterval = setInterval(() => {
+        if (document.getElementById('cam-panel-live') && !document.getElementById('cam-panel-live').classList.contains('hidden')) {
+            document.querySelectorAll('[id^="live-"] img').forEach(img => {
+                if (img.src.indexOf('/snapshot.jpg') !== -1) {
+                    const camId = img.closest('[id^="live-"]').id.replace('live-', '');
+                    const cam = allCameras.find(c => c.id === camId);
+                    if (cam && cam.stream_type !== 'mjpeg' && cam.stream_type !== 'hls') {
+                        img.src = `/api/cameras/${camId}/snapshot.jpg?t=${Date.now()}`;
+                    }
+                }
+            });
+            loadCameras();
+        }
+    }, 5000);
+}
+
+// ============== Helpers ==============
+function escHtml(t) {
+    if (t == null) return '';
+    const d = document.createElement('div');
+    d.textContent = String(t);
+    return d.innerHTML;
+}
+</script>
+{% endblock %}

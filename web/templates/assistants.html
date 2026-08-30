@@ -3,7 +3,6 @@
 {% block header_title %}AI Assistants{% endblock %}
 
 {% block content %}
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/atom-one-dark.min.css">
 <script src="https://cdn.jsdelivr.net/npm/marked@13.0.3/marked.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/core.min.js"></script>
@@ -11,9 +10,8 @@
 <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/languages/javascript.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/languages/bash.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/languages/json.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/languages/xml.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/languages/css.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/atom-one-dark.min.css">
 
 <style>
 :root {
@@ -33,19 +31,12 @@
     --text-secondary: #94a3b8;
     --text-muted: #64748b;
 }
-
 body { background: radial-gradient(ellipse at top left, #1e1b4b 0%, #0a0e1a 50%, #020617 100%); background-attachment: fixed; }
-
 .glass { background: var(--glass-bg); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); border: 1px solid var(--glass-border); border-radius: 16px; }
-.glass-strong { background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(22px); -webkit-backdrop-filter: blur(22px); border: 1px solid var(--glass-border-strong); border-radius: 16px; }
-
+.glass-strong { background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(22px); border-radius: 16px; }
 .stat-card { background: linear-gradient(135deg, rgba(139, 92, 246, 0.08), rgba(6, 182, 212, 0.05)); border: 1px solid var(--glass-border); border-radius: 16px; padding: 18px; transition: transform .2s, border-color .2s; }
 .stat-card:hover { transform: translateY(-2px); border-color: rgba(139, 92, 246, 0.4); }
-
 .gradient-text { background: linear-gradient(135deg, #c4b5fd 0%, #67e8f9 50%, #fde68a 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
-.gradient-border { position: relative; }
-.gradient-border::before { content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1px; background: linear-gradient(135deg, #8b5cf6, #06b6d4, #f59e0b); -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0); mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0); -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none; }
-
 .btn { padding: 9px 16px; border-radius: 10px; font-size: 13px; font-weight: 500; cursor: pointer; transition: all .2s; border: none; display: inline-flex; align-items: center; gap: 6px; }
 .btn-primary { background: linear-gradient(135deg, #8b5cf6, #6366f1); color: white; box-shadow: 0 4px 14px rgba(139, 92, 246, 0.35); }
 .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(139, 92, 246, 0.5); }
@@ -55,89 +46,88 @@ body { background: radial-gradient(ellipse at top left, #1e1b4b 0%, #0a0e1a 50%,
 .btn-ghost:hover { background: rgba(51, 65, 85, 0.4); color: var(--text-primary); }
 .btn-danger { background: linear-gradient(135deg, #ef4444, #dc2626); color: white; }
 .btn-icon { padding: 8px; border-radius: 10px; }
-
 .input-field { width: 100%; padding: 10px 14px; background: rgba(15, 23, 42, 0.7); border: 1px solid var(--glass-border-strong); border-radius: 10px; color: var(--text-primary); font-size: 13px; outline: none; transition: border-color .2s, box-shadow .2s; }
 .input-field:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.15); }
-
-.template-card { padding: 14px 8px; border-radius: 12px; border: 1px solid var(--glass-border); background: rgba(15, 23, 42, 0.5); cursor: pointer; transition: all .2s; text-align: center; }
-.template-card:hover { border-color: var(--accent); transform: translateY(-2px); }
-.template-card.active { border-color: var(--accent); background: rgba(139, 92, 246, 0.12); box-shadow: 0 0 0 1px var(--accent); }
-
+textarea.input-field { resize: vertical; min-height: 80px; }
 .assistant-card { padding: 18px; border-radius: 16px; background: var(--glass-bg); backdrop-filter: blur(14px); border: 1px solid var(--glass-border); cursor: pointer; transition: all .25s; position: relative; overflow: hidden; }
 .assistant-card:hover { border-color: rgba(139, 92, 246, 0.5); transform: translateY(-3px); box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4); }
-.assistant-card::after { content: ""; position: absolute; inset: 0; border-radius: inherit; opacity: 0; transition: opacity .2s; background: linear-gradient(135deg, transparent, rgba(139, 92, 246, 0.05)); pointer-events: none; }
-.assistant-card:hover::after { opacity: 1; }
-
 .badge { padding: 3px 9px; border-radius: 999px; font-size: 10px; font-weight: 600; letter-spacing: 0.3px; }
 .badge-active { background: rgba(16, 185, 129, 0.18); color: #6ee7b7; border: 1px solid rgba(16, 185, 129, 0.3); }
 .badge-inactive { background: rgba(100, 116, 139, 0.18); color: #94a3b8; border: 1px solid rgba(100, 116, 139, 0.3); }
 .badge-tag { background: rgba(139, 92, 246, 0.15); color: #c4b5fd; border: 1px solid rgba(139, 92, 246, 0.3); }
-
 .modal-overlay { position: fixed; inset: 0; background: rgba(2, 6, 23, 0.7); backdrop-filter: blur(8px); z-index: 60; display: flex; align-items: center; justify-content: center; padding: 16px; animation: fadeIn .2s; }
+.modal-overlay.hidden { display: none; }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 .modal-content { animation: slideUp .3s; }
-
 .chat-bubble { max-width: 85%; padding: 12px 16px; border-radius: 16px; line-height: 1.55; font-size: 14px; word-wrap: break-word; }
 .chat-bubble.user { background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white; border-bottom-right-radius: 4px; }
 .chat-bubble.assistant { background: rgba(30, 41, 59, 0.7); color: var(--text-primary); border: 1px solid var(--glass-border); border-bottom-left-radius: 4px; }
 .chat-bubble pre { background: #0a0e1a !important; border-radius: 10px; padding: 12px; overflow-x: auto; margin: 8px 0; font-size: 12.5px; }
 .chat-bubble code { font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 12.5px; }
 .chat-bubble p { margin: 6px 0; }
-.chat-bubble p:first-child { margin-top: 0; } .chat-bubble p:last-child { margin-bottom: 0; }
+.chat-bubble p:first-child { margin-top: 0; }
+.chat-bubble p:last-child { margin-bottom: 0; }
 .chat-bubble ul, .chat-bubble ol { margin: 6px 0 6px 20px; }
-.chat-bubble table { border-collapse: collapse; margin: 8px 0; font-size: 13px; }
-.chat-bubble th, .chat-bubble td { border: 1px solid rgba(148, 163, 184, 0.25); padding: 6px 10px; }
-.chat-bubble th { background: rgba(30, 41, 59, 0.6); }
 .chat-bubble a { color: #67e8f9; text-decoration: underline; }
 .chat-bubble blockquote { border-left: 3px solid var(--accent); padding-left: 12px; color: var(--text-secondary); margin: 6px 0; }
-
 .typing-dots span { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--text-secondary); margin: 0 2px; animation: bounce 1.2s infinite; }
 .typing-dots span:nth-child(2) { animation-delay: .15s; }
 .typing-dots span:nth-child(3) { animation-delay: .3s; }
 @keyframes bounce { 0%, 60%, 100% { transform: translateY(0); opacity: .5; } 30% { transform: translateY(-6px); opacity: 1; } }
-
-.sidebar-list { max-height: 100%; overflow-y: auto; }
-.sidebar-list::-webkit-scrollbar, .chat-scroll::-webkit-scrollbar { width: 6px; }
-.sidebar-list::-webkit-scrollbar-track, .chat-scroll::-webkit-scrollbar-track { background: transparent; }
-.sidebar-list::-webkit-scrollbar-thumb, .chat-scroll::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.25); border-radius: 3px; }
-
 .pulse-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.6); animation: pulse 2s infinite; }
 @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.6); } 70% { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); } 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); } }
-
 .tab-btn { padding: 8px 14px; border-radius: 10px; font-size: 13px; color: var(--text-secondary); cursor: pointer; transition: all .2s; }
 .tab-btn:hover { color: var(--text-primary); }
 .tab-btn.active { background: rgba(139, 92, 246, 0.15); color: #c4b5fd; border: 1px solid rgba(139, 92, 246, 0.3); }
-
-.copy-btn { opacity: 0; transition: opacity .2s; }
-.chat-message:hover .copy-btn { opacity: 1; }
-
 .empty-state { padding: 60px 20px; text-align: center; color: var(--text-muted); }
-
 .toast { position: fixed; bottom: 24px; right: 24px; padding: 12px 18px; border-radius: 12px; background: rgba(16, 185, 129, 0.95); color: white; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4); z-index: 100; animation: slideUp .3s; }
 .toast.error { background: rgba(239, 68, 68, 0.95); }
 .toast.info { background: rgba(6, 182, 212, 0.95); }
-
-.range-slider { -webkit-appearance: none; width: 100%; height: 4px; background: rgba(51, 65, 85, 0.6); border-radius: 2px; outline: none; }
-.range-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; background: var(--accent); border-radius: 50%; cursor: pointer; box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.2); }
-.range-slider::-moz-range-thumb { width: 16px; height: 16px; background: var(--accent); border-radius: 50%; cursor: pointer; border: none; }
-
-.view-toggle { display: inline-flex; background: rgba(15, 23, 42, 0.6); border-radius: 10px; padding: 3px; border: 1px solid var(--glass-border-strong); }
-.view-toggle button { padding: 6px 10px; border-radius: 8px; border: none; background: transparent; color: var(--text-secondary); cursor: pointer; transition: all .2s; }
-.view-toggle button.active { background: rgba(139, 92, 246, 0.2); color: #c4b5fd; }
-
+.template-card { padding: 12px 8px; border-radius: 12px; border: 1px solid var(--glass-border); background: rgba(15, 23, 42, 0.5); cursor: pointer; transition: all .2s; text-align: center; }
+.template-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+.template-card.active { border-color: var(--accent); background: rgba(139, 92, 246, 0.12); box-shadow: 0 0 0 1px var(--accent); }
 .search-input { position: relative; }
 .search-input i { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); }
 .search-input input { padding-left: 36px; }
-
-.list-view .assistant-card { display: flex; align-items: center; gap: 16px; padding: 12px 16px; }
-.list-view .assistant-card .meta-row { display: flex; gap: 16px; flex: 1; }
-
+.view-toggle { display: inline-flex; background: rgba(15, 23, 42, 0.6); border-radius: 10px; padding: 3px; border: 1px solid var(--glass-border-strong); }
+.view-toggle button { padding: 6px 10px; border-radius: 8px; border: none; background: transparent; color: var(--text-secondary); cursor: pointer; transition: all .2s; }
+.view-toggle button.active { background: rgba(139, 92, 246, 0.2); color: #c4b5fd; }
+.scroll-thin::-webkit-scrollbar { width: 6px; height: 6px; }
+.scroll-thin::-webkit-scrollbar-track { background: transparent; }
+.scroll-thin::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.25); border-radius: 3px; }
+.conv-item { padding: 10px 12px; border-radius: 10px; cursor: pointer; transition: all .15s; margin-bottom: 4px; }
+.conv-item:hover { background: rgba(51, 65, 85, 0.5); }
+.conv-item.active { background: rgba(139, 92, 246, 0.18); border: 1px solid rgba(139, 92, 246, 0.3); }
+.avatar-gradient { background: linear-gradient(135deg, var(--accent), var(--accent-2)); display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; }
 @media (max-width: 768px) {
     .stats-row { grid-template-columns: repeat(2, 1fr) !important; }
     .assistant-grid { grid-template-columns: 1fr !important; }
 }
 </style>
+
+<div class="flex items-center justify-between mb-6 flex-wrap gap-3">
+    <div>
+        <h1 class="text-2xl font-bold text-white flex items-center gap-2">
+            <i class="fas fa-robot text-purple-400"></i>
+            AI <span class="gradient-text">Assistants</span>
+        </h1>
+        <p class="text-sm text-gray-400 mt-1">Build, customize, and chat with intelligent assistants</p>
+    </div>
+    <div class="flex items-center gap-2 flex-wrap">
+        <div class="search-input">
+            <i class="fas fa-search"></i>
+            <input type="text" id="searchInput" placeholder="Search assistants..." class="input-field" style="min-width: 220px;" oninput="filterAssistants()">
+        </div>
+        <div class="view-toggle">
+            <button id="viewGridBtn" class="active" onclick="setView('grid')"><i class="fas fa-th-large"></i></button>
+            <button id="viewListBtn" onclick="setView('list')"><i class="fas fa-list"></i></button>
+        </div>
+        <button onclick="openCreateModal()" class="btn btn-primary">
+            <i class="fas fa-plus"></i> New Assistant
+        </button>
+    </div>
+</div>
 
 <!-- Stats Row -->
 <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 stats-row">
@@ -147,138 +137,67 @@ body { background: radial-gradient(ellipse at top left, #1e1b4b 0%, #0a0e1a 50%,
             <div class="w-8 h-8 bg-purple-600/20 rounded-lg flex items-center justify-center"><i class="fas fa-robot text-purple-400 text-sm"></i></div>
         </div>
         <p class="text-2xl font-bold text-white">{{ stats.total_assistants or 0 }}</p>
-        <p class="text-xs text-gray-500 mt-1"><span class="text-green-400">{{ stats.active_assistants or 0 }}</span> active</p>
+        <p class="text-[10px] text-gray-500 mt-1">{{ stats.active_assistants or 0 }} active</p>
     </div>
     <div class="stat-card">
         <div class="flex items-center justify-between mb-2">
-            <span class="text-gray-400 text-xs uppercase tracking-wider">Tasks</span>
-            <div class="w-8 h-8 bg-cyan-600/20 rounded-lg flex items-center justify-center"><i class="fas fa-bolt text-cyan-400 text-sm"></i></div>
+            <span class="text-gray-400 text-xs uppercase tracking-wider">Conversations</span>
+            <div class="w-8 h-8 bg-cyan-600/20 rounded-lg flex items-center justify-center"><i class="fas fa-comments text-cyan-400 text-sm"></i></div>
         </div>
-        <p class="text-2xl font-bold text-white">{{ stats.total_tasks or 0 }}</p>
-        <p class="text-xs text-gray-500 mt-1">automated tasks</p>
+        <p class="text-2xl font-bold text-white">{{ stats.total_conversations or 0 }}</p>
     </div>
     <div class="stat-card">
         <div class="flex items-center justify-between mb-2">
             <span class="text-gray-400 text-xs uppercase tracking-wider">Messages</span>
-            <div class="w-8 h-8 bg-pink-600/20 rounded-lg flex items-center justify-center"><i class="fas fa-comments text-pink-400 text-sm"></i></div>
+            <div class="w-8 h-8 bg-emerald-600/20 rounded-lg flex items-center justify-center"><i class="fas fa-message text-emerald-400 text-sm"></i></div>
         </div>
         <p class="text-2xl font-bold text-white">{{ stats.total_messages or 0 }}</p>
-        <p class="text-xs text-gray-500 mt-1">chat messages</p>
     </div>
     <div class="stat-card">
         <div class="flex items-center justify-between mb-2">
-            <span class="text-gray-400 text-xs uppercase tracking-wider">Tokens</span>
-            <div class="w-8 h-8 bg-amber-600/20 rounded-lg flex items-center justify-center"><i class="fas fa-coins text-amber-400 text-sm"></i></div>
+            <span class="text-gray-400 text-xs uppercase tracking-wider">Tasks Run</span>
+            <div class="w-8 h-8 bg-amber-600/20 rounded-lg flex items-center justify-center"><i class="fas fa-bolt text-amber-400 text-sm"></i></div>
         </div>
-        <p class="text-2xl font-bold text-white">{{ "{:,}".format(stats.total_tokens or 0) }}</p>
-        <p class="text-xs text-gray-500 mt-1">total tokens used</p>
+        <p class="text-2xl font-bold text-white">{{ stats.total_tasks_run or 0 }}</p>
     </div>
 </div>
 
-<!-- Header Bar -->
-<div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-    <div>
-        <h2 class="text-2xl font-bold gradient-text">Your AI Workforce</h2>
-        <p class="text-sm text-gray-400 mt-1">Create, customize, and converse with intelligent assistants</p>
+<!-- Templates Section -->
+<div class="glass p-5 mb-6">
+    <div class="flex items-center justify-between mb-3">
+        <h2 class="text-white font-semibold text-sm"><i class="fas fa-shapes text-purple-400 mr-2"></i>Quick Start Templates</h2>
+        <button onclick="filterByTemplate(null)" class="text-xs text-cyan-400 hover:text-cyan-300">Show all</button>
     </div>
-    <div class="flex items-center gap-3">
-        <div class="search-input">
-            <i class="fas fa-search"></i>
-            <input type="text" id="searchInput" class="input-field" placeholder="Search assistants..." onkeyup="filterAssistants()">
-        </div>
-        <div class="view-toggle">
-            <button id="gridViewBtn" class="active" onclick="setView('grid')" title="Grid view"><i class="fas fa-th-large"></i></button>
-            <button id="listViewBtn" onclick="setView('list')" title="List view"><i class="fas fa-list"></i></button>
-        </div>
-        <button onclick="openCreateModal()" class="btn btn-primary">
-            <i class="fas fa-plus"></i> New
-        </button>
-    </div>
+    <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3" id="templateGrid"></div>
 </div>
 
-<!-- Assistant Grid/List -->
-{% if assistants %}
-<div id="assistantsContainer" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 assistant-grid">
-    {% for a in assistants %}
-    <div class="assistant-card" data-name="{{ a.name|lower }}" data-model="{{ a.model_id }}" data-status="{{ 'active' if a.is_active else 'inactive' }}" onclick="openAssistant('{{ a.id }}')">
-        <div class="flex items-start justify-between mb-3">
-            <div class="flex items-center gap-3 min-w-0">
-                <div class="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0
-                    {% if a.is_active %}bg-gradient-to-br from-purple-600/30 to-cyan-600/30 border border-purple-500/30{% else %}bg-gray-700/40 border border-gray-600/30{% endif %}">
-                    <i class="{{ a.avatar or 'fas fa-robot' }} text-xl
-                        {% if a.is_active %}text-purple-300{% else %}text-gray-500{% endif %}"></i>
-                </div>
-                <div class="min-w-0">
-                    <div class="flex items-center gap-2">
-                        <h4 class="text-white font-semibold truncate">{{ a.name }}</h4>
-                        {% if a.is_active %}
-                        <span class="flex items-center gap-1 text-[10px] text-green-400"><span class="pulse-dot"></span></span>
-                        {% endif %}
-                    </div>
-                    <p class="text-xs text-gray-500 truncate">{{ a.description }}</p>
-                </div>
-            </div>
-            <button onclick="event.stopPropagation(); quickDelete('{{ a.id }}', '{{ a.name|e }}')" class="btn-icon btn-ghost text-gray-500 hover:text-red-400 hover:bg-red-500/10" title="Delete">
-                <i class="fas fa-trash text-xs"></i>
-            </button>
-        </div>
-        <div class="flex items-center flex-wrap gap-2 text-xs text-gray-400">
-            <span class="flex items-center gap-1.5 px-2 py-1 bg-gray-800/50 rounded-md"><i class="fas fa-cube text-purple-400"></i>{{ a.model_id }}</span>
-            <span class="flex items-center gap-1.5 px-2 py-1 bg-gray-800/50 rounded-md"><i class="fas fa-user-circle text-cyan-400"></i>{{ a.personality }}</span>
-            <span class="flex items-center gap-1.5 px-2 py-1 bg-gray-800/50 rounded-md"><i class="fas fa-calendar text-amber-400"></i>{{ a.created_at[:10] }}</span>
-        </div>
-        <div class="flex items-center justify-between mt-3 pt-3 border-t border-gray-700/50">
-            <span class="badge {% if a.is_active %}badge-active{% else %}badge-inactive{% endif %}">
-                {% if a.is_active %}<i class="fas fa-circle text-[6px] mr-1"></i>Active{% else %}<i class="fas fa-pause text-[6px] mr-1"></i>Inactive{% endif %}
-            </span>
-            <div class="flex items-center gap-2 text-xs text-gray-500">
-                <span><i class="fas fa-plug mr-1"></i>{{ a.tags or '—' }}</span>
-            </div>
-        </div>
-    </div>
-    {% endfor %}
-</div>
-{% else %}
-<div class="glass p-12 text-center empty-state">
-    <div class="w-20 h-20 bg-gradient-to-br from-purple-600/30 to-cyan-600/30 rounded-2xl flex items-center justify-center mx-auto mb-5 border border-purple-500/20">
-        <i class="fas fa-robot text-purple-300 text-3xl"></i>
-    </div>
-    <h3 class="text-xl font-semibold text-white mb-2">Build your first AI assistant</h3>
-    <p class="text-gray-500 text-sm mb-6 max-w-md mx-auto">Pick a template to get started, or design a custom assistant tailored to your workflow.</p>
-    <button onclick="openCreateModal()" class="btn btn-primary">
-        <i class="fas fa-plus mr-2"></i>Create Assistant
-    </button>
-</div>
-{% endif %}
+<!-- Assistants Container -->
+<div id="assistantsContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 assistant-grid"></div>
 
-<!-- ============= Create / Edit Modal ============= -->
+<!-- Create Modal -->
 <div id="createModal" class="modal-overlay hidden">
-    <div class="modal-content glass-strong w-full max-w-2xl max-h-[92vh] overflow-hidden flex flex-col">
-        <div class="flex items-center justify-between p-5 border-b border-gray-700/50">
-            <div class="flex items-center gap-3">
-                <div class="w-10 h-10 bg-gradient-to-br from-purple-600 to-cyan-600 rounded-xl flex items-center justify-center">
-                    <i class="fas fa-wand-magic-sparkles text-white"></i>
-                </div>
-                <div>
-                    <h3 id="createModalTitle" class="text-white font-semibold text-lg">Create Assistant</h3>
-                    <p class="text-xs text-gray-500">Choose a template to start</p>
-                </div>
-            </div>
+    <div class="modal-content glass-strong w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto scroll-thin">
+        <div class="flex items-center justify-between mb-5">
+            <h2 class="text-white font-semibold text-lg"><i class="fas fa-plus-circle text-purple-400 mr-2"></i>Create New Assistant</h2>
             <button onclick="closeCreateModal()" class="btn-icon btn-ghost text-gray-500 hover:text-white"><i class="fas fa-times"></i></button>
         </div>
-        <form id="createForm" method="POST" action="/assistants/create" class="p-5 space-y-4 overflow-y-auto">
-            <input type="hidden" name="template" id="formTemplate" value="custom">
-            <input type="hidden" name="icon" id="formIcon" value="">
-
+        <form id="createForm" class="space-y-4">
             <div>
-                <label class="block text-sm font-medium text-gray-300 mb-2">Template</label>
-                <div class="grid grid-cols-4 sm:grid-cols-6 gap-2" id="templateGrid"></div>
+                <label class="block text-sm font-medium text-gray-300 mb-1.5">Template</label>
+                <div id="createTemplateGrid" class="grid grid-cols-3 gap-2 max-h-32 overflow-y-auto scroll-thin"></div>
             </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-300 mb-1.5">Name *</label>
+                <input type="text" name="name" class="input-field" required placeholder="My Assistant">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-300 mb-1.5">Description</label>
+                <input type="text" name="description" class="input-field" placeholder="What does this assistant do?">
+            </div>
+            <div class="grid grid-cols-2 gap-3">
                 <div>
-                    <label class="block text-sm font-medium text-gray-300 mb-1.5">Name <span class="text-red-400">*</span></label>
-                    <input type="text" name="name" id="formName" required class="input-field" placeholder="My Email Assistant">
+                    <label class="block text-sm font-medium text-gray-300 mb-1.5">Model</label>
+                    <select name="model_id" id="formModel" class="input-field"></select>
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-300 mb-1.5">Personality</label>
@@ -292,62 +211,31 @@ body { background: radial-gradient(ellipse at top left, #1e1b4b 0%, #0a0e1a 50%,
                     </select>
                 </div>
             </div>
-
             <div>
-                <label class="block text-sm font-medium text-gray-300 mb-1.5">AI Model</label>
-                <select name="model_id" id="formModel" class="input-field"></select>
+                <label class="block text-sm font-medium text-gray-300 mb-1.5">System Prompt</label>
+                <textarea name="system_prompt" class="input-field font-mono text-xs" rows="3" placeholder="You are a helpful assistant..."></textarea>
             </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-300 mb-1.5">Temperature: <span id="tempVal" class="text-purple-400 font-mono">0.7</span></label>
-                    <input type="range" name="temperature" id="tempSlider" min="0" max="2" step="0.1" value="0.7" class="range-slider" oninput="document.getElementById('tempVal').textContent=this.value">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-300 mb-1.5">Max tokens: <span id="tokensVal" class="text-cyan-400 font-mono">1000</span></label>
-                    <input type="range" name="max_tokens" id="tokensSlider" min="100" max="4000" step="100" value="1000" class="range-slider" oninput="document.getElementById('tokensVal').textContent=this.value">
-                </div>
-            </div>
-
-            <div>
-                <label class="block text-sm font-medium text-gray-300 mb-1.5">Description</label>
-                <input type="text" name="description" id="formDescription" class="input-field" placeholder="What does this assistant do?">
-            </div>
-
             <div>
                 <label class="block text-sm font-medium text-gray-300 mb-1.5">Tags (comma-separated)</label>
-                <input type="text" name="tags" id="formTags" class="input-field" placeholder="productivity, email, support">
+                <input type="text" name="tags" class="input-field" placeholder="support, code, research">
             </div>
-
-            <div>
-                <label class="block text-sm font-medium text-gray-300 mb-1.5">Custom system prompt <span class="text-xs text-gray-500">(optional - overrides template)</span></label>
-                <textarea name="system_prompt" id="formSystemPrompt" rows="4" class="input-field font-mono text-xs" placeholder="You are a helpful assistant that..."></textarea>
-            </div>
-
-            <div class="p-3 bg-gray-800/40 rounded-lg border border-gray-700/40" id="capabilitiesBox">
-                <p class="text-xs text-gray-500 mb-2">Template capabilities</p>
-                <div id="capabilitiesContent" class="text-xs text-gray-400"></div>
-            </div>
-
             <div class="flex justify-end gap-2 pt-3 border-t border-gray-700/50">
                 <button type="button" onclick="closeCreateModal()" class="btn btn-secondary">Cancel</button>
-                <button type="submit" class="btn btn-primary"><i class="fas fa-plus mr-2"></i>Create Assistant</button>
+                <button type="submit" class="btn btn-primary"><i class="fas fa-rocket"></i> Create</button>
             </div>
         </form>
     </div>
 </div>
 
-<!-- ============= Assistant Detail / Chat Modal ============= -->
-<div id="detailModal" class="modal-overlay hidden">
-    <div class="modal-content glass-strong w-full max-w-7xl h-[92vh] overflow-hidden flex flex-col">
+<!-- Detail Modal (full chat) -->
+<div id="detailModal" class="modal-overlay hidden" style="padding: 0;">
+    <div class="modal-content glass-strong h-full w-full flex flex-col" style="border-radius:0;animation:slideUp .25s">
         <!-- Header -->
-        <div class="flex items-center justify-between p-4 border-b border-gray-700/50 bg-gradient-to-r from-purple-900/20 to-cyan-900/20">
-            <div class="flex items-center gap-3">
-                <div id="detailAvatar" class="w-11 h-11 rounded-xl bg-gradient-to-br from-purple-600/30 to-cyan-600/30 flex items-center justify-center border border-purple-500/30">
-                    <i class="fas fa-robot text-purple-300 text-lg"></i>
-                </div>
-                <div>
-                    <h3 id="detailName" class="text-white font-semibold">—</h3>
+        <div class="flex items-center justify-between p-4 border-b border-gray-700/50">
+            <div class="flex items-center gap-3 min-w-0">
+                <div id="detailAvatar" class="w-10 h-10 rounded-full avatar-gradient text-sm flex-shrink-0">AI</div>
+                <div class="min-w-0">
+                    <h3 id="detailName" class="text-white font-semibold truncate">—</h3>
                     <p id="detailSubtitle" class="text-xs text-gray-400">—</p>
                 </div>
             </div>
@@ -356,162 +244,173 @@ body { background: radial-gradient(ellipse at top left, #1e1b4b 0%, #0a0e1a 50%,
                 <button onclick="duplicateCurrentAssistant()" class="btn btn-ghost" title="Duplicate"><i class="fas fa-copy"></i></button>
                 <button onclick="shareCurrentAssistant()" class="btn btn-ghost" title="Share"><i class="fas fa-share-nodes"></i></button>
                 <button onclick="exportCurrentChat()" class="btn btn-ghost" title="Export chat"><i class="fas fa-download"></i></button>
+                <button onclick="openSettingsPanel()" class="btn btn-ghost" title="Edit"><i class="fas fa-pen"></i></button>
+                <button onclick="deleteCurrentAssistant()" class="btn btn-ghost text-red-400 hover:text-red-300" title="Delete"><i class="fas fa-trash"></i></button>
                 <button onclick="closeDetailModal()" class="btn btn-ghost text-gray-500 hover:text-white"><i class="fas fa-times"></i></button>
             </div>
         </div>
-
         <!-- Body: 3 columns -->
         <div class="flex-1 flex overflow-hidden">
             <!-- Sidebar: Conversations -->
-            <div class="w-64 border-r border-gray-700/50 bg-black/20 flex flex-col">
+            <div class="w-64 border-r border-gray-700/50 bg-black/20 flex flex-col flex-shrink-0">
                 <div class="p-3 border-b border-gray-700/50">
                     <button onclick="newConversation()" class="btn btn-primary w-full justify-center text-xs"><i class="fas fa-plus mr-2"></i>New Chat</button>
                 </div>
-                <div class="p-3 sidebar-list" id="conversationsList">
+                <div class="p-3 scroll-thin" id="conversationsList" style="overflow-y:auto;flex:1;">
                     <p class="text-xs text-gray-500 text-center py-8">No conversations yet</p>
                 </div>
             </div>
-
-            <!-- Center: Chat -->
-            <div class="flex-1 flex flex-col bg-black/10">
-                <div class="flex items-center gap-2 p-3 border-b border-gray-700/50 text-xs">
+            <!-- Center: Chat with tabs -->
+            <div class="flex-1 flex flex-col bg-black/10 min-w-0">
+                <div class="flex items-center gap-2 p-3 border-b border-gray-700/50 text-xs overflow-x-auto scroll-thin">
                     <button onclick="setTab('chat')" id="tabChat" class="tab-btn active"><i class="fas fa-comments mr-1"></i>Chat</button>
-                    <button onclick="setTab('info')" id="tabInfo" class="tab-btn"><i class="fas fa-info-circle mr-1"></i>Info</button>
-                    <button onclick="setTab('tasks')" id="tabTasks" class="tab-btn"><i class="fas fa-bolt mr-1"></i>Tasks</button>
                     <button onclick="setTab('integrations')" id="tabIntegrations" class="tab-btn"><i class="fas fa-plug mr-1"></i>Integrations</button>
+                    <button onclick="setTab('tasks')" id="tabTasks" class="tab-btn"><i class="fas fa-bolt mr-1"></i>Tasks</button>
                     <button onclick="setTab('analytics')" id="tabAnalytics" class="tab-btn"><i class="fas fa-chart-line mr-1"></i>Analytics</button>
                     <button onclick="setTab('logs')" id="tabLogs" class="tab-btn"><i class="fas fa-list mr-1"></i>Logs</button>
-                    <div class="ml-auto flex items-center gap-2 text-gray-500">
-                        <span id="chatModelLabel" class="text-xs"></span>
-                    </div>
                 </div>
-
-                <!-- Chat Tab -->
+                <!-- Chat tab -->
                 <div id="panelChat" class="flex-1 flex flex-col overflow-hidden">
-                    <div id="chatScroll" class="flex-1 overflow-y-auto p-6 chat-scroll">
+                    <div class="flex-1 overflow-y-auto p-4 scroll-thin" id="chatMessages">
                         <div class="empty-state">
-                            <i class="fas fa-comments text-5xl text-gray-600 mb-4"></i>
-                            <p class="text-sm">Start a conversation with your assistant</p>
+                            <i class="fas fa-robot text-4xl text-gray-700 mb-3"></i>
+                            <p class="text-sm">Start a conversation with this assistant</p>
                         </div>
                     </div>
-                    <div class="p-4 border-t border-gray-700/50 bg-black/30">
-                        <div id="quickPrompts" class="flex flex-wrap gap-2 mb-3"></div>
+                    <div class="border-t border-gray-700/50 p-4 bg-black/20">
                         <div class="flex items-end gap-2">
-                            <button onclick="toggleVoice()" id="voiceBtn" class="btn btn-secondary" title="Voice input"><i class="fas fa-microphone"></i></button>
-                            <textarea id="chatInput" rows="1" placeholder="Ask your assistant..." class="input-field resize-none flex-1" style="max-height:120px"
-                                onkeydown="if(event.key==='Enter' && !event.shiftKey){event.preventDefault();sendMessage();}"
-                                oninput="this.style.height='auto';this.style.height=(this.scrollHeight)+'px'"></textarea>
-                            <button onclick="sendMessage()" id="sendBtn" class="btn btn-primary px-5"><i class="fas fa-paper-plane"></i></button>
-                            <button onclick="stopGeneration()" id="stopBtn" class="btn btn-danger hidden px-5"><i class="fas fa-stop"></i></button>
+                            <textarea id="chatInput" class="input-field scroll-thin" rows="1" placeholder="Type your message... (Shift+Enter for new line)" style="resize:none;max-height:160px;" onkeydown="if(event.key==='Enter' && !event.shiftKey){event.preventDefault();sendMessage();}"></textarea>
+                            <button onclick="sendMessage()" id="sendBtn" class="btn btn-primary" style="height:42px;"><i class="fas fa-paper-plane"></i></button>
                         </div>
                         <div class="flex items-center justify-between mt-2 text-[10px] text-gray-500">
-                            <span><kbd class="px-1.5 py-0.5 bg-gray-800 rounded">Enter</kbd> to send · <kbd class="px-1.5 py-0.5 bg-gray-800 rounded">Shift+Enter</kbd> for new line</span>
-                            <span id="chatMeta"></span>
+                            <span>Model: <span id="currentModel" class="text-cyan-400">—</span></span>
+                            <span>Temp: <span id="currentTemp" class="text-cyan-400">—</span></span>
+                            <span>Tokens: <span id="currentTokens" class="text-cyan-400">—</span></span>
                         </div>
                     </div>
                 </div>
-
-                <!-- Info Tab -->
-                <div id="panelInfo" class="flex-1 overflow-y-auto p-6 hidden">
-                    <div class="grid grid-cols-2 md:grid-cols-3 gap-3 mb-5">
-                        <div class="p-3 bg-gray-800/50 rounded-lg"><p class="text-[10px] text-gray-500 uppercase">Status</p><p id="infoStatus" class="text-white font-medium">—</p></div>
-                        <div class="p-3 bg-gray-800/50 rounded-lg"><p class="text-[10px] text-gray-500 uppercase">Model</p><p id="infoModel" class="text-white font-medium">—</p></div>
-                        <div class="p-3 bg-gray-800/50 rounded-lg"><p class="text-[10px] text-gray-500 uppercase">Personality</p><p id="infoPersonality" class="text-white font-medium">—</p></div>
-                        <div class="p-3 bg-gray-800/50 rounded-lg"><p class="text-[10px] text-gray-500 uppercase">Temperature</p><p id="infoTemp" class="text-white font-medium">—</p></div>
-                        <div class="p-3 bg-gray-800/50 rounded-lg"><p class="text-[10px] text-gray-500 uppercase">Max tokens</p><p id="infoTokens" class="text-white font-medium">—</p></div>
-                        <div class="p-3 bg-gray-800/50 rounded-lg"><p class="text-[10px] text-gray-500 uppercase">Auto-reply</p><p id="infoAuto" class="text-white font-medium">—</p></div>
+                <!-- Integrations tab -->
+                <div id="panelIntegrations" class="flex-1 hidden overflow-y-auto p-4 scroll-thin">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-white font-semibold"><i class="fas fa-plug text-cyan-400 mr-2"></i>Integrations</h3>
+                        <button onclick="openAddIntegrationModal()" class="btn btn-primary text-xs"><i class="fas fa-plus mr-1"></i>Add</button>
                     </div>
-                    <div class="mb-5">
-                        <h4 class="text-white font-medium mb-2 text-sm">System prompt</h4>
-                        <div id="infoPrompt" class="p-4 bg-gray-800/50 rounded-lg text-sm text-gray-300 font-mono whitespace-pre-wrap">—</div>
+                    <div id="integrationsList" class="space-y-2">
+                        <p class="text-sm text-gray-500">No integrations configured</p>
                     </div>
-                    <div class="mb-5">
-                        <h4 class="text-white font-medium mb-2 text-sm">Description</h4>
-                        <div id="infoDescription" class="p-4 bg-gray-800/50 rounded-lg text-sm text-gray-300">—</div>
+                </div>
+                <!-- Tasks tab -->
+                <div id="panelTasks" class="flex-1 hidden overflow-y-auto p-4 scroll-thin">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-white font-semibold"><i class="fas fa-bolt text-amber-400 mr-2"></i>Scheduled Tasks</h3>
+                        <button onclick="openAddTaskModal()" class="btn btn-primary text-xs"><i class="fas fa-plus mr-1"></i>Add</button>
+                    </div>
+                    <div id="tasksList" class="space-y-2">
+                        <p class="text-sm text-gray-500">No tasks configured</p>
+                    </div>
+                </div>
+                <!-- Analytics tab -->
+                <div id="panelAnalytics" class="flex-1 hidden overflow-y-auto p-4 scroll-thin">
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                        <div class="stat-card"><p class="text-xs text-gray-400">Conversations</p><p class="text-xl font-bold text-white" id="anaConversations">0</p></div>
+                        <div class="stat-card"><p class="text-xs text-gray-400">Messages</p><p class="text-xl font-bold text-white" id="anaMessages">0</p></div>
+                        <div class="stat-card"><p class="text-xs text-gray-400">Tokens</p><p class="text-xl font-bold text-white" id="anaTokens">0</p></div>
+                        <div class="stat-card"><p class="text-xs text-gray-400">Tasks Run</p><p class="text-xl font-bold text-white" id="anaTasksRun">0</p></div>
+                    </div>
+                    <div class="glass p-4" style="height:280px;"><canvas id="activityChart"></canvas></div>
+                </div>
+                <!-- Logs tab -->
+                <div id="panelLogs" class="flex-1 hidden overflow-y-auto p-4 scroll-thin">
+                    <h3 class="text-white font-semibold mb-4"><i class="fas fa-list text-gray-400 mr-2"></i>Activity Logs</h3>
+                    <div id="logsList" class="space-y-2">
+                        <p class="text-sm text-gray-500">No activity yet</p>
+                    </div>
+                </div>
+            </div>
+            <!-- Right: Info -->
+            <div class="w-72 border-l border-gray-700/50 bg-black/20 flex flex-col flex-shrink-0 overflow-y-auto scroll-thin">
+                <div class="p-4 space-y-4" id="infoPanel">
+                    <div class="text-center">
+                        <div id="infoAvatar" class="w-20 h-20 rounded-full avatar-gradient text-2xl mx-auto mb-2">AI</div>
+                        <h3 id="infoName" class="text-white font-semibold">—</h3>
+                        <p id="infoDescription" class="text-xs text-gray-400 mt-1">—</p>
+                    </div>
+                    <div class="space-y-2 text-xs">
+                        <div class="flex justify-between p-2 bg-white/5 rounded-lg"><span class="text-gray-400">Status</span><span id="infoStatus" class="text-green-400">Active</span></div>
+                        <div class="flex justify-between p-2 bg-white/5 rounded-lg"><span class="text-gray-400">Model</span><span id="infoModel" class="text-cyan-400">—</span></div>
+                        <div class="flex justify-between p-2 bg-white/5 rounded-lg"><span class="text-gray-400">Personality</span><span id="infoPersonality" class="text-purple-400">—</span></div>
+                        <div class="flex justify-between p-2 bg-white/5 rounded-lg"><span class="text-gray-400">Temperature</span><span id="infoTemp" class="text-amber-400">—</span></div>
+                        <div class="flex justify-between p-2 bg-white/5 rounded-lg"><span class="text-gray-400">Max Tokens</span><span id="infoTokens" class="text-amber-400">—</span></div>
+                        <div class="flex justify-between p-2 bg-white/5 rounded-lg"><span class="text-gray-400">Created</span><span id="infoCreated" class="text-gray-300">—</span></div>
                     </div>
                     <div>
-                        <h4 class="text-white font-medium mb-2 text-sm">Tags</h4>
-                        <div id="infoTags" class="flex flex-wrap gap-2"></div>
+                        <h4 class="text-xs text-gray-400 font-semibold mb-2 uppercase tracking-wider">Tags</h4>
+                        <div id="infoTags" class="flex flex-wrap gap-1"></div>
                     </div>
-                </div>
-
-                <!-- Tasks Tab -->
-                <div id="panelTasks" class="flex-1 overflow-y-auto p-6 hidden">
-                    <div class="flex items-center justify-between mb-4">
-                        <h4 class="text-white font-medium">Automated Tasks</h4>
-                        <button onclick="openAddTaskModal()" class="btn btn-primary text-xs"><i class="fas fa-plus mr-1"></i>Add Task</button>
+                    <div>
+                        <h4 class="text-xs text-gray-400 font-semibold mb-2 uppercase tracking-wider">System Prompt</h4>
+                        <p id="infoPrompt" class="text-xs text-gray-500 bg-white/5 p-3 rounded-lg max-h-40 overflow-y-auto scroll-thin">—</p>
                     </div>
-                    <div id="tasksList" class="space-y-2"></div>
-                </div>
-
-                <!-- Integrations Tab -->
-                <div id="panelIntegrations" class="flex-1 overflow-y-auto p-6 hidden">
-                    <div class="flex items-center justify-between mb-4">
-                        <h4 class="text-white font-medium">Integrations</h4>
-                        <button onclick="openAddIntegrationModal()" class="btn btn-primary text-xs"><i class="fas fa-plus mr-1"></i>Add Integration</button>
-                    </div>
-                    <div id="integrationsList" class="space-y-2"></div>
-                </div>
-
-                <!-- Analytics Tab -->
-                <div id="panelAnalytics" class="flex-1 overflow-y-auto p-6 hidden">
-                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
-                        <div class="p-4 bg-gradient-to-br from-purple-600/15 to-purple-600/5 rounded-lg border border-purple-500/20">
-                            <p class="text-[10px] text-gray-500 uppercase">Conversations</p>
-                            <p id="anaConversations" class="text-2xl font-bold text-white mt-1">0</p>
-                        </div>
-                        <div class="p-4 bg-gradient-to-br from-cyan-600/15 to-cyan-600/5 rounded-lg border border-cyan-500/20">
-                            <p class="text-[10px] text-gray-500 uppercase">Messages</p>
-                            <p id="anaMessages" class="text-2xl font-bold text-white mt-1">0</p>
-                        </div>
-                        <div class="p-4 bg-gradient-to-br from-amber-600/15 to-amber-600/5 rounded-lg border border-amber-500/20">
-                            <p class="text-[10px] text-gray-500 uppercase">Tokens</p>
-                            <p id="anaTokens" class="text-2xl font-bold text-white mt-1">0</p>
-                        </div>
-                        <div class="p-4 bg-gradient-to-br from-green-600/15 to-green-600/5 rounded-lg border border-green-500/20">
-                            <p class="text-[10px] text-gray-500 uppercase">Tasks Run</p>
-                            <p id="anaTasksRun" class="text-2xl font-bold text-white mt-1">0</p>
-                        </div>
-                    </div>
-                    <div class="glass p-4">
-                        <h5 class="text-white font-medium text-sm mb-3">Activity (last 14 days)</h5>
-                        <canvas id="activityChart" height="100"></canvas>
-                    </div>
-                </div>
-
-                <!-- Logs Tab -->
-                <div id="panelLogs" class="flex-1 overflow-y-auto p-6 hidden">
-                    <h4 class="text-white font-medium mb-4">Recent Activity</h4>
-                    <div id="logsList" class="space-y-2"></div>
                 </div>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Add Task Modal -->
-<div id="taskModal" class="modal-overlay hidden">
-    <div class="modal-content glass-strong w-full max-w-lg p-5">
+<!-- Edit Settings Modal -->
+<div id="settingsModal" class="modal-overlay hidden">
+    <div class="modal-content glass-strong w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto scroll-thin">
         <div class="flex items-center justify-between mb-4">
-            <h3 class="text-white font-semibold">Add Task</h3>
-            <button onclick="closeTaskModal()" class="btn-icon btn-ghost text-gray-500 hover:text-white"><i class="fas fa-times"></i></button>
+            <h3 class="text-white font-semibold text-lg"><i class="fas fa-pen text-blue-400 mr-2"></i>Edit Assistant</h3>
+            <button onclick="closeSettingsPanel()" class="btn btn-ghost text-gray-500 hover:text-white"><i class="fas fa-times"></i></button>
         </div>
-        <form id="taskForm" class="space-y-4">
+        <form id="settingsForm" class="space-y-3">
             <div>
-                <label class="block text-sm font-medium text-gray-300 mb-1.5">Task Type</label>
-                <select name="task_type" id="taskTypeSelect" class="input-field"></select>
+                <label class="block text-sm font-medium text-gray-300 mb-1">Name</label>
+                <input type="text" name="name" id="setName" class="input-field" required>
             </div>
             <div>
-                <label class="block text-sm font-medium text-gray-300 mb-1.5">Name</label>
-                <input type="text" name="name" class="input-field" placeholder="e.g. Morning Email Check">
+                <label class="block text-sm font-medium text-gray-300 mb-1">Description</label>
+                <input type="text" name="description" id="setDescription" class="input-field">
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-1">Model</label>
+                    <select name="model_id" id="setModel" class="input-field"></select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-1">Personality</label>
+                    <select name="personality" id="setPersonality" class="input-field">
+                        <option value="professional">Professional</option>
+                        <option value="friendly">Friendly</option>
+                        <option value="concise">Concise</option>
+                        <option value="detailed">Detailed</option>
+                        <option value="technical">Technical</option>
+                        <option value="creative">Creative</option>
+                    </select>
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">Temperature: <span id="setTempVal" class="text-purple-400">0.7</span></label>
+                    <input type="range" name="temperature" id="setTemp" min="0" max="2" step="0.1" value="0.7" class="w-full" oninput="document.getElementById('setTempVal').textContent=this.value">
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">Max tokens: <span id="setTokensVal" class="text-cyan-400">1000</span></label>
+                    <input type="range" name="max_tokens" id="setTokens" min="100" max="4000" step="100" value="1000" class="w-full" oninput="document.getElementById('setTokensVal').textContent=this.value">
+                </div>
             </div>
             <div>
-                <label class="block text-sm font-medium text-gray-300 mb-1.5">Schedule</label>
-                <input type="text" name="schedule" class="input-field" placeholder="e.g. every day at 9am">
+                <label class="block text-sm font-medium text-gray-300 mb-1">System Prompt</label>
+                <textarea name="system_prompt" id="setPrompt" rows="4" class="input-field font-mono text-xs"></textarea>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-300 mb-1">Tags (comma-separated)</label>
+                <input type="text" name="tags" id="setTags" class="input-field">
             </div>
             <div class="flex justify-end gap-2 pt-3 border-t border-gray-700/50">
-                <button type="button" onclick="closeTaskModal()" class="btn btn-secondary">Cancel</button>
-                <button type="submit" class="btn btn-primary"><i class="fas fa-plus mr-2"></i>Add</button>
+                <button type="button" onclick="closeSettingsPanel()" class="btn btn-secondary">Cancel</button>
+                <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save</button>
             </div>
         </form>
     </div>
@@ -519,26 +418,54 @@ body { background: radial-gradient(ellipse at top left, #1e1b4b 0%, #0a0e1a 50%,
 
 <!-- Add Integration Modal -->
 <div id="integrationModal" class="modal-overlay hidden">
-    <div class="modal-content glass-strong w-full max-w-lg p-5 max-h-[90vh] overflow-y-auto">
+    <div class="modal-content glass-strong w-full max-w-lg p-5 max-h-[90vh] overflow-y-auto scroll-thin">
         <div class="flex items-center justify-between mb-4">
-            <h3 class="text-white font-semibold">Add Integration</h3>
-            <button onclick="closeIntegrationModal()" class="btn-icon btn-ghost text-gray-500 hover:text-white"><i class="fas fa-times"></i></button>
+            <h3 class="text-white font-semibold"><i class="fas fa-plug text-cyan-400 mr-2"></i>Add Integration</h3>
+            <button onclick="closeIntegrationModal()" class="btn btn-ghost text-gray-500 hover:text-white"><i class="fas fa-times"></i></button>
         </div>
-        <form id="integrationForm" class="space-y-4">
+        <form id="integrationForm" class="space-y-3">
             <div>
-                <label class="block text-sm font-medium text-gray-300 mb-1.5">Type</label>
+                <label class="block text-sm font-medium text-gray-300 mb-1">Type</label>
                 <select name="integration_type" id="integrationTypeSelect" class="input-field" onchange="onIntegrationTypeChange()"></select>
             </div>
             <div>
-                <label class="block text-sm font-medium text-gray-300 mb-1.5">Display name</label>
+                <label class="block text-sm font-medium text-gray-300 mb-1">Display name</label>
                 <input type="text" name="name" class="input-field" placeholder="My Email integration">
             </div>
-            <div id="integrationConfigFields" class="space-y-3 pt-3 border-t border-gray-700/50">
-                <p class="text-xs text-gray-500">Configuration fields will appear here based on the selected type.</p>
+            <div id="integrationConfigFields" class="space-y-2 pt-3 border-t border-gray-700/50">
+                <p class="text-xs text-gray-500">Select a type to see configuration options.</p>
             </div>
             <div class="flex justify-end gap-2 pt-3 border-t border-gray-700/50">
                 <button type="button" onclick="closeIntegrationModal()" class="btn btn-secondary">Cancel</button>
-                <button type="submit" class="btn btn-primary"><i class="fas fa-plus mr-2"></i>Add</button>
+                <button type="submit" class="btn btn-primary"><i class="fas fa-plus"></i>Add</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Add Task Modal -->
+<div id="taskModal" class="modal-overlay hidden">
+    <div class="modal-content glass-strong w-full max-w-md p-5">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-white font-semibold"><i class="fas fa-bolt text-amber-400 mr-2"></i>Add Task</h3>
+            <button onclick="closeTaskModal()" class="btn btn-ghost text-gray-500 hover:text-white"><i class="fas fa-times"></i></button>
+        </div>
+        <form id="taskForm" class="space-y-3">
+            <div>
+                <label class="block text-sm font-medium text-gray-300 mb-1">Task Type</label>
+                <select name="task_type" id="taskTypeSelect" class="input-field"></select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-300 mb-1">Name</label>
+                <input type="text" name="name" class="input-field" placeholder="Daily email check">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-300 mb-1">Schedule (cron-style)</label>
+                <input type="text" name="schedule" class="input-field" placeholder="0 9 * * * (every day at 9am)">
+            </div>
+            <div class="flex justify-end gap-2 pt-3 border-t border-gray-700/50">
+                <button type="button" onclick="closeTaskModal()" class="btn btn-secondary">Cancel</button>
+                <button type="submit" class="btn btn-primary"><i class="fas fa-plus"></i>Add</button>
             </div>
         </form>
     </div>
@@ -548,5 +475,5 @@ body { background: radial-gradient(ellipse at top left, #1e1b4b 0%, #0a0e1a 50%,
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/assistants.js?v=2"></script>
+<script src="/static/js/assistants.js?v=3"></script>
 {% endblock %}

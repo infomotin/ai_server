@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}OpenLocalAI - Dashboard{% endblock %}</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -109,11 +110,30 @@
             <a href="/data" class="nav-item {% if request.path == '/data' %}active{% endif %}">
                 <i class="fas fa-database w-5"></i> Data Sources
             </a>
+            <a href="/cameras" class="nav-item {% if request.path == '/cameras' %}active{% endif %}">
+                <i class="fas fa-video w-5"></i> Video / Cameras
+            </a>
 
             <div class="nav-section">Account</div>
             <a href="/keys" class="nav-item {% if request.path == '/keys' %}active{% endif %}">
                 <i class="fas fa-key w-5"></i> API Keys
             </a>
+
+            {% if session.get('user') and session['user']['is_admin'] %}
+            <div class="nav-section">Administration</div>
+            <a href="/admin/users" class="nav-item {% if request.path == '/admin/users' %}active{% endif %}">
+                <i class="fas fa-users w-5"></i> User Management
+            </a>
+            <a href="/admin/roles" class="nav-item {% if request.path == '/admin/roles' %}active{% endif %}">
+                <i class="fas fa-user-shield w-5"></i> Roles
+            </a>
+            <a href="/admin/permissions" class="nav-item {% if request.path == '/admin/permissions' %}active{% endif %}">
+                <i class="fas fa-key w-5"></i> Permissions
+            </a>
+            <a href="/admin/menus" class="nav-item {% if request.path == '/admin/menus' %}active{% endif %}">
+                <i class="fas fa-bars w-5"></i> Menus
+            </a>
+            {% endif %}
 
             <div class="mt-8 mx-4 p-4 bg-gray-800 rounded-xl border border-gray-700">
                 <div class="flex items-center gap-3 mb-3">

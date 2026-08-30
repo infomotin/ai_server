@@ -23,7 +23,10 @@ from src.routers import (
     ai_assistant_router,
     integrations_router,
     agent_router,
-    mcp_router
+    mcp_router,
+    training_router,
+    camera_router,
+    rbac_router
 )
 
 logging.basicConfig(
@@ -107,6 +110,9 @@ app.include_router(ai_assistant_router)
 app.include_router(integrations_router)
 app.include_router(agent_router)
 app.include_router(mcp_router)
+app.include_router(training_router.router)
+app.include_router(camera_router.router)
+app.include_router(rbac_router)
 
 
 @app.get("/")

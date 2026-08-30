@@ -143,33 +143,51 @@ class DatabaseConnector:
             print(f"Error listing databases: {e}")
             return []
 
-    def get_tables(self, connection_url: str) -> List[Dict[str, Any]]:
+    def get_tables(self, connection_url: str, lightweight: bool = False, include_row_counts: bool = False) -> List[Dict[str, Any]]:
+        """Get tables with full info (default) or just name (lightweight for large DBs).
+        include_row_counts only affects lightweight mode - it adds row count but is slow on huge DBs.
+        """
         try:
             engine = create_engine(connection_url, pool_pre_ping=True)
             inspector = inspect(engine)
 
             tables = []
             for table_name in inspector.get_table_names():
-                columns = inspector.get_columns(table_name)
-                pk_cols = inspector.get_pk_constraint(table_name)
-                indexes = inspector.get_indexes(table_name)
-
-                table_info = {
-                    "name": table_name,
-                    "columns": [
-                        {
-                            "name": col["name"],
-                            "type": str(col["type"]),
-                            "nullable": col.get("nullable", True),
-                            "primary_key": col["name"] in (pk_cols.get("constrained_columns", []) if pk_cols else [])
-                        }
-                        for col in columns
-                    ],
-                    "column_count": len(columns),
-                    "primary_key": pk_cols.get("constrained_columns", []) if pk_cols else [],
-                    "indexes": [idx.get("column_names", []) for idx in indexes]
-                }
-                tables.append(table_info)
+                if lightweight:
+                    tables.append({
+                        "name": table_name,
+                        "columns": [],  # Loaded on demand
+                        "column_count": 0,  # Loaded on demand
+                        "primary_key": [],
+                        "indexes": [],
+                        "row_count": -1,  # -1 = not yet counted
+                        "lightweight": True,
+                    })
+                else:
+                    columns = inspector.get_columns(table_name)
+                    pk_cols = inspector.get_pk_constraint(table_name)
+                    indexes = inspector.get_indexes(table_name)
+                    try:
+                        with engine.connect() as conn:
+                            count = conn.execute(text(f"SELECT COUNT(*) FROM `{table_name}`")).scalar()
+                    except Exception:
+                        count = 0
+                    tables.append({
+                        "name": table_name,
+                        "columns": [
+                            {
+                                "name": col["name"],
+                                "type": str(col["type"]),
+                                "nullable": col.get("nullable", True),
+                                "primary_key": col["name"] in (pk_cols.get("constrained_columns", []) if pk_cols else [])
+                            }
+                            for col in columns
+                        ],
+                        "column_count": len(columns),
+                        "primary_key": pk_cols.get("constrained_columns", []) if pk_cols else [],
+                        "indexes": [idx.get("column_names", []) for idx in indexes],
+                        "row_count": count or 0,
+                    })
 
             engine.dispose()
             return tables
@@ -203,6 +221,41 @@ class DatabaseConnector:
         except Exception as e:
             print(f"Error reading table: {e}")
             return {"columns": [], "rows": [], "total_rows": 0, "error": str(e)[:200]}
+
+    def get_table_columns(self, connection_url: str, table_name: str) -> List[Dict[str, Any]]:
+        """Get just the columns for a single table (used for lazy loading)."""
+        try:
+            engine = create_engine(connection_url, pool_pre_ping=True)
+            inspector = inspect(engine)
+            columns = inspector.get_columns(table_name)
+            pk_cols = inspector.get_pk_constraint(table_name)
+            pk_names = pk_cols.get("constrained_columns", []) if pk_cols else []
+            result = [
+                {
+                    "name": col["name"],
+                    "type": str(col["type"]),
+                    "nullable": col.get("nullable", True),
+                    "primary_key": col["name"] in pk_names,
+                }
+                for col in columns
+            ]
+            engine.dispose()
+            return result
+        except Exception as e:
+            print(f"Error getting columns for {table_name}: {e}")
+            return []
+
+    def get_table_row_count(self, connection_url: str, table_name: str) -> int:
+        """Get row count for a single table (lazy loading)."""
+        try:
+            engine = create_engine(connection_url, pool_pre_ping=True)
+            with engine.connect() as conn:
+                count = conn.execute(text(f"SELECT COUNT(*) FROM `{table_name}`")).scalar()
+            engine.dispose()
+            return count or 0
+        except Exception as e:
+            print(f"Error counting {table_name}: {e}")
+            return 0
 
     def export_table_to_training_format(self, connection_url: str, table_name: str,
                                         format_type: str = "json", limit: int = 10000,

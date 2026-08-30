@@ -110,3 +110,29 @@ def require_scope(required_scope: str):
         return api_key
 
     return scope_checker
+
+
+def require_permission(required_permission: str):
+    async def permission_checker(
+        current_user: User = Depends(get_current_user),
+        db: Session = Depends(get_db_session)
+    ) -> User:
+        from src.services.rbac_service import rbac_service
+
+        # Super admin or is_admin bypass
+        if current_user.is_admin:
+            return current_user
+
+        # Check permission
+        if not rbac_service.user_has_permission(db, current_user.id, required_permission):
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "message": f"Permission denied: {required_permission}",
+                    "type": "permission_error",
+                    "code": 403
+                }
+            )
+        return current_user
+
+    return permission_checker

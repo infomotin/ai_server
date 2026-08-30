@@ -2493,14 +2493,39 @@ def api_database_preview():
         conn_url = request.args.get("connection_url", "")
         table_name = request.args.get("table_name", "")
         limit = request.args.get("limit", 5, type=int)
+        offset = request.args.get("offset", 0, type=int)
         resp = requests.post(
             f"{API_BASE_URL}/database/table/data",
-            params={"connection_url": conn_url, "table_name": table_name, "limit": limit, "offset": 0},
+            params={"connection_url": conn_url, "table_name": table_name, "limit": limit, "offset": offset},
             headers=get_api_headers(), timeout=15
         )
         return resp.json() if resp.status_code == 200 else {"columns": [], "rows": []}
     except requests.exceptions.RequestException:
         return {"columns": [], "rows": [], "error": "Connection error"}
+
+
+@app.route("/api/database/table/columns", methods=["POST"])
+def api_database_columns():
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    try:
+        data = request.get_json()
+        resp = requests.post(f"{API_BASE_URL}/database/table/columns", json=data, headers=get_api_headers(), timeout=15)
+        return resp.json() if resp.status_code == 200 else {"columns": [], "error": "Failed"}
+    except requests.exceptions.RequestException:
+        return {"columns": [], "error": "Connection error"}
+
+
+@app.route("/api/database/table/row-count", methods=["POST"])
+def api_database_row_count():
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    try:
+        data = request.get_json()
+        resp = requests.post(f"{API_BASE_URL}/database/table/row-count", json=data, headers=get_api_headers(), timeout=15)
+        return resp.json() if resp.status_code == 200 else {"row_count": 0, "error": "Failed"}
+    except requests.exceptions.RequestException:
+        return {"row_count": 0, "error": "Connection error"}
 
 
 @app.route("/api/database/table/export", methods=["POST"])
@@ -2513,6 +2538,394 @@ def api_database_export():
         return resp.json() if resp.status_code == 200 else {"error": "Export failed"}
     except requests.exceptions.RequestException:
         return {"error": "Connection error"}
+
+
+# ============= Training Routes =============
+@app.route("/api/training/jobs", methods=["GET"])
+def api_training_list():
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    try:
+        resp = requests.get(f"{API_BASE_URL}/training/jobs", headers=get_api_headers(), timeout=10)
+        return resp.json() if resp.status_code == 200 else {"jobs": []}
+    except requests.exceptions.RequestException:
+        return {"jobs": [], "error": "Connection error"}
+
+
+@app.route("/api/training/jobs", methods=["POST"])
+def api_training_create():
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    try:
+        data = request.get_json()
+        resp = requests.post(f"{API_BASE_URL}/training/jobs", json=data, headers=get_api_headers(), timeout=10)
+        return resp.json() if resp.status_code == 200 else {"error": "Failed to create job"}
+    except requests.exceptions.RequestException:
+        return {"error": "Connection error"}
+
+
+@app.route("/api/training/jobs/<job_id>", methods=["GET"])
+def api_training_get(job_id):
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    try:
+        resp = requests.get(f"{API_BASE_URL}/training/jobs/{job_id}", headers=get_api_headers(), timeout=10)
+        return resp.json() if resp.status_code == 200 else {"error": "Not found"}
+    except requests.exceptions.RequestException:
+        return {"error": "Connection error"}
+
+
+@app.route("/api/training/jobs/<job_id>/start", methods=["POST"])
+def api_training_start(job_id):
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    try:
+        resp = requests.post(f"{API_BASE_URL}/training/jobs/{job_id}/start", headers=get_api_headers(), timeout=10)
+        return resp.json() if resp.status_code == 200 else {"error": "Failed"}
+    except requests.exceptions.RequestException:
+        return {"error": "Connection error"}
+
+
+@app.route("/api/training/jobs/<job_id>/cancel", methods=["POST"])
+def api_training_cancel(job_id):
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    try:
+        resp = requests.post(f"{API_BASE_URL}/training/jobs/{job_id}/cancel", headers=get_api_headers(), timeout=10)
+        return resp.json() if resp.status_code == 200 else {"error": "Failed"}
+    except requests.exceptions.RequestException:
+        return {"error": "Connection error"}
+
+
+@app.route("/api/training/jobs/<job_id>/test", methods=["POST"])
+def api_training_test(job_id):
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    try:
+        data = request.get_json()
+        resp = requests.post(f"{API_BASE_URL}/training/jobs/{job_id}/test", json=data, headers=get_api_headers(), timeout=30)
+        return resp.json() if resp.status_code == 200 else {"error": "Failed"}
+    except requests.exceptions.RequestException:
+        return {"error": "Connection error"}
+
+
+@app.route("/api/training/jobs/<job_id>/feedback", methods=["POST"])
+def api_training_feedback(job_id):
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    try:
+        data = request.get_json()
+        resp = requests.post(f"{API_BASE_URL}/training/jobs/{job_id}/feedback", json=data, headers=get_api_headers(), timeout=10)
+        return resp.json() if resp.status_code == 200 else {"error": "Failed"}
+    except requests.exceptions.RequestException:
+        return {"error": "Connection error"}
+
+
+@app.route("/api/training/jobs/<job_id>/retrain", methods=["POST"])
+def api_training_retrain(job_id):
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    try:
+        resp = requests.post(f"{API_BASE_URL}/training/jobs/{job_id}/retrain", headers=get_api_headers(), timeout=10)
+        return resp.json() if resp.status_code == 200 else {"error": "Failed"}
+    except requests.exceptions.RequestException:
+        return {"error": "Connection error"}
+
+
+@app.route("/api/training/jobs/<job_id>", methods=["DELETE"])
+def api_training_delete(job_id):
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    try:
+        resp = requests.delete(f"{API_BASE_URL}/training/jobs/{job_id}", headers=get_api_headers(), timeout=10)
+        return resp.json() if resp.status_code == 200 else {"error": "Failed"}
+    except requests.exceptions.RequestException:
+        return {"error": "Connection error"}
+
+
+@app.route("/api/training/stages", methods=["GET"])
+def api_training_stages():
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    try:
+        resp = requests.get(f"{API_BASE_URL}/training/stages", headers=get_api_headers(), timeout=5)
+        return resp.json() if resp.status_code == 200 else {"stages": []}
+    except requests.exceptions.RequestException:
+        return {"stages": []}
+
+
+# ============== Camera Routes ==============
+@app.route("/cameras")
+def cameras_page():
+    if "access_token" not in session:
+        return redirect(url_for("login"))
+    return render_template("cameras.html")
+
+
+@app.route("/api/cameras", methods=["GET"])
+def api_cameras_list():
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    try:
+        resp = requests.get(f"{API_BASE_URL}/cameras", headers=get_api_headers(), timeout=10)
+        return resp.json() if resp.status_code == 200 else {"cameras": []}
+    except requests.exceptions.RequestException:
+        return {"cameras": [], "error": "Connection error"}
+
+
+@app.route("/api/cameras", methods=["POST"])
+def api_cameras_create():
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    try:
+        data = request.get_json()
+        resp = requests.post(f"{API_BASE_URL}/cameras", json=data, headers=get_api_headers(), timeout=10)
+        return resp.json() if resp.status_code in (200, 201) else {"error": "Failed"}
+    except requests.exceptions.RequestException:
+        return {"error": "Connection error"}
+
+
+@app.route("/api/cameras/<camera_id>", methods=["GET"])
+def api_cameras_get(camera_id):
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    try:
+        resp = requests.get(f"{API_BASE_URL}/cameras/{camera_id}", headers=get_api_headers(), timeout=10)
+        return resp.json() if resp.status_code == 200 else {"error": "Not found"}
+    except requests.exceptions.RequestException:
+        return {"error": "Connection error"}
+
+
+@app.route("/api/cameras/<camera_id>", methods=["PUT", "DELETE"])
+def api_cameras_modify(camera_id):
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    try:
+        data = request.get_json() if request.method == "PUT" else None
+        resp = requests.request(
+            request.method, f"{API_BASE_URL}/cameras/{camera_id}",
+            json=data, headers=get_api_headers(), timeout=10
+        )
+        return resp.json() if resp.status_code == 200 else {"error": "Failed"}
+    except requests.exceptions.RequestException:
+        return {"error": "Connection error"}
+
+
+@app.route("/api/cameras/<camera_id>/test", methods=["GET", "POST"])
+def api_cameras_test(camera_id):
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    try:
+        resp = requests.post(f"{API_BASE_URL}/cameras/{camera_id}/test", headers=get_api_headers(), timeout=15)
+        return resp.json() if resp.status_code == 200 else {"error": "Failed"}
+    except requests.exceptions.RequestException:
+        return {"error": "Connection error"}
+
+
+@app.route("/api/cameras/<camera_id>/snapshot", methods=["POST"])
+def api_cameras_snapshot(camera_id):
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    try:
+        resp = requests.post(f"{API_BASE_URL}/cameras/{camera_id}/snapshot", headers=get_api_headers(), timeout=15)
+        return resp.json() if resp.status_code == 200 else {"error": "Failed"}
+    except requests.exceptions.RequestException:
+        return {"error": "Connection error"}
+
+
+@app.route("/api/cameras/<camera_id>/record/start", methods=["POST"])
+def api_cameras_record_start(camera_id):
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    try:
+        data = request.get_json() or {}
+        resp = requests.post(f"{API_BASE_URL}/cameras/{camera_id}/record/start", json=data, headers=get_api_headers(), timeout=10)
+        return resp.json() if resp.status_code == 200 else {"error": "Failed"}
+    except requests.exceptions.RequestException:
+        return {"error": "Connection error"}
+
+
+@app.route("/api/cameras/<camera_id>/record/stop", methods=["POST"])
+def api_cameras_record_stop(camera_id):
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    try:
+        resp = requests.post(f"{API_BASE_URL}/cameras/{camera_id}/record/stop", headers=get_api_headers(), timeout=10)
+        return resp.json() if resp.status_code == 200 else {"error": "Failed"}
+    except requests.exceptions.RequestException:
+        return {"error": "Connection error"}
+
+
+@app.route("/api/cameras/<camera_id>/recordings", methods=["GET"])
+def api_cameras_recordings(camera_id):
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    try:
+        resp = requests.get(f"{API_BASE_URL}/cameras/{camera_id}/recordings", headers=get_api_headers(), timeout=10)
+        return resp.json() if resp.status_code == 200 else {"recordings": []}
+    except requests.exceptions.RequestException:
+        return {"recordings": [], "error": "Connection error"}
+
+
+@app.route("/api/cameras/recordings/all", methods=["GET"])
+def api_cameras_recordings_all():
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    try:
+        resp = requests.get(f"{API_BASE_URL}/cameras/recordings/all", headers=get_api_headers(), timeout=10)
+        return resp.json() if resp.status_code == 200 else {"recordings": []}
+    except requests.exceptions.RequestException:
+        return {"recordings": [], "error": "Connection error"}
+
+
+@app.route("/api/cameras/recordings/<rec_id>", methods=["GET"])
+def api_recording_get(rec_id):
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    try:
+        resp = requests.get(f"{API_BASE_URL}/cameras/recordings/{rec_id}", headers=get_api_headers(), timeout=10)
+        return resp.json() if resp.status_code == 200 else {"error": "Not found"}
+    except requests.exceptions.RequestException:
+        return {"error": "Connection error"}
+
+
+@app.route("/api/cameras/recordings/<rec_id>", methods=["DELETE"])
+def api_recording_delete(rec_id):
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    try:
+        resp = requests.delete(f"{API_BASE_URL}/cameras/recordings/{rec_id}", headers=get_api_headers(), timeout=10)
+        return resp.json() if resp.status_code == 200 else {"error": "Failed"}
+    except requests.exceptions.RequestException:
+        return {"error": "Connection error"}
+
+
+@app.route("/api/cameras/recordings/<rec_id>/analyze", methods=["POST"])
+def api_recording_analyze(rec_id):
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    try:
+        resp = requests.post(f"{API_BASE_URL}/cameras/recordings/{rec_id}/analyze", headers=get_api_headers(), timeout=120)
+        return resp.json() if resp.status_code == 200 else {"error": "Failed"}
+    except requests.exceptions.RequestException:
+        return {"error": "Connection error"}
+
+
+@app.route("/api/cameras/recordings/<rec_id>/stream")
+def api_recording_stream(rec_id):
+    """Stream a recording file with Range request support (for video playback)."""
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    # Get recording file path from API
+    try:
+        resp = requests.get(f"{API_BASE_URL}/cameras/recordings/{rec_id}", headers=get_api_headers(), timeout=10)
+        if resp.status_code != 200:
+            return jsonify({"error": "Not found"}), 404
+        rec = resp.json()
+        file_path = rec.get("file_path")
+        if not file_path or not os.path.exists(file_path):
+            return jsonify({"error": "File missing"}), 404
+        # Use Flask's send_file with Range support
+        return send_file_with_range(file_path)
+    except requests.exceptions.RequestException:
+        return jsonify({"error": "Connection error"}), 500
+
+
+def send_file_with_range(file_path):
+    """Send file with HTTP Range support for video seeking."""
+    import re
+    file_size = os.path.getsize(file_path)
+    range_header = request.headers.get('Range', None)
+    if range_header:
+        # Parse Range: bytes=START-END
+        m = re.match(r'bytes=(\d+)-(\d*)', range_header)
+        if m:
+            start = int(m.group(1))
+            end = int(m.group(2)) if m.group(2) else file_size - 1
+            end = min(end, file_size - 1)
+            length = end - start + 1
+            with open(file_path, 'rb') as f:
+                f.seek(start)
+                data = f.read(length)
+            resp = Response(
+                data,
+                status=206,
+                mimetype='video/mp4',
+                headers={
+                    'Content-Range': f'bytes {start}-{end}/{file_size}',
+                    'Accept-Ranges': 'bytes',
+                    'Content-Length': str(length),
+                }
+            )
+            return resp
+    # No range - send whole file
+    return send_file(file_path, mimetype='video/mp4', conditional=True)
+
+
+@app.route("/api/cameras/<camera_id>/snapshot.jpg")
+def api_camera_snapshot_image(camera_id):
+    """Serve latest snapshot for a camera."""
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    # Find latest snapshot
+    snap_dir = Path("/www/AI_server/data/camera_snapshots")
+    if snap_dir.exists():
+        files = sorted(snap_dir.glob(f"{camera_id}-*.jpg"), key=lambda p: p.stat().st_mtime, reverse=True)
+        if files:
+            return send_file(str(files[0]), mimetype='image/jpeg')
+    return Response(status_code=404)
+
+
+@app.route("/api/cameras/<camera_id>/permissions", methods=["POST"])
+def api_camera_permissions(camera_id):
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    try:
+        data = request.get_json()
+        resp = requests.post(f"{API_BASE_URL}/cameras/{camera_id}/permissions", json=data, headers=get_api_headers(), timeout=10)
+        return resp.json() if resp.status_code == 200 else {"error": "Failed"}
+    except requests.exceptions.RequestException:
+        return {"error": "Connection error"}
+
+
+@app.route("/api/cameras/roles/me", methods=["GET", "POST"])
+def api_my_role():
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    try:
+        if request.method == "POST":
+            data = request.get_json() or {}
+            resp = requests.post(f"{API_BASE_URL}/cameras/roles/me", json=data, headers=get_api_headers(), timeout=10)
+        else:
+            resp = requests.get(f"{API_BASE_URL}/cameras/roles/me", headers=get_api_headers(), timeout=10)
+        return resp.json() if resp.status_code == 200 else {"error": "Failed"}
+    except requests.exceptions.RequestException:
+        return {"error": "Connection error"}
+
+
+@app.route("/api/cameras/brands/presets", methods=["GET"])
+def api_brand_presets():
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    try:
+        resp = requests.get(f"{API_BASE_URL}/cameras/brands/presets", headers=get_api_headers(), timeout=5)
+        return resp.json() if resp.status_code == 200 else {}
+    except requests.exceptions.RequestException:
+        return {}
+
+
+@app.route("/api/cameras/admin/users", methods=["GET"])
+def api_admin_list_users():
+    if "access_token" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    try:
+        resp = requests.get(f"{API_BASE_URL}/cameras/admin/users", headers=get_api_headers(), timeout=10)
+        return resp.json() if resp.status_code == 200 else {"users": [], "error": "Admin only"}
+    except requests.exceptions.RequestException:
+        return {"users": [], "error": "Connection error"}
+
+
+# ============== AI Assistants Routes ==============
 
 
 # ============= AI Assistants Routes =============
@@ -3634,3 +4047,134 @@ def api_telegram_qr():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=False)
+
+
+# ============= Admin RBAC Routes =============
+
+def require_admin(f):
+    from functools import wraps
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if "access_token" not in session:
+            return redirect(url_for("login"))
+        if not session.get("user", {}).get("is_admin"):
+            flash("Admin access required", "error")
+            return redirect(url_for("dashboard"))
+        return f(*args, **kwargs)
+    return decorated
+
+
+@app.route("/admin/users")
+@require_admin
+def admin_users():
+    try:
+        resp = requests.get(f"{API_BASE_URL}/rbac/users/roles", headers=get_api_headers(), timeout=10)
+        users = resp.json() if resp.status_code == 200 else []
+    except:
+        users = []
+    return render_template("admin/users.html", users=users)
+
+
+@app.route("/admin/roles")
+@require_admin
+def admin_roles():
+    try:
+        resp = requests.get(f"{API_BASE_URL}/rbac/roles?include_permissions=true", headers=get_api_headers(), timeout=10)
+        roles = resp.json() if resp.status_code == 200 else []
+    except:
+        roles = []
+    return render_template("admin/roles.html", roles=roles)
+
+
+@app.route("/admin/permissions")
+@require_admin
+def admin_permissions():
+    try:
+        resp = requests.get(f"{API_BASE_URL}/rbac/permissions", headers=get_api_headers(), timeout=10)
+        permissions = resp.json() if resp.status_code == 200 else []
+    except:
+        permissions = []
+    try:
+        modules_resp = requests.get(f"{API_BASE_URL}/rbac/modules?include_menus=true", headers=get_api_headers(), timeout=10)
+        modules = modules_resp.json() if modules_resp.status_code == 200 else []
+    except:
+        modules = []
+    return render_template("admin/permissions.html", permissions=permissions, modules=modules)
+
+
+@app.route("/admin/menus")
+@require_admin
+def admin_menus():
+    try:
+        modules_resp = requests.get(f"{API_BASE_URL}/rbac/modules?include_menus=true", headers=get_api_headers(), timeout=10)
+        modules = modules_resp.json() if modules_resp.status_code == 200 else []
+    except:
+        modules = []
+    return render_template("admin/menus.html", modules=modules)
+
+
+@app.route("/admin/init-rbac", methods=["POST"])
+@require_admin
+def admin_init_rbac():
+    try:
+        resp = requests.post(f"{API_BASE_URL}/rbac/init", headers=get_api_headers(), timeout=10)
+        if resp.status_code == 200:
+            flash("RBAC system initialized successfully!", "success")
+        else:
+            flash("Failed to initialize RBAC", "error")
+    except Exception as e:
+        flash(f"Connection error: {str(e)}", "error")
+    return redirect(url_for("admin_roles"))
+
+
+@app.route("/api/admin/roles", methods=["POST"])
+@require_admin
+def api_create_role():
+    data = request.get_json(silent=True) or {}
+    try:
+        resp = requests.post(f"{API_BASE_URL}/rbac/roles", json=data, headers=get_api_headers(), timeout=10)
+        return resp.json(), resp.status_code
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/admin/roles/<role_id>", methods=["PUT"])
+@require_admin
+def api_update_role(role_id):
+    data = request.get_json(silent=True) or {}
+    try:
+        resp = requests.put(f"{API_BASE_URL}/rbac/roles/{role_id}", json=data, headers=get_api_headers(), timeout=10)
+        return resp.json(), resp.status_code
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/admin/roles/<role_id>", methods=["DELETE"])
+@require_admin
+def api_delete_role(role_id):
+    try:
+        resp = requests.delete(f"{API_BASE_URL}/rbac/roles/{role_id}", headers=get_api_headers(), timeout=10)
+        return resp.json(), resp.status_code
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/admin/roles/<role_id>/toggle", methods=["POST"])
+@require_admin
+def api_toggle_role(role_id):
+    try:
+        resp = requests.post(f"{API_BASE_URL}/rbac/roles/{role_id}/toggle", headers=get_api_headers(), timeout=10)
+        return resp.json(), resp.status_code
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/admin/users/<user_id>/role", methods=["POST"])
+@require_admin
+def api_assign_user_role(user_id):
+    data = request.get_json(silent=True) or {}
+    try:
+        resp = requests.post(f"{API_BASE_URL}/rbac/users/{user_id}/role", json=data, headers=get_api_headers(), timeout=10)
+        return resp.json(), resp.status_code
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500

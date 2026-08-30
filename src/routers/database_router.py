@@ -31,6 +31,18 @@ class DBConnectRequest(BaseModel):
     file_path: Optional[str] = None
 
 
+class DBTableRequest(BaseModel):
+    """Connection + table name for single-table operations."""
+    db_type: str = Field(..., pattern="^(mysql|postgresql|mssql|oracle|sqlite)$")
+    host: Optional[str] = None
+    port: Optional[int] = None
+    database: Optional[str] = None
+    username: Optional[str] = None
+    password: Optional[str] = None
+    file_path: Optional[str] = None
+    table_name: str
+
+
 class DBExportRequest(BaseModel):
     connection_url: str
     table_name: str
@@ -95,10 +107,67 @@ async def connect_and_list_tables(
             password=data.password,
             file_path=data.file_path
         )
-        tables = db_connector.get_tables(url)
-        return {"connection_url": url, "tables": tables}
+        # Use lightweight mode (just names + row counts) for fast load on big DBs.
+        # Columns are loaded on demand via /table/columns.
+        tables = db_connector.get_tables(url, lightweight=True)
+        return {"connection_url": url, "tables": tables, "lightweight": True}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e)[:200])
+
+
+@router.post("/table/columns")
+async def get_table_columns_endpoint(
+    data: DBTableRequest,
+    current_user: User = Depends(get_current_user)
+):
+    """Lazy-load columns for a single table after connect."""
+    try:
+        url = db_connector.build_connection_url(
+            db_type=data.db_type,
+            host=data.host,
+            port=data.port,
+            database=data.database,
+            username=data.username,
+            password=data.password,
+            file_path=data.file_path
+        )
+        columns = db_connector.get_table_columns(url, data.table_name)
+        return {"table_name": data.table_name, "columns": columns}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e)[:200])
+
+
+@router.post("/table/row-count")
+async def get_table_row_count_endpoint(
+    data: DBTableRequest,
+    current_user: User = Depends(get_current_user)
+):
+    """Lazy-load row count for a single table after connect."""
+    try:
+        url = db_connector.build_connection_url(
+            db_type=data.db_type,
+            host=data.host,
+            port=data.port,
+            database=data.database,
+            username=data.username,
+            password=data.password,
+            file_path=data.file_path
+        )
+        count = db_connector.get_table_row_count(url, data.table_name)
+        return {"table_name": data.table_name, "row_count": count}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e)[:200])
+async def get_table_data(
+    connection_url: str,
+    table_name: str,
+    limit: int = 100,
+    offset: int = 0,
+    current_user: User = Depends(get_current_user)
+):
+    from urllib.parse import unquote
+    decoded_url = unquote(connection_url)
+    data = db_connector.get_table_data(decoded_url, table_name, limit, offset)
+    return data
 
 
 @router.post("/table/data")

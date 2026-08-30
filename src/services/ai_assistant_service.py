@@ -677,7 +677,20 @@ class AIAssistantService:
         integrations = self.get_integrations(db, assistant_id)
         tasks = self.get_tasks(db, assistant_id)
         logs = self.get_logs(db, assistant_id, limit=20)
-        conversations = self.get_conversations(db, assistant_id)
+        conversations_raw = self.get_conversations(db, assistant_id)
+        from src.models.database import AssistantMessage
+        conversations = []
+        for c in conversations_raw:
+            msg_count = db.query(AssistantMessage).filter(
+                AssistantMessage.conversation_id == c.id
+            ).count()
+            conversations.append({
+                "id": c.id,
+                "title": c.title,
+                "created_at": str(c.created_at),
+                "updated_at": str(c.updated_at) if c.updated_at else None,
+                "message_count": msg_count
+            })
 
         tmpl_key = None
         for key, info in ASSISTANT_TEMPLATES.items():

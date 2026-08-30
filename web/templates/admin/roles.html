@@ -1,0 +1,296 @@
+{% extends "base.html" %}
+
+{% block title %}Role Management - Admin{% endblock %}
+{% block header_title %}Role Management{% endblock %}
+
+{% block content %}
+<div class="mb-6 flex items-center justify-between">
+    <div>
+        <h2 class="text-2xl font-bold text-white">Role Management</h2>
+        <p class="text-gray-400 text-sm mt-1">Create and manage roles with granular permissions</p>
+    </div>
+    <div class="flex gap-3">
+        <form action="/admin/init-rbac" method="POST">
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-magic mr-2"></i>Initialize RBAC
+            </button>
+        </form>
+        <button onclick="showCreateModal()" class="btn btn-primary">
+            <i class="fas fa-plus mr-2"></i>Create Role
+        </button>
+    </div>
+</div>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        {% for category, message in messages %}
+            <div class="flash flash-{{ category }} mb-4">{{ message }}</div>
+        {% endfor %}
+    {% endif %}
+{% endwith %}
+
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    {% for role in roles %}
+    <div class="card">
+        <div class="flex items-start justify-between mb-4">
+            <div>
+                <h3 class="text-lg font-semibold text-white">{{ role.name }}</h3>
+                <p class="text-gray-400 text-sm">{{ role.description or 'No description' }}</p>
+            </div>
+            <div class="flex items-center gap-2">
+                {% if role.is_system %}
+                    <span class="badge badge-yellow">System</span>
+                {% endif %}
+                {% if role.is_active %}
+                    <span class="badge badge-green">Active</span>
+                {% else %}
+                    <span class="badge badge-red">Inactive</span>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="mb-4">
+            <p class="text-xs text-gray-500 uppercase mb-2">Permissions ({{ role.permissions|length if role.permissions else 0 }})</p>
+            <div class="flex flex-wrap gap-1 max-h-24 overflow-y-auto">
+                {% if role.permissions and role.permissions|length > 0 %}
+                    {% for perm in role.permissions %}
+                        <span class="px-2 py-1 bg-gray-700 rounded text-xs text-gray-300">{{ perm }}</span>
+                    {% endfor %}
+                {% else %}
+                    <span class="text-gray-500 text-sm">No permissions assigned</span>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="flex gap-2 pt-4 border-t border-gray-700">
+            {% if not role.is_system %}
+                <button onclick="editRole('{{ role.id }}', '{{ role.name }}', '{{ role.description or '' }}', {{ role.permissions|tojson }})"
+                        class="btn btn-sm btn-primary flex-1">
+                    <i class="fas fa-edit mr-1"></i>Edit
+                </button>
+                <button onclick="toggleRole('{{ role.id }}')" class="btn btn-sm btn-secondary flex-1">
+                    <i class="fas fa-toggle-on mr-1"></i>Toggle
+                </button>
+                <button onclick="deleteRole('{{ role.id }}')" class="btn btn-sm btn-danger">
+                    <i class="fas fa-trash"></i>
+                </button>
+            {% else %}
+                <span class="text-gray-500 text-sm italic flex-1 text-center py-2">System role cannot be modified</span>
+            {% endif %}
+        </div>
+    </div>
+    {% else %}
+    <div class="col-span-full card text-center py-12">
+        <i class="fas fa-user-shield text-4xl text-gray-600 mb-4"></i>
+        <p class="text-gray-400">No roles found. Click "Initialize RBAC" to create default roles.</p>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Create/Edit Modal -->
+<div id="roleModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
+    <div class="bg-gray-800 rounded-xl p-6 w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
+        <div class="flex items-center justify-between mb-6">
+            <h3 id="modalTitle" class="text-xl font-bold text-white">Create Role</h3>
+            <button onclick="closeModal()" class="text-gray-400 hover:text-white">
+                <i class="fas fa-times text-xl"></i>
+            </button>
+        </div>
+
+        <form id="roleForm" onsubmit="saveRole(event)">
+            <input type="hidden" id="editRoleId" value="">
+
+            <div class="mb-4">
+                <label class="block text-gray-300 text-sm font-medium mb-2">Role Name</label>
+                <input type="text" id="roleName" class="input-field" placeholder="Enter role name" required>
+            </div>
+
+            <div class="mb-4">
+                <label class="block text-gray-300 text-sm font-medium mb-2">Slug</label>
+                <input type="text" id="roleSlug" class="input-field" placeholder="role-slug" required>
+            </div>
+
+            <div class="mb-4">
+                <label class="block text-gray-300 text-sm font-medium mb-2">Description</label>
+                <textarea id="roleDescription" class="input-field" rows="2" placeholder="Optional description"></textarea>
+            </div>
+
+            <div class="mb-4">
+                <label class="block text-gray-300 text-sm font-medium mb-2">Permissions</label>
+                <div class="bg-gray-900 rounded-lg p-4 max-h-64 overflow-y-auto" id="permissionsList">
+                    <p class="text-gray-500 text-sm">Loading permissions...</p>
+                </div>
+            </div>
+
+            <div class="flex gap-3 pt-4">
+                <button type="button" onclick="closeModal()" class="btn btn-secondary flex-1">Cancel</button>
+                <button type="submit" class="btn btn-primary flex-1">
+                    <i class="fas fa-save mr-2"></i>Save Role
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let allPermissions = [];
+
+async function loadPermissions() {
+    try {
+        const response = await fetch('/admin/permissions');
+        const data = await response.json();
+        allPermissions = data;
+        renderPermissions();
+    } catch (error) {
+        console.error('Failed to load permissions:', error);
+    }
+}
+
+function renderPermissions(selected = []) {
+    const container = document.getElementById('permissionsList');
+    if (!container) return;
+
+    let html = '<div class="space-y-4">';
+
+    // Group by module
+    const grouped = {};
+    allPermissions.forEach(p => {
+        if (!grouped[p.module]) grouped[p.module] = [];
+        grouped[p.module].push(p);
+    });
+
+    for (const [module, perms] of Object.entries(grouped)) {
+        html += `<div class="border border-gray-700 rounded-lg p-3">`;
+        html += `<h4 class="text-white font-medium mb-2 text-sm">${module}</h4>`;
+        html += `<div class="grid grid-cols-2 gap-2">`;
+
+        perms.forEach(p => {
+            const isSelected = selected.includes(p.name) || selected.includes(`${p.menu_slug}.*`);
+            html += `
+                <label class="flex items-center gap-2 text-sm cursor-pointer">
+                    <input type="checkbox" name="permissions" value="${p.name}"
+                           ${isSelected ? 'checked' : ''}
+                           class="rounded bg-gray-700 border-gray-600 text-blue-500">
+                    <span class="text-gray-300">${p.menu}</span>
+                    <span class="text-xs text-gray-500">(${p.action})</span>
+                </label>
+            `;
+        });
+
+        html += `</div></div>`;
+    }
+
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+function showCreateModal() {
+    document.getElementById('modalTitle').textContent = 'Create Role';
+    document.getElementById('editRoleId').value = '';
+    document.getElementById('roleForm').reset();
+    renderPermissions([]);
+    document.getElementById('roleModal').classList.remove('hidden');
+}
+
+function editRole(id, name, description, permissions) {
+    document.getElementById('modalTitle').textContent = 'Edit Role';
+    document.getElementById('editRoleId').value = id;
+    document.getElementById('roleName').value = name;
+    document.getElementById('roleSlug').value = name.toLowerCase().replace(/\s+/g, '-');
+    document.getElementById('roleDescription').value = description;
+    renderPermissions(permissions || []);
+    document.getElementById('roleModal').classList.remove('hidden');
+}
+
+function closeModal() {
+    document.getElementById('roleModal').classList.add('hidden');
+}
+
+async function saveRole(event) {
+    event.preventDefault();
+
+    const id = document.getElementById('editRoleId').value;
+    const name = document.getElementById('roleName').value;
+    const slug = document.getElementById('roleSlug').value;
+    const description = document.getElementById('roleDescription').value;
+
+    const selectedPerms = Array.from(document.querySelectorAll('input[name="permissions"]:checked'))
+        .map(cb => cb.value);
+
+    const data = { name, slug, description, permissions: selectedPerms };
+
+    try {
+        const url = id ? `/api/admin/roles/${id}` : '/api/admin/roles';
+        const method = id ? 'PUT' : 'POST';
+
+        const response = await fetch(url, {
+            method,
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify(data)
+        });
+
+        if (response.ok) {
+            showToast('Role saved successfully', 'success');
+            closeModal();
+            setTimeout(() => window.location.reload(), 500);
+        } else {
+            const error = await response.json();
+            showToast(error.detail || 'Failed to save role', 'error');
+        }
+    } catch (error) {
+        showToast('Error: ' + error.message, 'error');
+    }
+}
+
+async function toggleRole(id) {
+    try {
+        const response = await fetch(`/api/admin/roles/${id}/toggle`, {
+            method: 'POST',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        });
+        if (response.ok) {
+            showToast('Role toggled', 'success');
+            setTimeout(() => window.location.reload(), 500);
+        }
+    } catch (error) {
+        showToast('Error: ' + error.message, 'error');
+    }
+}
+
+async function deleteRole(id) {
+    if (!confirm('Are you sure you want to delete this role?')) return;
+
+    try {
+        const response = await fetch(`/api/admin/roles/${id}`, {
+            method: 'DELETE',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        });
+        if (response.ok) {
+            showToast('Role deleted', 'success');
+            setTimeout(() => window.location.reload(), 500);
+        } else {
+            const error = await response.json();
+            showToast(error.detail || 'Failed to delete role', 'error');
+        }
+    } catch (error) {
+        showToast('Error: ' + error.message, 'error');
+    }
+}
+
+function showToast(message, type) {
+    const toast = document.createElement('div');
+    toast.className = `fixed bottom-4 right-4 px-6 py-3 rounded-lg text-white z-50 ${type === 'success' ? 'bg-green-600' : 'bg-red-600'}`;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
+}
+
+// Load permissions on page load
+document.addEventListener('DOMContentLoaded', loadPermissions);
+</script>
+{% endblock %}

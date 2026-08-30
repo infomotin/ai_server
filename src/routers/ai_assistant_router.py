@@ -153,13 +153,6 @@ async def get_assistant(
     logs = data["recent_logs"]
     conversations = data["conversations"]
 
-    def _conv(c):
-        return {
-            "id": c.id, "title": c.title,
-            "created_at": str(c.created_at),
-            "updated_at": str(c.updated_at) if c.updated_at else None
-        }
-
     return {
         "assistant": {
             "id": assistant.id, "name": assistant.name, "description": assistant.description,
@@ -188,7 +181,12 @@ async def get_assistant(
             "run_count": t.run_count,
             "created_at": str(t.created_at)
         } for t in tasks],
-        "conversations": [_conv(c) for c in conversations],
+        "conversations": [c if isinstance(c, dict) else {
+            "id": c.id, "title": c.title,
+            "created_at": str(c.created_at),
+            "updated_at": str(c.updated_at) if c.updated_at else None,
+            "message_count": getattr(c, 'message_count', 0)
+        } for c in conversations],
         "recent_logs": [{
             "id": l.id, "action": l.action, "input_text": l.input_text[:200] if l.input_text else None,
             "output_text": l.output_text[:200] if l.output_text else None,

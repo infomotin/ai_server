@@ -15,6 +15,7 @@ from src.routers.ai_assistant_router import router as ai_assistant_router
 from src.routers.integrations_router import router as integrations_router
 from src.routers.agent_router import router as agent_router
 from src.routers.mcp_router import router as mcp_router
+from src.routers.rbac_router import router as rbac_router
 
 __all__ = [
     "auth_router",
@@ -33,5 +34,6 @@ __all__ = [
     "ai_assistant_router",
     "integrations_router",
     "agent_router",
-    "mcp_router"
+    "mcp_router",
+    "rbac_router"
 ]

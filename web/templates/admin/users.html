@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+
+{% block title %}User Management - Admin{% endblock %}
+{% block header_title %}User Management{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+    <div class="flex items-center justify-between">
+        <div>
+            <h2 class="text-2xl font-bold text-white">User Management</h2>
+            <p class="text-gray-400 text-sm mt-1">Manage users and their role assignments</p>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h3 class="text-lg font-semibold text-white"><i class="fas fa-users mr-2"></i>All Users</h3>
+    </div>
+    <div class="card-body">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="flash flash-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead>
+                    <tr class="text-left text-gray-400 text-sm border-b border-gray-700">
+                        <th class="pb-3">Username</th>
+                        <th class="pb-3">Email</th>
+                        <th class="pb-3">Status</th>
+                        <th class="pb-3">Assigned Role</th>
+                        <th class="pb-3">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in users %}
+                    <tr class="border-b border-gray-800 hover:bg-gray-800/50">
+                        <td class="py-4">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold">
+                                    {{ user.username[0]|upper }}
+                                </div>
+                                <span class="text-white font-medium">{{ user.username }}</span>
+                            </div>
+                        </td>
+                        <td class="py-4 text-gray-400">{{ user.email }}</td>
+                        <td class="py-4">
+                            {% if user.is_active %}
+                                <span class="badge badge-green">Active</span>
+                            {% else %}
+                                <span class="badge badge-red">Inactive</span>
+                            {% endif %}
+                        </td>
+                        <td class="py-4">
+                            {% if user.roles and user.roles|length > 0 %}
+                                {% for ur in user.roles %}
+                                    <span class="badge badge-blue">{{ ur.role_name }}</span>
+                                {% endfor %}
+                            {% else %}
+                                <span class="text-gray-500 text-sm">No role assigned</span>
+                            {% endif %}
+                        </td>
+                        <td class="py-4">
+                            <select class="role-select bg-gray-700 border border-gray-600 rounded px-3 py-1.5 text-sm text-white"
+                                    data-user-id="{{ user.id }}"
+                                    onchange="assignRole('{{ user.id }}', this.value)">
+                                <option value="">Select Role</option>
+                                <option value="">-- Remove Role --</option>
+                                {% for user in users %}
+                                    {% for role in user.roles %}
+                                    {% endfor %}
+                                {% endfor %}
+                            </select>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="5" class="py-8 text-center text-gray-500">No users found</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function assignRole(userId, roleId) {
+    if (!roleId) return;
+
+    try {
+        const response = await fetch(`/api/admin/users/${userId}/role`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify({ role_id: roleId })
+        });
+
+        const data = await response.json();
+        if (response.ok) {
+            showToast('Role assigned successfully', 'success');
+            setTimeout(() => window.location.reload(), 500);
+        } else {
+            showToast(data.detail || 'Failed to assign role', 'error');
+        }
+    } catch (error) {
+        showToast('Error: ' + error.message, 'error');
+    }
+}
+
+function showToast(message, type) {
+    const toast = document.createElement('div');
+    toast.className = `fixed bottom-4 right-4 px-6 py-3 rounded-lg text-white ${type === 'success' ? 'bg-green-600' : 'bg-red-600'}`;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
+}
+</script>
+{% endblock %}

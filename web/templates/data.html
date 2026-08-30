@@ -43,6 +43,7 @@
 <div class="flex items-center gap-1 mb-6 border-b border-gray-700 pb-1">
     <button onclick="showDataTab('upload')" id="tab-upload" class="px-4 py-2 rounded-lg text-sm font-medium text-white bg-gray-700/50 transition">Upload Files</button>
     <button onclick="showDataTab('database')" id="tab-database" class="px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white transition">Database Connect</button>
+    <button onclick="showDataTab('training')" id="tab-training" class="px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white transition"><i class="fas fa-brain mr-1"></i>Train AI Model</button>
     <button onclick="showDataTab('knowledge')" id="tab-knowledge" class="px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white transition">Knowledge Bases</button>
 </div>
 
@@ -236,7 +237,20 @@
                         </button>
                     </div>
 
+                    <button onclick="saveConnection()" class="w-full bg-amber-600/20 hover:bg-amber-600/30 text-amber-400 py-2 rounded-lg text-sm transition border border-amber-600/30">
+                        <i class="fas fa-bookmark mr-1"></i>Save Connection
+                    </button>
+
                     <div id="connectionStatus" class="hidden"></div>
+
+                    <!-- Saved Connections -->
+                    <div class="mt-4 border-t border-gray-700/50 pt-4">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-xs font-semibold text-gray-400 uppercase tracking-wide">Saved Connections</span>
+                            <span id="savedConnCount" class="text-[10px] text-gray-500">0</span>
+                        </div>
+                        <div id="savedConnectionsList" class="space-y-1.5 max-h-48 overflow-y-auto pr-1"></div>
+                    </div>
 
                     <!-- List Databases Button -->
                     <button onclick="listDatabases()" id="listDbsBtn" class="hidden w-full bg-gray-700 hover:bg-gray-600 text-white py-2 rounded-lg text-sm transition">
@@ -250,16 +264,395 @@
         <!-- Table Explorer -->
         <div class="lg:col-span-2 space-y-6">
             <div class="card">
-                <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
                     <h3 class="text-white font-semibold flex items-center gap-2">
-                        <i class="fas fa-table text-gray-400"></i> <span id="explorerTitle">Table Explorer</span>
+                        <i class="fas fa-table text-gray-400"></i> <span id="explorerTitle">All Tables</span>
+                        <span class="text-[10px] text-gray-500" id="allTablesCount"></span>
                     </h3>
+                    <div class="flex items-center gap-2">
+                        <div class="relative">
+                            <input type="text" id="tablesSearch" placeholder="🔍 Search tables..." oninput="renderTables()" class="bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-xs text-white w-56 focus:outline-none focus:border-blue-500">
+                        </div>
+                    </div>
                 </div>
-                <div id="tablesExplorer">
+                <div id="tablesExplorer" class="max-h-[500px] overflow-y-auto pr-1">
                     <div class="text-center py-12 text-gray-500">
                         <i class="fas fa-plug text-4xl mb-3 opacity-30"></i>
-                        <p>Connect to a database to explore tables</p>
+                        <p>Connect to a database to see tables</p>
                     </div>
+                </div>
+            </div>
+
+            <!-- Data Grid (shown when a table is selected) -->
+            <div class="card hidden" id="dataGridCard">
+                <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+                    <h3 class="text-white font-semibold flex items-center gap-2">
+                        <i class="fas fa-th text-cyan-400"></i> <span id="dataGridTitle">Table Data</span>
+                        <span class="text-[10px] text-gray-500" id="dataGridInfo"></span>
+                    </h3>
+                    <div class="flex items-center gap-2">
+                        <select id="tableDataPerPage" onchange="changeTableDataPerPage()" class="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs text-white">
+                            <option value="10">10 / page</option>
+                            <option value="25" selected>25 / page</option>
+                            <option value="50">50 / page</option>
+                            <option value="100">100 / page</option>
+                        </select>
+                        <button onclick="clearTableSelection()" class="text-[10px] text-gray-500 hover:text-red-400 transition">
+                            <i class="fas fa-times mr-1"></i>Close
+                        </button>
+                    </div>
+                </div>
+                <div id="dataGridContent">
+                    <p class="text-center text-gray-500 text-sm py-8">Select a table to view data</p>
+                </div>
+                <div id="dataGridPagination" class="hidden mt-4 flex items-center justify-between border-t border-gray-700/50 pt-3 flex-wrap gap-2"></div>
+            </div>
+
+            <!-- Selected Table Schema Panel -->
+            <div id="selectedTablePanel" class="card hidden">
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="text-white font-semibold flex items-center gap-2">
+                        <i class="fas fa-eye text-cyan-400"></i> Schema & Actions
+                    </h3>
+                    <button onclick="clearTableSelection()" class="text-xs text-gray-500 hover:text-red-400 transition">
+                        <i class="fas fa-times mr-1"></i>Clear
+                    </button>
+                </div>
+                <div id="selectedTableInfo"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ============== AI Model Training Tab ============== -->
+<div id="panel-training" class="hidden space-y-6">
+    <!-- Training Stats Row -->
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <div class="bg-gradient-to-br from-blue-900/30 to-blue-800/10 border border-blue-700/30 rounded-xl p-4">
+            <div class="flex items-center justify-between mb-1.5">
+                <span class="text-xs text-blue-300 font-semibold">Total Jobs</span>
+                <i class="fas fa-tasks text-blue-400"></i>
+            </div>
+            <p class="text-2xl font-bold text-white" id="trainTotalJobs">0</p>
+            <p class="text-[10px] text-blue-300/70 mt-1">All training jobs</p>
+        </div>
+        <div class="bg-gradient-to-br from-amber-900/30 to-amber-800/10 border border-amber-700/30 rounded-xl p-4">
+            <div class="flex items-center justify-between mb-1.5">
+                <span class="text-xs text-amber-300 font-semibold">Running</span>
+                <i class="fas fa-spinner text-amber-400 fa-spin"></i>
+            </div>
+            <p class="text-2xl font-bold text-amber-400" id="trainRunningJobs">0</p>
+            <p class="text-[10px] text-amber-300/70 mt-1">In progress now</p>
+        </div>
+        <div class="bg-gradient-to-br from-green-900/30 to-green-800/10 border border-green-700/30 rounded-xl p-4">
+            <div class="flex items-center justify-between mb-1.5">
+                <span class="text-xs text-green-300 font-semibold">Trained Models</span>
+                <i class="fas fa-robot text-green-400"></i>
+            </div>
+            <p class="text-2xl font-bold text-green-400" id="trainCompletedJobs">0</p>
+            <p class="text-[10px] text-green-300/70 mt-1">Ready to use</p>
+        </div>
+        <div class="bg-gradient-to-br from-purple-900/30 to-purple-800/10 border border-purple-700/30 rounded-xl p-4">
+            <div class="flex items-center justify-between mb-1.5">
+                <span class="text-xs text-purple-300 font-semibold">Q&A Pairs</span>
+                <i class="fas fa-comments text-purple-400"></i>
+            </div>
+            <p class="text-2xl font-bold text-purple-400" id="trainTotalQA">0</p>
+            <p class="text-[10px] text-purple-300/70 mt-1">Total generated</p>
+        </div>
+        <div class="bg-gradient-to-br from-cyan-900/30 to-cyan-800/10 border border-cyan-700/30 rounded-xl p-4">
+            <div class="flex items-center justify-between mb-1.5">
+                <span class="text-xs text-cyan-300 font-semibold">Knowledge Bases</span>
+                <i class="fas fa-brain text-cyan-400"></i>
+            </div>
+            <p class="text-2xl font-bold text-cyan-400" id="trainTotalKB">0</p>
+            <p class="text-[10px] text-cyan-300/70 mt-1">Created from jobs</p>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- LEFT: Wizard + Active Job -->
+        <div class="lg:col-span-1 space-y-6">
+            <!-- Step 1: Create New Training -->
+            <div class="card border-blue-500/30" id="train-create-card">
+                <div class="flex items-center gap-3 mb-4">
+                    <div class="w-10 h-10 bg-blue-600/20 rounded-xl flex items-center justify-center">
+                        <i class="fas fa-plus-circle text-blue-400 text-xl"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-white font-semibold">New Training Job</h3>
+                        <p class="text-xs text-gray-500">Train an AI model from your database</p>
+                    </div>
+                </div>
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-xs text-gray-400 mb-1 font-semibold">Job Name</label>
+                        <input type="text" id="trainJobName" class="input-field text-sm" placeholder="e.g. Customer Support AI">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-400 mb-1 font-semibold flex items-center justify-between">
+                            <span><i class="fas fa-database mr-1 text-blue-400"></i>Source Connection</span>
+                            <button onclick="openDbConnectFromTraining()" class="text-[10px] text-blue-400 hover:text-blue-300 underline">+ Add New</button>
+                        </label>
+                        <select id="trainConnSelect" class="input-field text-sm" onchange="onTrainConnChange()">
+                            <option value="">-- Select a saved connection --</option>
+                        </select>
+                        <p class="text-[10px] text-gray-500 mt-1"><i class="fas fa-info-circle mr-1"></i>Connections saved in the Database Connect tab appear here</p>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-400 mb-1 font-semibold">Select Tables</label>
+                        <div id="trainTablesList" class="bg-gray-900/60 border border-gray-700 rounded-lg p-2 max-h-40 overflow-y-auto space-y-1">
+                            <p class="text-[11px] text-gray-600 text-center py-4">Select a connection to load tables</p>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-xs text-gray-400 mb-1 font-semibold">Question Col</label>
+                            <select id="trainQCol" class="input-field text-sm">
+                                <option value="auto">Auto-detect</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-400 mb-1 font-semibold">Answer Col</label>
+                            <select id="trainACol" class="input-field text-sm">
+                                <option value="auto">Auto-detect</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-xs text-gray-400 mb-1 font-semibold">Max Rows</label>
+                            <input type="number" id="trainMaxRows" value="500" min="10" max="100000" class="input-field text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-400 mb-1 font-semibold">Model</label>
+                            <select id="trainModel" class="input-field text-sm">
+                                <option value="qwen2.5:0.5b" selected>qwen2.5:0.5b (Fast)</option>
+                                <option value="qwen2.5-coder:1.5b">qwen2.5-coder:1.5b (Coder)</option>
+                                <option value="llama3.2:1b">llama3.2:1b (General)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <button onclick="createTrainingJob()" id="trainCreateBtn" class="w-full btn btn-primary py-2.5 text-sm">
+                        <i class="fas fa-rocket mr-1"></i>Start Training
+                    </button>
+                </div>
+            </div>
+
+            <!-- Active Job Control -->
+            <div class="card border-amber-500/30 hidden" id="train-active-card">
+                <div class="flex items-center gap-3 mb-3">
+                    <div class="w-10 h-10 bg-amber-600/20 rounded-xl flex items-center justify-center">
+                        <i class="fas fa-cogs text-amber-400 fa-spin"></i>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <h3 class="text-white font-semibold truncate" id="trainActiveName">-</h3>
+                        <p class="text-xs text-gray-500" id="trainActiveStatus">-</p>
+                    </div>
+                </div>
+                <div class="space-y-2 mb-3">
+                    <div class="flex items-center justify-between text-xs">
+                        <span class="text-gray-400">Progress</span>
+                        <span class="text-white font-semibold" id="trainActiveProgress">0%</span>
+                    </div>
+                    <div class="w-full bg-gray-700 rounded-full h-2.5">
+                        <div class="bg-gradient-to-r from-blue-500 to-cyan-500 h-2.5 rounded-full transition-all" id="trainActiveBar" style="width:0%"></div>
+                    </div>
+                    <p class="text-[10px] text-gray-500 text-center" id="trainActiveMessage">Initializing...</p>
+                </div>
+                <div class="grid grid-cols-3 gap-2 mb-3 text-center">
+                    <div class="bg-gray-900/60 rounded-lg p-2">
+                        <p class="text-lg font-bold text-blue-400" id="trainActiveRows">0</p>
+                        <p class="text-[9px] text-gray-500">Rows</p>
+                    </div>
+                    <div class="bg-gray-900/60 rounded-lg p-2">
+                        <p class="text-lg font-bold text-purple-400" id="trainActiveQA">0</p>
+                        <p class="text-[9px] text-gray-500">Q&A Pairs</p>
+                    </div>
+                    <div class="bg-gray-900/60 rounded-lg p-2">
+                        <p class="text-lg font-bold text-green-400" id="trainActiveChunks">0</p>
+                        <p class="text-[9px] text-gray-500">Chunks</p>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <button onclick="cancelActiveJob()" class="bg-red-600/20 hover:bg-red-600/40 text-red-300 py-2 rounded-lg text-xs font-medium border border-red-600/30">
+                        <i class="fas fa-stop mr-1"></i>Cancel
+                    </button>
+                    <button onclick="refreshActiveJob()" class="bg-gray-700 hover:bg-gray-600 text-white py-2 rounded-lg text-xs font-medium">
+                        <i class="fas fa-sync mr-1"></i>Refresh
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- RIGHT (spanning 2 cols): Training History with rich details -->
+        <div class="lg:col-span-2 space-y-6">
+            <!-- Currently Active Job (if any) -->
+            <div class="card border-amber-500/30 hidden" id="train-active-card">
+                <div class="flex items-center gap-3 mb-3">
+                    <div class="w-10 h-10 bg-amber-600/20 rounded-xl flex items-center justify-center">
+                        <i class="fas fa-cogs text-amber-400 fa-spin text-lg"></i>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <h3 class="text-white font-semibold truncate" id="trainActiveName">-</h3>
+                        <p class="text-xs text-gray-500" id="trainActiveStatus">-</p>
+                    </div>
+                    <div class="flex items-center gap-1">
+                        <button onclick="refreshActiveJob()" class="px-2 py-1 bg-gray-700 hover:bg-gray-600 text-white text-xs rounded transition" title="Refresh"><i class="fas fa-sync"></i></button>
+                        <button onclick="cancelActiveJob()" class="px-2 py-1 bg-red-600/20 hover:bg-red-600/40 text-red-300 text-xs rounded border border-red-600/30 transition" title="Cancel"><i class="fas fa-stop"></i></button>
+                    </div>
+                </div>
+                <div class="space-y-2 mb-3">
+                    <div class="flex items-center justify-between text-xs">
+                        <span class="text-gray-400">Overall Progress</span>
+                        <span class="text-white font-semibold" id="trainActiveProgress">0%</span>
+                    </div>
+                    <div class="w-full bg-gray-700 rounded-full h-2.5">
+                        <div class="bg-gradient-to-r from-amber-500 via-orange-500 to-red-500 h-2.5 rounded-full transition-all" id="trainActiveBar" style="width:0%"></div>
+                    </div>
+                    <p class="text-[10px] text-amber-300 text-center" id="trainActiveMessage">Initializing...</p>
+                </div>
+                <div class="grid grid-cols-5 gap-2 text-center">
+                    <div class="bg-gray-900/60 rounded-lg p-2 border border-gray-700/30">
+                        <p class="text-lg font-bold text-blue-400" id="trainActiveRows">0</p>
+                        <p class="text-[9px] text-gray-500">Rows</p>
+                    </div>
+                    <div class="bg-gray-900/60 rounded-lg p-2 border border-gray-700/30">
+                        <p class="text-lg font-bold text-purple-400" id="trainActiveQA">0</p>
+                        <p class="text-[9px] text-gray-500">Q&A</p>
+                    </div>
+                    <div class="bg-gray-900/60 rounded-lg p-2 border border-gray-700/30">
+                        <p class="text-lg font-bold text-cyan-400" id="trainActiveChunks">0</p>
+                        <p class="text-[9px] text-gray-500">Chunks</p>
+                    </div>
+                    <div class="bg-gray-900/60 rounded-lg p-2 border border-gray-700/30">
+                        <p class="text-lg font-bold text-red-400" id="trainActiveLoss">0.00</p>
+                        <p class="text-[9px] text-gray-500">Loss</p>
+                    </div>
+                    <div class="bg-gray-900/60 rounded-lg p-2 border border-gray-700/30">
+                        <p class="text-lg font-bold text-green-400" id="trainActiveAcc">0%</p>
+                        <p class="text-[9px] text-gray-500">Acc</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Training History - rich cards with model, KB, stages, test results -->
+            <div class="card">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-white font-semibold flex items-center gap-2">
+                        <i class="fas fa-history text-cyan-400"></i> Training History
+                        <span class="text-xs text-gray-500 ml-1" id="trainHistoryCount">(0)</span>
+                    </h3>
+                    <div class="flex items-center gap-2">
+                        <select id="trainHistoryFilter" onchange="renderTrainingHistory()" class="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs text-white">
+                            <option value="all">All</option>
+                            <option value="completed">Completed</option>
+                            <option value="running">Running</option>
+                            <option value="failed">Failed</option>
+                        </select>
+                        <button onclick="loadTrainingJobs()" class="text-xs text-gray-500 hover:text-white px-2 py-1 bg-gray-800 rounded">
+                            <i class="fas fa-sync mr-1"></i>Refresh
+                        </button>
+                    </div>
+                </div>
+                <div id="trainJobsList" class="space-y-3 max-h-[600px] overflow-y-auto pr-1">
+                    <div class="text-center py-12 text-gray-500">
+                        <i class="fas fa-brain text-4xl mb-3 opacity-30"></i>
+                        <p class="text-sm">No training jobs yet. Create one to get started!</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stage Progress (current job or selected) -->
+            <div class="card">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-white font-semibold flex items-center gap-2">
+                        <i class="fas fa-stream text-blue-400"></i> Training Pipeline
+                        <span class="text-xs text-gray-500">7 stages</span>
+                    </h3>
+                </div>
+                <div class="grid grid-cols-7 gap-2" id="trainStagesRow"></div>
+            </div>
+
+            <!-- Live Metrics + Charts -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="card">
+                    <h3 class="text-white font-semibold mb-3 flex items-center gap-2">
+                        <i class="fas fa-chart-line text-cyan-400"></i> Loss & Accuracy
+                    </h3>
+                    <canvas id="trainLossChart" height="120" class="w-full"></canvas>
+                </div>
+                <div class="card">
+                    <h3 class="text-white font-semibold mb-3 flex items-center gap-2">
+                        <i class="fas fa-microchip text-amber-400"></i> Resources & Throughput
+                    </h3>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div class="bg-gray-900/60 rounded-lg p-3 border border-gray-700/50">
+                            <p class="text-xs text-gray-500">Throughput</p>
+                            <p class="text-lg font-bold text-cyan-400" id="trainThroughput">0 r/s</p>
+                        </div>
+                        <div class="bg-gray-900/60 rounded-lg p-3 border border-gray-700/50">
+                            <p class="text-xs text-gray-500">ETA</p>
+                            <p class="text-lg font-bold text-amber-400" id="trainEta">-</p>
+                        </div>
+                        <div class="bg-gray-900/60 rounded-lg p-3 border border-gray-700/50">
+                            <p class="text-xs text-gray-500">CPU</p>
+                            <p class="text-lg font-bold text-orange-400" id="trainCpu">0%</p>
+                        </div>
+                        <div class="bg-gray-900/60 rounded-lg p-3 border border-gray-700/50">
+                            <p class="text-xs text-gray-500">Memory</p>
+                            <p class="text-lg font-bold text-pink-400" id="trainMem">0 MB</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Live Log Console -->
+            <div class="card">
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="text-white font-semibold flex items-center gap-2">
+                        <i class="fas fa-terminal text-green-400"></i> Live Log
+                    </h3>
+                    <button onclick="clearTrainingLogs()" class="text-[10px] text-gray-500 hover:text-red-400">
+                        <i class="fas fa-trash mr-1"></i>Clear
+                    </button>
+                </div>
+                <div class="bg-gray-950 border border-gray-800 rounded-lg p-3 font-mono text-[11px] h-48 overflow-y-auto" id="trainLogBox">
+                    <p class="text-gray-600 text-center">No active training. Start a job to see live logs.</p>
+                </div>
+            </div>
+
+            <!-- Test & Validate (shown after completion) -->
+            <div class="card hidden" id="train-test-card">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-white font-semibold flex items-center gap-2">
+                        <i class="fas fa-vial text-cyan-400"></i> Test & Validate Model
+                    </h3>
+                    <span class="text-xs text-gray-500">Mark answers as Right or Wrong, then retrain</span>
+                </div>
+                <div class="flex gap-2 mb-3">
+                    <input type="text" id="trainTestQ" class="input-field text-sm flex-1" placeholder="Ask your trained model a question..." onkeydown="if(event.key==='Enter') testTrainedModel()">
+                    <button onclick="testTrainedModel()" class="btn btn-primary text-sm px-4">
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                </div>
+                <div id="trainTestResult" class="hidden mb-4"></div>
+                <div class="border-t border-gray-700/50 pt-3">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs text-gray-400 font-semibold uppercase tracking-wide">Training Q&A Pairs (sample)</span>
+                        <span class="text-[10px] text-gray-500" id="trainQACount">0 pairs</span>
+                    </div>
+                    <div class="space-y-2 max-h-64 overflow-y-auto" id="trainQAList"></div>
+                </div>
+                <div class="border-t border-gray-700/50 pt-3 mt-3" id="trainFeedbackSection" style="display:none">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs text-gray-400 font-semibold uppercase tracking-wide">User Feedback (Right / Wrong)</span>
+                        <span class="text-[10px] text-gray-500" id="trainFeedbackCount">0</span>
+                    </div>
+                    <div class="space-y-1.5 max-h-40 overflow-y-auto" id="trainFeedbackList"></div>
+                    <button onclick="retrainWithFeedback()" id="trainRetrainBtn" class="w-full mt-3 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white py-2.5 rounded-lg text-sm font-semibold">
+                        <i class="fas fa-redo mr-1"></i>Retrain with Corrections (<span id="trainCorrectionsCount">0</span>)
+                    </button>
                 </div>
             </div>
         </div>
@@ -401,6 +794,10 @@
                 <button onclick="runExport()" class="btn btn-primary w-full py-3">
                     <i class="fas fa-file-export mr-2"></i>Export & Train
                 </button>
+
+                <button id="exportTrainBtn" class="w-full bg-gradient-to-r from-purple-600/30 to-cyan-600/30 hover:from-purple-600/50 hover:to-cyan-600/50 text-white py-2.5 rounded-lg text-sm font-medium border border-purple-500/30 mt-2">
+                    <i class="fas fa-brain mr-2"></i>Train AI Model on this Table
+                </button>
             </div>
 
             <div id="exportResult" class="hidden mt-4"></div>
@@ -421,6 +818,14 @@
 let currentDbType = 'mysql';
 let currentConnectionUrl = '';
 let currentColumns = [];
+let allTables = [];
+let selectedTable = null;
+let tableDataPage = 1;
+let tableDataPerPage = 25;
+let tableDataRows = [];
+let tableDataTotal = 0;
+let currentTableColumns = [];
+const SAVED_CONN_KEY = 'openlocalai_saved_db_connections';
 
 function showDataTab(tab) {
     document.querySelectorAll('[id^="panel-"]').forEach(p => p.classList.add('hidden'));
@@ -431,6 +836,15 @@ function showDataTab(tab) {
     document.getElementById(`panel-${tab}`).classList.remove('hidden');
     document.getElementById(`tab-${tab}`).classList.add('text-white', 'bg-gray-700/50');
     document.getElementById(`tab-${tab}`).classList.remove('text-gray-400');
+    // When switching to training tab, refresh connections list and jobs
+    if (tab === 'training') {
+        if (typeof populateTrainingConnSelect === 'function') {
+            populateTrainingConnSelect();
+        }
+        if (typeof loadTrainingJobs === 'function') {
+            loadTrainingJobs();
+        }
+    }
 }
 
 function selectDbType(type) {
@@ -508,12 +922,16 @@ async function connectToDatabase() {
             method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)
         });
         const result = await resp.json();
-        
+
         if (result.connection_url) {
             currentConnectionUrl = result.connection_url;
+            allTables = result.tables || [];
             document.getElementById('dbConnCount').textContent = '1';
-            document.getElementById('explorerTitle').textContent = `Tables (${result.tables.length})`;
-            renderTables(result.tables);
+            document.getElementById('explorerTitle').textContent = `All Tables`;
+            document.getElementById('allTablesCount').textContent = `(${allTables.length})`;
+            renderTables();
+            // Populate training connection selector
+            populateTrainingConnSelect();
         } else {
             explorer.innerHTML = '<div class="text-center py-8 text-red-400"><i class="fas fa-exclamation-triangle text-2xl mb-2"></i><p>' + (result.detail || 'Connection failed') + '</p></div>';
         }
@@ -555,79 +973,281 @@ function selectDatabase(dbName) {
     connectToDatabase();
 }
 
-function renderTables(tables) {
+function getCurrentConnData() {
+    return {
+        db_type: currentDbType,
+        host: document.getElementById('dbHost')?.value || '',
+        port: parseInt(document.getElementById('dbPort')?.value) || 3306,
+        database: document.getElementById('dbName')?.value || '',
+        username: document.getElementById('dbUser')?.value || '',
+        password: document.getElementById('dbPass')?.value || '',
+    };
+}
+
+function renderTables() {
     const explorer = document.getElementById('tablesExplorer');
-    if (!tables || tables.length === 0) {
-        explorer.innerHTML = '<div class="text-center py-8 text-gray-500">No tables found</div>';
+    const countEl = document.getElementById('allTablesCount');
+    if (!allTables || allTables.length === 0) {
+        explorer.innerHTML = '<div class="text-center py-8 text-gray-500">No tables found. Connect to a database first.</div>';
+        if (countEl) countEl.textContent = '';
         return;
     }
 
-    let html = '<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">';
-    tables.forEach(table => {
+    // Search/filter
+    const search = (document.getElementById('tablesSearch')?.value || '').toLowerCase();
+    const filtered = search ? allTables.filter(t => t.name.toLowerCase().includes(search)) : allTables;
+
+    if (countEl) {
+        countEl.textContent = search
+            ? `(${filtered.length} of ${allTables.length})`
+            : `(${allTables.length} total)`;
+    }
+
+    if (!filtered.length) {
+        explorer.innerHTML = `<div class="text-center py-8 text-gray-500">No tables matching "${escHtml(search)}"</div>`;
+        return;
+    }
+
+    // Render all tables - compact list view (not card grid)
+    let html = '<div class="space-y-1">';
+    filtered.forEach(table => {
+        const isSelected = selectedTable && selectedTable.name === table.name;
+        const selClass = isSelected ? 'bg-cyan-600/20 border-cyan-500/50 ring-1 ring-cyan-500/30' : 'bg-gray-800/40 border-gray-700/50 hover:bg-gray-700/50 hover:border-blue-500/40';
+        const hasColumns = table.columns && table.columns.length > 0;
+        const rowCountText = table.row_count > 0 ? table.row_count + ' rows' : (table.row_count === 0 ? 'empty' : '? rows');
+        const colsHtml = hasColumns
+            ? `<div class="flex flex-wrap gap-1 mt-1">${table.columns.slice(0, 4).map(c => `<span class="text-[9px] px-1.5 py-0.5 bg-gray-700/70 rounded text-gray-400">${c.name}</span>`).join('')}${table.columns.length > 4 ? `<span class="text-[9px] px-1.5 py-0.5 bg-gray-700/70 rounded text-gray-400">+${table.columns.length - 4}</span>` : ''}</div>`
+            : '';
+        const onclickAction = hasColumns ? `selectTable('${table.name}', ${JSON.stringify(table.columns).replace(/"/g, '&quot;')})` : `selectTable('${table.name}', [])`;
         html += `
-        <div class="p-4 bg-gray-800/50 rounded-xl border border-gray-700 hover:border-blue-500/30 transition cursor-pointer" onclick="previewTable('${table.name}', ${JSON.stringify(table.columns).replace(/"/g, '&quot;')})">
-            <div class="flex items-center justify-between mb-2">
+        <div class="px-3 py-2 ${selClass} border rounded-lg transition cursor-pointer flex items-center gap-3" onclick="${onclickAction}">
+            <i class="fas fa-table ${isSelected ? 'text-cyan-400' : 'text-blue-400'} flex-shrink-0 text-sm"></i>
+            <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-2">
-                    <i class="fas fa-table text-blue-400"></i>
-                    <span class="text-white font-medium text-sm">${table.name}</span>
+                    <span class="text-sm text-white truncate" title="${table.name}">${escHtml(table.name)}</span>
+                    ${isSelected ? '<span class="text-[9px] px-1.5 py-0.5 bg-cyan-600/40 text-cyan-200 rounded">SELECTED</span>' : ''}
                 </div>
-                <span class="text-[10px] text-gray-500">${table.column_count} cols</span>
+                ${colsHtml || `<div class="text-[10px] text-gray-600 mt-0.5">~${rowCountText}</div>`}
             </div>
-            <div class="flex flex-wrap gap-1 mt-2">
-                ${table.columns.slice(0, 5).map(c => `<span class="text-[9px] px-1.5 py-0.5 bg-gray-700 rounded text-gray-400">${c.name}</span>`).join('')}
-                ${table.columns.length > 5 ? `<span class="text-[9px] px-1.5 py-0.5 bg-gray-700 rounded text-gray-400">+${table.columns.length - 5}</span>` : ''}
-            </div>
+            <span class="text-[10px] text-gray-500 flex-shrink-0 text-right">
+                ${hasColumns ? table.column_count + 'c' : (table.row_count > 0 ? table.row_count + 'r' : '?')}
+            </span>
+            ${isSelected ? `<button onclick="event.stopPropagation();previewTable('${table.name}')" class="text-[10px] px-2 py-1 bg-blue-600/30 hover:bg-blue-600/50 text-blue-200 rounded transition flex-shrink-0" title="View data"><i class="fas fa-th"></i></button>` : ''}
         </div>`;
     });
     html += '</div>';
     explorer.innerHTML = html;
 }
 
-async function previewTable(tableName, columns) {
-    currentColumns = columns.map(c => c.name || c);
-    const explorer = document.getElementById('tablesExplorer');
-    explorer.innerHTML = '<div class="text-center py-8"><i class="fas fa-spinner fa-spin text-2xl text-gray-500"></i></div>';
+function selectTable(tableName, columns) {
+    // If columns not loaded (lightweight mode), fetch them now
+    if (!Array.isArray(columns) || columns.length === 0) {
+        const info = document.getElementById('selectedTableInfo');
+        const panel = document.getElementById('selectedTablePanel');
+        panel.classList.remove('hidden');
+        info.innerHTML = `<div class="text-center py-6"><i class="fas fa-spinner fa-spin text-2xl text-blue-400"></i><p class="text-xs text-gray-500 mt-2">Loading schema for ${escHtml(tableName)}...</p></div>`;
+        const conn = getCurrentConnData();
+        if (!conn) {
+            info.innerHTML = '<p class="text-red-400 text-sm">No active connection. Reconnect first.</p>';
+            return;
+        }
+        fetch('/api/database/table/columns', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({...conn, table_name: tableName})
+        })
+        .then(r => r.json())
+        .then(d => {
+            // Cache columns in allTables so next click is instant
+            const cached = d.columns || [];
+            const idx = allTables.findIndex(t => t.name === tableName);
+            if (idx >= 0) allTables[idx].columns = cached;
+            renderSelectedTable(tableName, cached);
+            // Auto-load data
+            tableDataPage = 1;
+            loadTableDataPage(tableName);
+        })
+        .catch(e => { info.innerHTML = '<p class="text-red-400 text-sm">Failed: ' + e.message + '</p>'; });
+        return;
+    }
+    renderSelectedTable(tableName, columns);
+    // Auto-load data
+    tableDataPage = 1;
+    loadTableDataPage(tableName);
+}
+
+function renderSelectedTable(tableName, cols) {
+    selectedTable = { name: tableName, columns: cols };
+    currentColumns = cols.map(c => c.name || c);
+    renderTables();
+    const panel = document.getElementById('selectedTablePanel');
+    const info = document.getElementById('selectedTableInfo');
+    panel.classList.remove('hidden');
+    const primaryKeys = cols.filter(c => c.primary_key).map(c => c.name);
+    info.innerHTML = `
+        <div class="mb-3">
+            <div class="text-xs text-gray-500 mb-0.5">Table Name</div>
+            <div class="text-white font-mono text-sm flex items-center gap-2">
+                <i class="fas fa-table text-cyan-400"></i>${tableName}
+            </div>
+        </div>
+        <div class="grid grid-cols-3 gap-3 mb-3 text-center">
+            <div class="bg-gray-800/50 rounded-lg p-2 border border-gray-700/50">
+                <div class="text-lg font-bold text-blue-400">${cols.length}</div>
+                <div class="text-[10px] text-gray-500">Columns</div>
+            </div>
+            <div class="bg-gray-800/50 rounded-lg p-2 border border-gray-700/50">
+                <div class="text-lg font-bold text-amber-400">${primaryKeys.length}</div>
+                <div class="text-[10px] text-gray-500">Primary Keys</div>
+            </div>
+            <div class="bg-gray-800/50 rounded-lg p-2 border border-gray-700/50">
+                <div class="text-lg font-bold text-green-400">${cols.filter(c => c.nullable === false).length}</div>
+                <div class="text-[10px] text-gray-500">Not Null</div>
+            </div>
+        </div>
+        <div class="mb-3">
+            <div class="text-xs text-gray-500 mb-1.5">Schema</div>
+            <div class="bg-gray-900/60 rounded-lg p-2 max-h-32 overflow-y-auto text-[10px] font-mono">
+                ${cols.map(c => {
+                    const pk = c.primary_key ? '<span class="text-amber-400">[PK]</span> ' : '<span class="text-gray-600">     </span> ';
+                    const nn = c.nullable === false ? '<span class="text-red-400">*</span>' : '<span class="text-gray-600"> </span>';
+                    return `<div class="py-0.5">${pk}${nn}<span class="text-cyan-400">${c.name}</span> <span class="text-gray-500">${c.type || ''}</span></div>`;
+                }).join('')}
+            </div>
+        </div>
+        <div class="flex gap-2">
+            <button onclick="previewTable('${tableName}')" class="flex-1 bg-blue-600/20 hover:bg-blue-600/40 text-blue-300 py-2 rounded-lg text-sm transition border border-blue-600/30">
+                <i class="fas fa-eye mr-1"></i>Preview Data
+            </button>
+            <button onclick="sendTableToTraining('${tableName}')" class="flex-1 bg-gradient-to-r from-cyan-600/30 to-purple-600/30 hover:from-cyan-600/50 hover:to-purple-600/50 text-cyan-200 py-2 rounded-lg text-sm font-semibold transition border border-cyan-500/30">
+                <i class="fas fa-brain mr-1"></i>Send to Train
+            </button>
+            <button onclick="openExportModal('${tableName}')" class="flex-1 bg-purple-600/20 hover:bg-purple-600/40 text-purple-300 py-2 rounded-lg text-sm transition border border-purple-600/30">
+                <i class="fas fa-file-export mr-1"></i>Export
+            </button>
+        </div>`;
+}
+
+function clearTableSelection() {
+    selectedTable = null;
+    currentColumns = [];
+    document.getElementById('selectedTablePanel').classList.add('hidden');
+    renderTables();
+}
+
+async function previewTable(tableName) {
+    tableDataPage = 1;
+    await loadTableDataPage(tableName);
+}
+
+async function loadTableDataPage(tableName) {
+    const grid = document.getElementById('dataGridContent');
+    const gridCard = document.getElementById('dataGridCard');
+    const offset = (tableDataPage - 1) * tableDataPerPage;
+    gridCard.classList.remove('hidden');
+    grid.innerHTML = '<div class="text-center py-8"><i class="fas fa-spinner fa-spin text-2xl text-gray-500"></i><p class="text-gray-500 text-xs mt-2">Loading data...</p></div>';
+    // Scroll to data grid
+    gridCard.scrollIntoView({behavior: 'smooth', block: 'start'});
 
     try {
-        const resp = await fetch(`/api/database/table/preview?connection_url=${encodeURIComponent(currentConnectionUrl)}&table_name=${tableName}&limit=5`);
+        const resp = await fetch(`/api/database/table/preview?connection_url=${encodeURIComponent(currentConnectionUrl)}&table_name=${tableName}&limit=${tableDataPerPage}&offset=${offset}`);
         const data = await resp.json();
+        tableDataRows = data.rows || [];
+        tableDataTotal = data.total_rows || 0;
+        currentTableColumns = data.columns || [];
+
+        document.getElementById('dataGridTitle').textContent = tableName;
+        document.getElementById('dataGridInfo').textContent = `(${tableDataTotal.toLocaleString()} rows total)`;
+
+        const totalPages = Math.max(1, Math.ceil(tableDataTotal / tableDataPerPage));
+        const startRow = tableDataTotal === 0 ? 0 : offset + 1;
+        const endRow = Math.min(offset + tableDataPerPage, tableDataTotal);
 
         let html = `
-        <div class="mb-4 flex items-center justify-between">
-            <h4 class="text-white font-medium"><i class="fas fa-table text-blue-400 mr-2"></i>${tableName}</h4>
-            <div class="flex gap-2">
-                <button onclick="openExportModal('${tableName}')" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white text-xs rounded-lg transition">
-                    <i class="fas fa-file-export mr-1"></i>Export for Training
+        <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+            <div class="text-xs text-gray-400">
+                <i class="fas fa-list mr-1 text-cyan-400"></i>Showing <span class="text-white">${startRow}-${endRow}</span> of <span class="text-white">${tableDataTotal.toLocaleString()}</span> rows
+            </div>
+            <div class="flex gap-1.5">
+                <button onclick="sendTableToTraining('${tableName}')" class="text-[10px] px-2 py-1 bg-gradient-to-r from-cyan-600 to-purple-600 hover:from-cyan-500 hover:to-purple-500 text-white rounded transition font-semibold" title="Train AI on this table">
+                    <i class="fas fa-brain mr-1"></i>Send to Training
                 </button>
-                <button onclick="renderTables([])" class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-white text-xs rounded-lg transition">
-                    <i class="fas fa-arrow-left mr-1"></i>Back
+                <button onclick="openExportModal('${tableName}')" class="text-[10px] px-2 py-1 bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 rounded transition" title="Export for training">
+                    <i class="fas fa-file-export mr-1"></i>Export
                 </button>
             </div>
         </div>`;
 
-        if (data.rows && data.rows.length > 0) {
-            html += '<div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr class="border-b border-gray-700">';
-            (data.columns || []).forEach(col => {
-                html += `<th class="px-3 py-2 text-left text-xs text-gray-400 font-medium">${col}</th>`;
+        if (tableDataRows.length > 0) {
+            html += '<div class="overflow-x-auto border border-gray-700/50 rounded-lg"><table class="w-full text-sm"><thead><tr class="bg-gray-800/50 border-b border-gray-700">';
+            html += '<th class="px-2 py-2 text-left text-[10px] text-gray-500 font-medium w-12 sticky left-0 bg-gray-800/50">#</th>';
+            (currentTableColumns).forEach(col => {
+                html += `<th class="px-3 py-2 text-left text-xs text-gray-300 font-semibold whitespace-nowrap">${escHtml(col)}</th>`;
             });
             html += '</tr></thead><tbody>';
-            data.rows.forEach(row => {
-                html += '<tr class="border-b border-gray-800 hover:bg-gray-800/50">';
-                (data.columns || []).forEach(col => {
-                    const val = row[col] !== null && row[col] !== undefined ? String(row[col]).substring(0, 100) : '<span class="text-gray-600">NULL</span>';
-                    html += `<td class="px-3 py-2 text-xs text-gray-300">${val}</td>`;
+            tableDataRows.forEach((row, ri) => {
+                html += `<tr class="border-b border-gray-800 hover:bg-cyan-900/10">`;
+                html += `<td class="px-2 py-2 text-[10px] text-gray-600 sticky left-0 bg-gray-900/50">${offset + ri + 1}</td>`;
+                (currentTableColumns).forEach(col => {
+                    let val = row[col];
+                    if (val === null || val === undefined) {
+                        val = '<span class="text-gray-600 italic">NULL</span>';
+                    } else {
+                        val = String(val);
+                        if (val.length > 100) val = val.substring(0, 100) + '…';
+                        // Escape HTML
+                        val = escHtml(val);
+                    }
+                    html += `<td class="px-3 py-2 text-xs text-gray-200 whitespace-nowrap">${val}</td>`;
                 });
                 html += '</tr>';
             });
             html += '</tbody></table></div>';
-            html += `<p class="text-xs text-gray-500 mt-3 text-center">Showing ${data.rows.length} of ${data.total_rows} rows</p>`;
         } else {
-            html += '<div class="text-center py-8 text-gray-500">No data in table</div>';
+            html += '<div class="text-center py-12 text-gray-500 border border-gray-700/50 rounded-lg"><i class="fas fa-inbox text-3xl mb-2 opacity-30"></i><p class="text-sm">No data in table</p></div>';
         }
+        grid.innerHTML = html;
 
-        explorer.innerHTML = html;
+        // Pagination for data grid
+        const pag = document.getElementById('dataGridPagination');
+        if (totalPages > 1) {
+            pag.classList.remove('hidden');
+            let pagHtml = `<div class="text-xs text-gray-500">Page <span class="text-white">${tableDataPage}</span> of <span class="text-white">${totalPages}</span></div><div class="flex items-center gap-1">`;
+            pagHtml += `<button onclick="goToTableDataPage(1, '${tableName}')" ${tableDataPage <= 1 ? 'disabled' : ''} class="px-2 py-1 rounded text-xs ${tableDataPage <= 1 ? 'bg-gray-800 text-gray-600 cursor-not-allowed' : 'bg-gray-700 hover:bg-gray-600 text-white'}"><i class="fas fa-angle-double-left"></i></button>`;
+            pagHtml += `<button onclick="goToTableDataPage(${tableDataPage - 1}, '${tableName}')" ${tableDataPage <= 1 ? 'disabled' : ''} class="px-2 py-1 rounded text-xs ${tableDataPage <= 1 ? 'bg-gray-800 text-gray-600 cursor-not-allowed' : 'bg-gray-700 hover:bg-gray-600 text-white'}"><i class="fas fa-chevron-left"></i></button>`;
+            const maxButtons = 5;
+            let pStart = Math.max(1, tableDataPage - Math.floor(maxButtons / 2));
+            let pEnd = Math.min(totalPages, pStart + maxButtons - 1);
+            if (pEnd - pStart < maxButtons - 1) pStart = Math.max(1, pEnd - maxButtons + 1);
+            if (pStart > 1) pagHtml += `<button onclick="goToTableDataPage(1, '${tableName}')" class="px-2 py-1 rounded text-xs bg-gray-700 hover:bg-gray-600 text-white">1</button><span class="text-gray-600 px-1">...</span>`;
+            for (let p = pStart; p <= pEnd; p++) {
+                const isActive = p === tableDataPage;
+                pagHtml += `<button onclick="goToTableDataPage(${p}, '${tableName}')" class="px-2.5 py-1 rounded text-xs ${isActive ? 'bg-cyan-600 text-white font-semibold' : 'bg-gray-700 hover:bg-gray-600 text-white'}">${p}</button>`;
+            }
+            if (pEnd < totalPages) pagHtml += `<span class="text-gray-600 px-1">...</span><button onclick="goToTableDataPage(${totalPages}, '${tableName}')" class="px-2 py-1 rounded text-xs bg-gray-700 hover:bg-gray-600 text-white">${totalPages}</button>`;
+            pagHtml += `<button onclick="goToTableDataPage(${tableDataPage + 1}, '${tableName}')" ${tableDataPage >= totalPages ? 'disabled' : ''} class="px-2 py-1 rounded text-xs ${tableDataPage >= totalPages ? 'bg-gray-800 text-gray-600 cursor-not-allowed' : 'bg-gray-700 hover:bg-gray-600 text-white'}"><i class="fas fa-chevron-right"></i></button>`;
+            pagHtml += `<button onclick="goToTableDataPage(${totalPages}, '${tableName}')" ${tableDataPage >= totalPages ? 'disabled' : ''} class="px-2 py-1 rounded text-xs ${tableDataPage >= totalPages ? 'bg-gray-800 text-gray-600 cursor-not-allowed' : 'bg-gray-700 hover:bg-gray-600 text-white'}"><i class="fas fa-angle-double-right"></i></button>`;
+            pagHtml += `</div>`;
+            pag.innerHTML = pagHtml;
+        } else {
+            pag.classList.add('hidden');
+        }
     } catch (e) {
-        explorer.innerHTML = '<div class="text-center py-8 text-red-400">Failed to load table data</div>';
+        grid.innerHTML = '<div class="text-center py-8 text-red-400"><i class="fas fa-exclamation-triangle"></i><p class="text-sm mt-2">Failed to load table data: ' + e.message + '</p></div>';
+    }
+}
+
+function goToTableDataPage(p, tableName) {
+    const totalPages = Math.max(1, Math.ceil(tableDataTotal / tableDataPerPage));
+    if (p < 1 || p > totalPages) return;
+    tableDataPage = p;
+    loadTableDataPage(tableName);
+}
+
+function changeTableDataPerPage() {
+    tableDataPerPage = parseInt(document.getElementById('tableDataPerPage').value) || 25;
+    tableDataPage = 1;
+    if (selectedTable) {
+        loadTableDataPage(selectedTable.name);
     }
 }
 
@@ -646,7 +1266,41 @@ function openExportModal(tableName) {
         aCol.innerHTML += `<option value="${col}">${col}</option>`;
     });
 
+    // Show "Train on this table" button if Training tab exists
+    const trainBtn = document.getElementById('exportTrainBtn');
+    if (trainBtn) {
+        trainBtn.onclick = () => {
+            closeExportModal();
+            sendTableToTraining(tableName);
+        };
+    }
+
     document.getElementById('exportModal').classList.remove('hidden');
+}
+
+function sendTableToTraining(tableName) {
+    // Switch to training tab
+    showDataTab('training');
+    // Make sure connection is set
+    if (typeof populateTrainingConnSelect === 'function') {
+        populateTrainingConnSelect();
+    }
+    // Find or create a training job name
+    const nameField = document.getElementById('trainJobName');
+    if (nameField) nameField.value = `Train on ${tableName}`;
+    // Check the table's checkbox in the training tab
+    setTimeout(() => {
+        const cb = document.querySelector(`.train-tbl-cb[value="${tableName}"]`);
+        if (cb) {
+            cb.checked = true;
+            if (typeof updateTrainColSelectors === 'function') {
+                updateTrainColSelectors();
+            }
+            showToast(`✅ ${tableName} selected for training`);
+        } else {
+            showToast('Select a connection first to load tables', 'error');
+        }
+    }, 500);
 }
 
 function closeExportModal() {
@@ -739,6 +1393,931 @@ function showToast(msg) {
 
 document.addEventListener('DOMContentLoaded', () => {
     selectDbType('mysql');
+    renderSavedConnections();
+    populateTrainingConnSelect(); // Ensure training dropdown is populated
+    if (document.getElementById('trainStagesRow')) {
+        renderTrainingStages();
+    }
+    loadTrainingJobs();
 });
+
+// ============== AI Model Training ==============
+let trainStages = [];
+let currentJobId = null;
+let currentJob = null;
+let trainPollInterval = null;
+let lossChart = null;
+
+async function loadTrainingStages() {
+    try {
+        const r = await fetch('/api/training/stages');
+        const d = await r.json();
+        trainStages = d.stages || [];
+        renderTrainingStages();
+    } catch (e) {
+        console.error('Failed to load stages', e);
+    }
+}
+
+function renderTrainingStages() {
+    const row = document.getElementById('trainStagesRow');
+    if (!row) return;
+    const stages = trainStages.length ? trainStages : [
+        {id:'extracting',name:'Extract',icon:'fas fa-database',desc:'Pull rows'},
+        {id:'analyzing',name:'Analyze',icon:'fas fa-search',desc:'Detect cols'},
+        {id:'generating_qa',name:'Q&A',icon:'fas fa-comments',desc:'Gen pairs'},
+        {id:'chunking',name:'Chunk',icon:'fas fa-puzzle-piece',desc:'Split'},
+        {id:'training',name:'Train',icon:'fas fa-cogs',desc:'Build model'},
+        {id:'saving',name:'Save',icon:'fas fa-save',desc:'Persist'},
+        {id:'validating',name:'Validate',icon:'fas fa-check-double',desc:'Test'},
+    ];
+    if (currentJob) {
+        const curIdx = currentJob.stage_idx || 0;
+        const curStage = currentJob.current_stage;
+        row.innerHTML = stages.map((s, i) => {
+            let cls = 'bg-gray-800/50 border-gray-700/50 text-gray-500';
+            if (i < curIdx) cls = 'bg-green-900/20 border-green-600/40 text-green-400';
+            else if (i === curIdx) cls = 'bg-blue-600/20 border-blue-500 text-blue-300 ring-2 ring-blue-500/40 animate-pulse';
+            const status = i < curIdx ? '<i class="fas fa-check text-green-400 text-[10px]"></i>' : (i === curIdx ? '<i class="fas fa-spinner fa-spin text-[10px]"></i>' : '<span class="text-[10px]">'+(i+1)+'</span>');
+            return `<div class="p-2.5 rounded-lg border ${cls} text-center transition" title="${s.desc}">
+                <div class="text-lg mb-0.5"><i class="${s.icon}"></i></div>
+                <div class="text-[10px] font-semibold">${s.name}</div>
+                <div class="mt-0.5">${status}</div>
+            </div>`;
+        }).join('');
+    } else {
+        row.innerHTML = stages.map((s, i) => `
+            <div class="p-2.5 rounded-lg border bg-gray-800/50 border-gray-700/50 text-gray-500 text-center" title="${s.desc}">
+                <div class="text-lg mb-0.5"><i class="${s.icon}"></i></div>
+                <div class="text-[10px] font-semibold">${s.name}</div>
+                <div class="mt-0.5"><span class="text-[10px]">${i+1}</span></div>
+            </div>`).join('');
+    }
+}
+
+function onTrainConnChange() {
+    const sel = document.getElementById('trainConnSelect');
+    const val = sel.value;
+    if (!val) {
+        document.getElementById('trainTablesList').innerHTML = '<p class="text-[11px] text-gray-600 text-center py-4">Select a connection to load tables</p>';
+        return;
+    }
+    let conn = null;
+    if (val === 'CURRENT') {
+        // Use current form values
+        conn = {
+            host: document.getElementById('dbHost')?.value || '',
+            port: document.getElementById('dbPort')?.value || '',
+            database: document.getElementById('dbName')?.value || '',
+            username: document.getElementById('dbUser')?.value || '',
+            password: document.getElementById('dbPass')?.value || '',
+        };
+    } else {
+        // Load from saved
+        const c = getSavedConnections().find(x => x.id === val);
+        if (!c) return;
+        conn = {host: c.host, port: c.port, database: c.database, username: c.username, password: c.password};
+        // Also fill the form fields so the connection is "active"
+        document.getElementById('dbHost').value = c.host;
+        document.getElementById('dbPort').value = c.port;
+        document.getElementById('dbName').value = c.database;
+        document.getElementById('dbUser').value = c.username;
+        document.getElementById('dbPass').value = c.password;
+    }
+    if (!conn.host || !conn.database) {
+        showToast('Connection incomplete', 'error');
+        return;
+    }
+    // Auto-connect to load tables
+    const tablesList = document.getElementById('trainTablesList');
+    tablesList.innerHTML = '<p class="text-[11px] text-blue-400 text-center py-4"><i class="fas fa-spinner fa-spin mr-1"></i>Loading tables from ' + escHtml(conn.database) + '...</p>';
+    fetch('/api/database/connect', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({db_type: 'mysql', ...conn})
+    })
+    .then(r => r.json())
+    .then(d => {
+        if (d.tables) {
+            currentConnectionUrl = d.connection_url;
+            allTables = d.tables;
+            // Update db explorer too
+            const explorerTitle = document.getElementById('explorerTitle');
+            if (explorerTitle) explorerTitle.textContent = `All Tables`;
+            const allTablesCount = document.getElementById('allTablesCount');
+            if (allTablesCount) allTablesCount.textContent = `(${allTables.length} total)`;
+            const dbConnCount = document.getElementById('dbConnCount');
+            if (dbConnCount) dbConnCount.textContent = '1';
+            // Update training tables list
+            tablesList.innerHTML = allTables.map(t => `
+                <label class="flex items-center gap-2 p-1.5 hover:bg-gray-800/50 rounded cursor-pointer">
+                    <input type="checkbox" class="train-tbl-cb rounded border-gray-600 text-blue-500" value="${escHtml(t.name)}" onchange="updateTrainColSelectors()">
+                    <span class="text-xs text-white flex-1 truncate" title="${escHtml(t.name)}">${escHtml(t.name)}</span>
+                    <span class="text-[9px] text-gray-500">${(t.column_count || 0)}${t.columns?.length ? 'c' : 'r'}</span>
+                </label>
+            `).join('');
+            // If on Database tab, refresh it
+            if (typeof renderTables === 'function') {
+                try { renderTables(); } catch(e) { console.error(e); }
+            }
+            showToast(`✅ Connected: ${allTables.length} tables loaded`);
+        } else {
+            tablesList.innerHTML = `<p class="text-[11px] text-red-400 text-center py-4">Failed: ${d.detail || 'Unknown error'}</p>`;
+            showToast('Connection failed', 'error');
+        }
+    })
+    .catch(e => {
+        tablesList.innerHTML = `<p class="text-[11px] text-red-400 text-center py-4">Error: ${e.message}</p>`;
+        showToast('Error: ' + e.message, 'error');
+    });
+}
+
+function updateTrainColSelectors() {
+    const selected = Array.from(document.querySelectorAll('.train-tbl-cb:checked')).map(cb => cb.value);
+    if (!selected.length) return;
+    // Get columns of first selected table
+    const t = allTables.find(t => t.name === selected[0]);
+    if (!t) return;
+    const qSel = document.getElementById('trainQCol');
+    const aSel = document.getElementById('trainACol');
+    const opts = '<option value="auto">Auto-detect</option>' + t.columns.map(c => `<option value="${c.name}">${c.name}</option>`).join('');
+    qSel.innerHTML = opts;
+    aSel.innerHTML = opts;
+}
+
+async function createTrainingJob() {
+    const name = document.getElementById('trainJobName').value.trim();
+    const connVal = document.getElementById('trainConnSelect').value;
+    const tables = Array.from(document.querySelectorAll('.train-tbl-cb:checked')).map(cb => cb.value);
+    const qCol = document.getElementById('trainQCol').value;
+    const aCol = document.getElementById('trainACol').value;
+    const maxRows = parseInt(document.getElementById('trainMaxRows').value) || 500;
+    const model = document.getElementById('trainModel').value;
+
+    if (!name) { showToast('Enter a job name', 'error'); return; }
+    if (!connVal) { showToast('Select a source connection (connect a DB first)', 'error'); return; }
+    if (!tables.length) { showToast('Select at least one table', 'error'); return; }
+
+    // Resolve connection details
+    let conn = null;
+    if (connVal === 'CURRENT') {
+        conn = {
+            host: document.getElementById('dbHost')?.value || '',
+            port: parseInt(document.getElementById('dbPort')?.value) || 3306,
+            database: document.getElementById('dbName')?.value || '',
+            username: document.getElementById('dbUser')?.value || '',
+            password: document.getElementById('dbPass')?.value || '',
+        };
+    } else {
+        const c = getSavedConnections().find(x => x.id === connVal);
+        if (!c) { showToast('Saved connection not found', 'error'); return; }
+        conn = {
+            host: c.host,
+            port: c.port || 3306,
+            database: c.database,
+            username: c.username,
+            password: c.password,
+        };
+    }
+
+    const btn = document.getElementById('trainCreateBtn');
+    btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Creating...';
+
+    try {
+        const resp = await fetch('/api/training/jobs', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                name,
+                db_type: 'mysql',
+                host: conn.host,
+                port: conn.port,
+                database: conn.database,
+                username: conn.username,
+                password: conn.password,
+                tables,
+                question_column: qCol,
+                answer_column: aCol,
+                max_rows: maxRows,
+                model,
+                batch_size: 5,
+                chunk_size: 500,
+            })
+        });
+        const data = await resp.json();
+        if (data.id) {
+            currentJobId = data.id;
+            showToast('Job created: ' + data.name);
+            // Start training
+            const sr = await fetch(`/api/training/jobs/${data.id}/start`, {method: 'POST'});
+            const sd = await sr.json();
+            if (sd.success) {
+                startJobPolling();
+                document.getElementById('trainLogBox').innerHTML = '<p class="text-green-400">[SYSTEM] Training started in background. UI is non-blocking.</p>';
+                appendLog('info', 'Training started for ' + name);
+            }
+            loadTrainingJobs();
+        } else {
+            showToast('Failed to create: ' + (data.error || ''), 'error');
+        }
+    } catch (e) {
+        showToast('Error: ' + e.message, 'error');
+    }
+    btn.disabled = false; btn.innerHTML = '<i class="fas fa-rocket mr-1"></i>Start Training';
+}
+
+function startJobPolling() {
+    if (trainPollInterval) clearInterval(trainPollInterval);
+    trainPollInterval = setInterval(pollActiveJob, 1500);
+    pollActiveJob();
+}
+
+async function pollActiveJob() {
+    if (!currentJobId) return;
+    try {
+        const r = await fetch(`/api/training/jobs/${currentJobId}`);
+        if (!r.ok) return;
+        const d = await r.json();
+        currentJob = d;
+        updateActiveJobUI(d);
+        // Update active card
+        const activeCard = document.getElementById('train-active-card');
+        if (['pending','extracting','analyzing','generating_qa','chunking','training','saving','validating'].includes(d.status)) {
+            activeCard.classList.remove('hidden');
+            document.getElementById('train-create-card').classList.add('hidden');
+        } else {
+            activeCard.classList.add('hidden');
+            document.getElementById('train-create-card').classList.remove('hidden');
+        }
+        // Stop polling if done
+        if (['completed','failed','cancelled'].includes(d.status)) {
+            clearInterval(trainPollInterval);
+            trainPollInterval = null;
+            showToast(d.status === 'completed' ? 'Training complete!' : 'Training ' + d.status);
+            if (d.status === 'completed') {
+                showTestCard(d);
+            }
+            loadTrainingJobs();
+        }
+        renderTrainingStages();
+    } catch (e) {
+        console.error('poll error', e);
+    }
+}
+
+function updateActiveJobUI(d) {
+    document.getElementById('trainActiveName').textContent = d.name;
+    document.getElementById('trainActiveStatus').textContent = d.status.toUpperCase();
+    document.getElementById('trainActiveProgress').textContent = d.progress.toFixed(1) + '%';
+    document.getElementById('trainActiveBar').style.width = d.progress + '%';
+    document.getElementById('trainActiveMessage').textContent = d.message || '';
+    document.getElementById('trainActiveRows').textContent = d.metrics.rows_extracted;
+    document.getElementById('trainActiveQA').textContent = d.metrics.qa_pairs_generated;
+    document.getElementById('trainActiveChunks').textContent = d.metrics.chunks_created;
+    // Loss/Acc in new compact active card
+    const lossEl = document.getElementById('trainActiveLoss');
+    const accEl = document.getElementById('trainActiveAcc');
+    if (lossEl) lossEl.textContent = d.metrics.loss.toFixed(3);
+    if (accEl) accEl.textContent = (d.metrics.accuracy * 100).toFixed(1) + '%';
+    // Charts
+    const lossDisplay = document.getElementById('trainLoss');
+    const accDisplay = document.getElementById('trainAcc');
+    if (lossDisplay) lossDisplay.textContent = d.metrics.loss.toFixed(3);
+    if (accDisplay) accDisplay.textContent = (d.metrics.accuracy * 100).toFixed(1) + '%';
+    document.getElementById('trainThroughput').textContent = d.metrics.throughput_rps.toFixed(1) + ' r/s';
+    document.getElementById('trainEta').textContent = d.metrics.eta_sec > 0 ? Math.round(d.metrics.eta_sec) + 's' : '-';
+    document.getElementById('trainCpu').textContent = d.metrics.cpu_usage.toFixed(0) + '%';
+    document.getElementById('trainMem').textContent = d.metrics.memory_mb.toFixed(0) + ' MB';
+    // Draw loss chart
+    if (d.metrics.loss_curve && d.metrics.loss_curve.length > 0) {
+        drawLossChart(d.metrics.loss_curve, d.metrics.accuracy_curve || []);
+    }
+    // Logs
+    if (d.logs && d.logs.length > 0) {
+        const logBox = document.getElementById('trainLogBox');
+        const last = d.logs[d.logs.length - 1];
+        const newLogKey = last.ts + last.msg;
+        if (logBox.dataset.last !== newLogKey) {
+            logBox.dataset.last = newLogKey;
+            renderLogs(d.logs);
+        }
+    }
+}
+
+function renderLogs(logs) {
+    const box = document.getElementById('trainLogBox');
+    if (!logs.length) { box.innerHTML = '<p class="text-gray-600 text-center">No logs yet</p>'; return; }
+    const recent = logs.slice(-100);
+    const colors = { info: 'text-blue-300', warn: 'text-amber-300', error: 'text-red-300' };
+    box.innerHTML = recent.map(l => {
+        const t = (l.ts || '').split('T')[1] ? (l.ts.split('T')[1].split('.')[0]) : '';
+        return `<div class="${colors[l.level] || 'text-gray-400'}"><span class="text-gray-600">[${t}]</span> <span class="text-${l.level === 'error' ? 'red' : l.level === 'warn' ? 'amber' : 'gray'}-500">[${(l.level||'').toUpperCase()}]</span> <span class="text-cyan-400">[${l.stage||'-'}]</span> ${escHtml(l.msg||'')}</div>`;
+    }).join('');
+    box.scrollTop = box.scrollHeight;
+}
+
+function appendLog(level, msg) {
+    const box = document.getElementById('trainLogBox');
+    if (!box) return;
+    const colors = { info: 'text-blue-300', warn: 'text-amber-300', error: 'text-red-300' };
+    const t = new Date().toISOString().split('T')[1].split('.')[0];
+    const line = document.createElement('div');
+    line.className = colors[level] || 'text-gray-400';
+    line.innerHTML = `<span class="text-gray-600">[${t}]</span> [${level.toUpperCase()}] ${escHtml(msg)}`;
+    box.appendChild(line);
+    box.scrollTop = box.scrollHeight;
+}
+
+function clearTrainingLogs() {
+    document.getElementById('trainLogBox').innerHTML = '<p class="text-gray-600 text-center">Logs cleared</p>';
+}
+
+async function cancelActiveJob() {
+    if (!currentJobId) return;
+    if (!confirm('Cancel this training job?')) return;
+    try {
+        const r = await fetch(`/api/training/jobs/${currentJobId}/cancel`, {method: 'POST'});
+        const d = await r.json();
+        showToast('Job cancelled');
+        if (trainPollInterval) clearInterval(trainPollInterval);
+        loadTrainingJobs();
+    } catch (e) { showToast('Cancel failed', 'error'); }
+}
+
+async function refreshActiveJob() {
+    if (currentJobId) await pollActiveJob();
+}
+
+function drawLossChart(loss, acc) {
+    const canvas = document.getElementById('trainLossChart');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width = canvas.offsetWidth * (window.devicePixelRatio || 1);
+    const H = canvas.height = 120 * (window.devicePixelRatio || 1);
+    ctx.scale(window.devicePixelRatio || 1, window.devicePixelRatio || 1);
+    const w = canvas.offsetWidth, h = 120;
+    ctx.clearRect(0, 0, w, h);
+    // Draw loss
+    if (loss.length > 1) {
+        const max = Math.max(...loss, 1);
+        ctx.strokeStyle = '#f87171';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        loss.forEach((v, i) => {
+            const x = (i / (loss.length - 1)) * w;
+            const y = h - (v / max) * h;
+            if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        });
+        ctx.stroke();
+    }
+    // Draw accuracy
+    if (acc.length > 1) {
+        const max = 1;
+        ctx.strokeStyle = '#34d399';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        acc.forEach((v, i) => {
+            const x = (i / (acc.length - 1)) * w;
+            const y = h - (v / max) * h;
+            if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        });
+        ctx.stroke();
+    }
+    // Legend
+    ctx.font = '10px sans-serif';
+    ctx.fillStyle = '#f87171'; ctx.fillText('— Loss', 4, 12);
+    ctx.fillStyle = '#34d399'; ctx.fillText('— Accuracy', 60, 12);
+    // Axes
+    ctx.strokeStyle = '#334155';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, h - 0.5); ctx.lineTo(w, h - 0.5);
+    ctx.stroke();
+}
+
+async function loadTrainingJobs() {
+    try {
+        const r = await fetch('/api/training/jobs');
+        const d = await r.json();
+        const jobs = d.jobs || [];
+        let running = 0, completed = 0, totalQA = 0, totalKB = 0;
+        jobs.forEach(j => {
+            if (['extracting','analyzing','generating_qa','chunking','training','saving','validating'].includes(j.status)) running++;
+            if (j.status === 'completed') {
+                completed++;
+                if (j.data_source_id) totalKB++;
+            }
+            totalQA += j.metrics?.qa_pairs_generated || 0;
+        });
+        document.getElementById('trainTotalJobs').textContent = jobs.length;
+        document.getElementById('trainRunningJobs').textContent = running;
+        document.getElementById('trainCompletedJobs').textContent = completed;
+        document.getElementById('trainTotalQA').textContent = totalQA;
+        const kbEl = document.getElementById('trainTotalKB');
+        if (kbEl) kbEl.textContent = totalKB;
+        // Store for filtering
+        window._allTrainJobs = jobs;
+        renderTrainingHistory();
+    } catch (e) { console.error('load jobs', e); }
+}
+
+function renderTrainingHistory() {
+    const jobs = window._allTrainJobs || [];
+    const filter = document.getElementById('trainHistoryFilter')?.value || 'all';
+    const filtered = filter === 'all' ? jobs : jobs.filter(j => {
+        if (filter === 'running') return ['extracting','analyzing','generating_qa','chunking','training','saving','validating','pending'].includes(j.status);
+        return j.status === filter;
+    });
+    document.getElementById('trainHistoryCount').textContent = `(${jobs.length})`;
+    const list = document.getElementById('trainJobsList');
+    if (!filtered.length) {
+        list.innerHTML = `<div class="text-center py-8 text-gray-500 text-sm">${jobs.length ? 'No jobs match this filter' : 'No training jobs yet. Create one to get started!'}</div>`;
+        return;
+    }
+    const statusColors = {
+        pending: 'gray', extracting: 'blue', analyzing: 'blue', generating_qa: 'purple',
+        chunking: 'purple', training: 'amber', saving: 'cyan', validating: 'cyan',
+        completed: 'green', failed: 'red', cancelled: 'gray'
+    };
+    const stageNames = {
+        extracting: 'Extract', analyzing: 'Analyze', generating_qa: 'Q&A Pairs',
+        chunking: 'Chunk', training: 'Train', saving: 'Save', validating: 'Validate'
+    };
+    const stageIcons = {
+        extracting: 'fa-database', analyzing: 'fa-search', generating_qa: 'fa-comments',
+        chunking: 'fa-puzzle-piece', training: 'fa-cogs', saving: 'fa-save', validating: 'fa-check-double'
+    };
+    list.innerHTML = filtered.map(j => {
+        const c = statusColors[j.status] || 'gray';
+        const cfg = j.config || {};
+        const isRunning = ['extracting','analyzing','generating_qa','chunking','training','saving','validating','pending'].includes(j.status);
+        const isCompleted = j.status === 'completed';
+        const isFailed = j.status === 'failed';
+        const testResults = j.test_results_count || 0;
+        const corrections = j.corrections_count || 0;
+        const feedbackStats = (() => {
+            // We don't have detailed feedback in list view, but show counts
+            return '';
+        })();
+        // Build stage indicators
+        const stages = ['extracting','analyzing','generating_qa','chunking','training','saving','validating'];
+        const curStageIdx = j.stage_idx || 0;
+        const stageHtml = stages.map((s, i) => {
+            let sc = 'bg-gray-800/50 border-gray-700/40 text-gray-500';
+            let icon = stageIcons[s];
+            let status = '';
+            if (i < curStageIdx) { sc = 'bg-green-900/30 border-green-600/40 text-green-400'; status = '<i class="fas fa-check text-[8px]"></i>'; }
+            else if (i === curStageIdx) {
+                if (isRunning) { sc = 'bg-blue-600/30 border-blue-500 text-blue-300 ring-1 ring-blue-400/40'; status = '<i class="fas fa-spinner fa-spin text-[8px]"></i>'; }
+                else if (isCompleted) { sc = 'bg-green-900/30 border-green-600/40 text-green-400'; status = '<i class="fas fa-check text-[8px]"></i>'; }
+            }
+            return `<div class="flex flex-col items-center gap-0.5" title="${stageNames[s]}">
+                <div class="w-6 h-6 rounded ${sc} border flex items-center justify-center text-[10px]">
+                    <i class="fas ${icon}"></i>
+                </div>
+                <span class="text-[8px] text-gray-500 leading-none">${stageNames[s]}</span>
+            </div>`;
+        }).join('<div class="flex-1 h-0.5 bg-gray-700/50 self-center" style="margin-top:-12px"></div>');
+        return `<div class="p-4 bg-gray-800/40 border border-${c}-500/30 rounded-xl hover:border-${c}-500/60 transition">
+            <!-- Header -->
+            <div class="flex items-start justify-between gap-2 mb-3">
+                <div class="flex items-start gap-2 flex-1 min-w-0">
+                    <div class="w-9 h-9 rounded-lg bg-${c}-600/20 flex items-center justify-center flex-shrink-0">
+                        ${isRunning ? '<i class="fas fa-cogs fa-spin text-' + c + '-400 text-sm"></i>' :
+                          isCompleted ? '<i class="fas fa-robot text-green-400 text-sm"></i>' :
+                          isFailed ? '<i class="fas fa-exclamation-triangle text-red-400 text-sm"></i>' :
+                          '<i class="fas fa-brain text-gray-400 text-sm"></i>'}
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm text-white font-semibold truncate">${escHtml(j.name)}</p>
+                        <p class="text-[10px] text-gray-500">${new Date(j.created_at).toLocaleString()}${j.finished_at ? ' → ' + Math.round((new Date(j.finished_at) - new Date(j.created_at))/1000) + 's' : ''}</p>
+                    </div>
+                </div>
+                <div class="flex flex-col items-end gap-1">
+                    <span class="text-[9px] px-2 py-0.5 bg-${c}-900/40 text-${c}-300 rounded-full font-semibold uppercase border border-${c}-500/30">${j.status}</span>
+                    <span class="text-[10px] text-${c}-300 font-mono">${(j.progress||0).toFixed(0)}%</span>
+                </div>
+            </div>
+
+            <!-- Stage progress -->
+            <div class="mb-3 px-1 overflow-x-auto">
+                <div class="flex items-center justify-between min-w-fit">
+                    ${stageHtml}
+                </div>
+            </div>
+
+            <!-- Progress bar (for running jobs) -->
+            ${isRunning ? `<div class="mb-3">
+                <div class="w-full bg-gray-700 rounded-full h-1.5">
+                    <div class="bg-gradient-to-r from-blue-500 to-cyan-500 h-1.5 rounded-full transition-all" style="width:${j.progress||0}%"></div>
+                </div>
+                <p class="text-[10px] text-gray-500 mt-1 text-center">${escHtml(j.message || 'Running...')}</p>
+            </div>` : ''}
+
+            <!-- Info grid -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-center mb-3">
+                <div class="bg-gray-900/40 rounded p-1.5">
+                    <p class="text-[10px] text-gray-500">Source</p>
+                    <p class="text-xs text-white truncate" title="${escHtml(cfg.host||'')}/${escHtml(cfg.database||'')}">${escHtml(cfg.host||'')}/${escHtml(cfg.database||'')}</p>
+                </div>
+                <div class="bg-gray-900/40 rounded p-1.5">
+                    <p class="text-[10px] text-gray-500">Model</p>
+                    <p class="text-xs text-cyan-300 truncate" title="${escHtml(cfg.model||'')}">${escHtml(cfg.model || 'qwen2.5:0.5b')}</p>
+                </div>
+                <div class="bg-gray-900/40 rounded p-1.5">
+                    <p class="text-[10px] text-gray-500">Q&A Pairs</p>
+                    <p class="text-xs text-purple-300 font-bold">${j.metrics?.qa_pairs_generated||0}</p>
+                </div>
+                <div class="bg-gray-900/40 rounded p-1.5">
+                    <p class="text-[10px] text-gray-500">Accuracy</p>
+                    <p class="text-xs text-green-300 font-bold">${((j.metrics?.accuracy||0)*100).toFixed(1)}%</p>
+                </div>
+            </div>
+
+            <!-- Model + Knowledge Base info (for completed) -->
+            ${isCompleted ? `<div class="grid grid-cols-1 md:grid-cols-2 gap-2 mb-3">
+                <div class="bg-green-900/20 border border-green-700/30 rounded-lg p-2.5">
+                    <div class="flex items-center gap-1.5 mb-1">
+                        <i class="fas fa-robot text-green-400 text-xs"></i>
+                        <span class="text-[10px] text-green-300 font-semibold uppercase">Trained Model</span>
+                    </div>
+                    <p class="text-xs text-white font-mono">${escHtml(cfg.model || 'qwen2.5:0.5b')}</p>
+                    <p class="text-[10px] text-gray-500">Loss: ${(j.metrics?.loss||0).toFixed(3)} • Chunks: ${j.metrics?.chunks_created||0}</p>
+                </div>
+                <div class="bg-cyan-900/20 border border-cyan-700/30 rounded-lg p-2.5">
+                    <div class="flex items-center gap-1.5 mb-1">
+                        <i class="fas fa-brain text-cyan-400 text-xs"></i>
+                        <span class="text-[10px] text-cyan-300 font-semibold uppercase">Knowledge Base</span>
+                    </div>
+                    <p class="text-xs text-white font-mono">${j.data_source_id ? 'src-' + j.data_source_id.substring(0,12) + '...' : 'pending'}</p>
+                    <p class="text-[10px] text-gray-500">${j.data_source_id ? 'Saved to MySQL' : 'Not created'}</p>
+                </div>
+            </div>` : ''}
+
+            <!-- Tables trained on -->
+            <div class="mb-3">
+                <p class="text-[10px] text-gray-500 mb-1">Tables:</p>
+                <div class="flex flex-wrap gap-1">
+                    ${(cfg.tables||[]).map(t => `<span class="text-[9px] px-1.5 py-0.5 bg-blue-900/30 text-blue-300 rounded border border-blue-700/30">${escHtml(t)}</span>`).join('')}
+                </div>
+            </div>
+
+            <!-- Test results summary (for completed jobs) -->
+            ${isCompleted && testResults > 0 ? `<div class="mb-3 p-2 bg-gray-900/40 rounded-lg">
+                <p class="text-[10px] text-gray-500 mb-1.5"><i class="fas fa-vial mr-1"></i>Test Results: <span class="text-white">${testResults}</span> total${corrections > 0 ? ` • <span class="text-amber-300">${corrections} corrections</span>` : ''}</p>
+            </div>` : ''}
+
+            <!-- Actions -->
+            <div class="flex items-center gap-1 pt-2 border-t border-gray-700/30">
+                ${isCompleted ? `<button onclick="viewJob('${j.id}')" class="flex-1 text-[10px] px-2 py-1.5 bg-cyan-600/20 hover:bg-cyan-600/40 text-cyan-300 rounded transition border border-cyan-600/30"><i class="fas fa-vial mr-1"></i>Test</button>` : ''}
+                ${isRunning ? `<button onclick="setActiveJob('${j.id}')" class="flex-1 text-[10px] px-2 py-1.5 bg-blue-600/20 hover:bg-blue-600/40 text-blue-300 rounded transition border border-blue-600/30"><i class="fas fa-eye mr-1"></i>Watch</button>` : ''}
+                ${isCompleted && corrections > 0 ? `<button onclick="retrainJobById('${j.id}')" class="flex-1 text-[10px] px-2 py-1.5 bg-amber-600/20 hover:bg-amber-600/40 text-amber-300 rounded transition border border-amber-600/30"><i class="fas fa-redo mr-1"></i>Retrain</button>` : ''}
+                <button onclick="deleteJob('${j.id}')" class="text-[10px] px-2 py-1.5 bg-red-600/20 hover:bg-red-600/40 text-red-300 rounded transition border border-red-600/30"><i class="fas fa-trash"></i></button>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function setActiveJob(id) {
+    currentJobId = id;
+    startJobPolling();
+    showToast('Watching job');
+}
+
+async function deleteJob(id) {
+    if (!confirm('Delete this job?')) return;
+    try {
+        await fetch(`/api/training/jobs/${id}`, {method:'DELETE'});
+        showToast('Deleted');
+        loadTrainingJobs();
+    } catch (e) { showToast('Delete failed', 'error'); }
+}
+
+async function viewJob(id) {
+    currentJobId = id;
+    try {
+        const r = await fetch(`/api/training/jobs/${id}`);
+        const d = await r.json();
+        currentJob = d;
+        if (d.status === 'completed') {
+            showTestCard(d);
+        } else {
+            showToast('Job is ' + d.status);
+        }
+    } catch (e) { showToast('Failed to load job', 'error'); }
+}
+
+function showTestCard(d) {
+    const card = document.getElementById('train-test-card');
+    card.classList.remove('hidden');
+    document.getElementById('trainQACount').textContent = (d.qa_pairs?.length || 0) + ' pairs';
+    // Render Q&A
+    const list = document.getElementById('trainQAList');
+    if (d.qa_pairs && d.qa_pairs.length) {
+        list.innerHTML = d.qa_pairs.slice(0, 30).map((qa, i) => `
+            <div class="p-2 bg-gray-900/60 rounded-lg border border-gray-700/30">
+                <div class="flex items-start gap-2">
+                    <span class="text-[10px] text-blue-400 font-mono w-4">${i+1}</span>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-xs text-white"><span class="text-blue-400 font-semibold">Q:</span> ${escHtml(qa.q)}</p>
+                        <p class="text-xs text-gray-300 mt-0.5"><span class="text-green-400 font-semibold">A:</span> ${escHtml(qa.a.slice(0,200))}${qa.a.length>200?'...':''}</p>
+                    </div>
+                    <span class="text-[9px] text-gray-600">${qa.source||''}</span>
+                </div>
+            </div>
+        `).join('');
+    } else {
+        list.innerHTML = '<p class="text-xs text-gray-500 text-center py-4">No Q&A pairs</p>';
+    }
+    // Show feedback section if there are any
+    if (d.test_results && d.test_results.filter(t => !t.auto).length) {
+        showFeedbackSection(d);
+    }
+    card.scrollIntoView({behavior: 'smooth'});
+}
+
+function showFeedbackSection(d) {
+    const sec = document.getElementById('trainFeedbackSection');
+    sec.style.display = 'block';
+    const fb = d.test_results ? d.test_results.filter(t => !t.auto) : [];
+    document.getElementById('trainFeedbackCount').textContent = fb.length;
+    document.getElementById('trainCorrectionsCount').textContent = (d.corrections||[]).length;
+    const list = document.getElementById('trainFeedbackList');
+    list.innerHTML = fb.map((t, i) => {
+        const ok = t.is_correct;
+        return `<div class="p-2 rounded-lg border ${ok ? 'border-green-600/30 bg-green-900/10' : 'border-red-600/30 bg-red-900/10'}">
+            <div class="flex items-start gap-2">
+                <i class="fas ${ok ? 'fa-check-circle text-green-400' : 'fa-times-circle text-red-400'} mt-0.5"></i>
+                <div class="flex-1 min-w-0">
+                    <p class="text-xs text-white truncate"><strong>Q:</strong> ${escHtml(t.question)}</p>
+                    <p class="text-[10px] text-gray-400 truncate"><strong>Got:</strong> ${escHtml((t.got||'').slice(0,80))}</p>
+                    ${!ok && t.correction ? `<p class="text-[10px] text-amber-300 truncate"><strong>Fix:</strong> ${escHtml(t.correction)}</p>` : ''}
+                </div>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+async function testTrainedModel() {
+    if (!currentJobId) { showToast('No active job', 'error'); return; }
+    const q = document.getElementById('trainTestQ').value.trim();
+    if (!q) return;
+    try {
+        const r = await fetch(`/api/training/jobs/${currentJobId}/test`, {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({question: q})
+        });
+        const d = await r.json();
+        const resultDiv = document.getElementById('trainTestResult');
+        resultDiv.classList.remove('hidden');
+        if (d.error) {
+            resultDiv.innerHTML = `<div class="p-3 bg-red-900/20 border border-red-700/50 rounded-lg text-red-300 text-sm"><i class="fas fa-exclamation-circle mr-1"></i>${d.error}</div>`;
+            return;
+        }
+        const conf = (d.confidence || 0) * 100;
+        const confColor = conf > 60 ? 'green' : conf > 30 ? 'amber' : 'red';
+        const isCorrect = d.success;
+        resultDiv.innerHTML = `
+            <div class="p-4 bg-gray-900/60 border border-gray-700/50 rounded-lg space-y-3">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs text-gray-400">Confidence</span>
+                    <span class="text-xs font-semibold text-${confColor}-400">${conf.toFixed(1)}%</span>
+                </div>
+                <div class="w-full bg-gray-700 rounded-full h-1.5"><div class="bg-${confColor}-500 h-1.5 rounded-full" style="width:${conf}%"></div></div>
+                ${d.matched_q ? `<p class="text-[10px] text-gray-500">Matched: "${escHtml(d.matched_q.slice(0,100))}"</p>` : ''}
+                <div class="p-3 bg-gray-800/50 rounded-lg border border-gray-700/30">
+                    <p class="text-xs text-gray-400 mb-1">Model Answer</p>
+                    <p class="text-sm text-white">${escHtml(d.answer)}</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="text-xs text-gray-400 mr-2">Was this correct?</span>
+                    <button onclick="submitFeedback(true)" class="flex-1 bg-green-600/20 hover:bg-green-600/40 text-green-300 py-1.5 rounded text-xs font-medium border border-green-600/30">
+                        <i class="fas fa-check mr-1"></i>Right
+                    </button>
+                    <button onclick="submitFeedback(false)" class="flex-1 bg-red-600/20 hover:bg-red-600/40 text-red-300 py-1.5 rounded text-xs font-medium border border-red-600/30">
+                        <i class="fas fa-times mr-1"></i>Wrong
+                    </button>
+                </div>
+                <div id="trainCorrectionBox" class="hidden">
+                    <label class="text-xs text-gray-400 block mb-1">Correct answer (will be used for retraining):</label>
+                    <textarea id="trainCorrectionText" class="input-field text-sm" rows="2" placeholder="Type the correct answer here..."></textarea>
+                    <button onclick="submitWrongWithFix()" class="mt-2 w-full bg-amber-600/20 hover:bg-amber-600/40 text-amber-300 py-1.5 rounded text-xs font-medium border border-amber-600/30">
+                        <i class="fas fa-save mr-1"></i>Save Correction
+                    </button>
+                </div>
+            </div>`;
+    } catch (e) { showToast('Test failed: ' + e.message, 'error'); }
+}
+
+let lastTestQuestion = '';
+let lastTestGot = '';
+
+async function submitFeedback(isCorrect) {
+    if (!currentJobId) return;
+    lastTestQuestion = document.getElementById('trainTestQ').value;
+    const resultDiv = document.getElementById('trainTestResult');
+    const got = resultDiv.querySelector('p.text-sm')?.textContent || '';
+    lastTestGot = got;
+    if (isCorrect) {
+        try {
+            await fetch(`/api/training/jobs/${currentJobId}/feedback`, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({question: lastTestQuestion, expected: got, got, is_correct: true})
+            });
+            showToast('✅ Marked as Right');
+            // Refresh job data to update feedback list
+            viewJob(currentJobId);
+        } catch (e) { showToast('Failed: ' + e.message, 'error'); }
+    } else {
+        document.getElementById('trainCorrectionBox').classList.remove('hidden');
+    }
+}
+
+async function submitWrongWithFix() {
+    if (!currentJobId) return;
+    const correction = document.getElementById('trainCorrectionText').value.trim();
+    if (!correction) { showToast('Please enter the correct answer', 'error'); return; }
+    try {
+        await fetch(`/api/training/jobs/${currentJobId}/feedback`, {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({question: lastTestQuestion, expected: correction, got: lastTestGot, is_correct: false, correction})
+        });
+        showToast('❌ Saved correction. Click Retrain to apply.');
+        document.getElementById('trainCorrectionBox').classList.add('hidden');
+        viewJob(currentJobId);
+    } catch (e) { showToast('Failed: ' + e.message, 'error'); }
+}
+
+async function retrainWithFeedback() {
+    if (!currentJobId) return;
+    if (!confirm('Retrain with all corrections? This will run the full pipeline again.')) return;
+    try {
+        const r = await fetch(`/api/training/jobs/${currentJobId}/retrain`, {method:'POST'});
+        const d = await r.json();
+        if (d.success) {
+            showToast('Retraining started with corrections');
+            startJobPolling();
+            document.getElementById('trainLogBox').innerHTML = '<p class="text-amber-400">[SYSTEM] Retraining with ' + d.corrections + ' corrections...</p>';
+        } else {
+            showToast(d.message || 'Retrain failed');
+        }
+    } catch (e) { showToast('Error: ' + e.message, 'error'); }
+}
+
+async function retrainJobById(id) {
+    if (!id) return;
+    if (!confirm('Retrain this job with its corrections?')) return;
+    try {
+        const r = await fetch(`/api/training/jobs/${id}/retrain`, {method:'POST'});
+        const d = await r.json();
+        if (d.success) {
+            showToast('Retraining started');
+            currentJobId = id;
+            startJobPolling();
+            document.getElementById('trainLogBox').innerHTML = '<p class="text-amber-400">[SYSTEM] Retraining job...</p>';
+        } else {
+            showToast(d.message || 'Retrain failed');
+        }
+    } catch (e) { showToast('Error: ' + e.message, 'error'); }
+}
+
+function openDbConnectFromTraining() {
+    // Switch to database tab so user can add a new connection
+    showDataTab('database');
+    // Highlight the connection form
+    setTimeout(() => {
+        const form = document.getElementById('dbHost');
+        if (form) {
+            form.scrollIntoView({behavior: 'smooth', block: 'center'});
+            form.focus();
+        }
+    }, 200);
+    showToast('Add a database connection, then come back to Training tab');
+}
+
+// ============= Saved Connections (localStorage) =============
+function getSavedConnections() {
+    try {
+        return JSON.parse(localStorage.getItem(SAVED_CONN_KEY) || '[]');
+    } catch (e) {
+        return [];
+    }
+}
+
+function persistSavedConnections(list) {
+    try {
+        localStorage.setItem(SAVED_CONN_KEY, JSON.stringify(list));
+    } catch (e) {
+        console.error('Failed to save connection:', e);
+    }
+}
+
+function saveConnection() {
+    const data = getConnectionData();
+    if (data.db_type === 'sqlite') {
+        if (!data.file_path) { showToast('Provide a file path first', 'error'); return; }
+    } else {
+        if (!data.host || !data.database || !data.username) {
+            showToast('Fill in host, database, and username first', 'error');
+            return;
+        }
+    }
+    const name = prompt('Name this connection (e.g. "Local ERP"):', `${data.db_type}-${data.host || ''}-${data.database || ''}`);
+    if (!name) return;
+    const list = getSavedConnections();
+    const id = 'conn-' + Date.now();
+    list.push({ id, name, db_type: data.db_type, host: data.host, port: data.port, database: data.database, username: data.username, password: data.password, file_path: data.file_path, created_at: new Date().toISOString() });
+    persistSavedConnections(list);
+    renderSavedConnections();
+    showToast('Connection saved: ' + name);
+}
+
+function renderSavedConnections() {
+    const list = getSavedConnections();
+    const container = document.getElementById('savedConnectionsList');
+    document.getElementById('savedConnCount').textContent = list.length;
+    if (list.length === 0) {
+        container.innerHTML = '<p class="text-[11px] text-gray-600 text-center py-3">No saved connections yet</p>';
+        return;
+    }
+    container.innerHTML = list.map(c => {
+        const typeIcon = { mysql: 'fab fa-php text-blue-400', postgresql: 'fas fa-elephant text-indigo-400', mssql: 'fas fa-server text-red-400', oracle: 'fas fa-database text-amber-400', sqlite: 'fas fa-file-code text-green-400' }[c.db_type] || 'fas fa-plug text-gray-400';
+        const summary = c.db_type === 'sqlite' ? (c.file_path || '') : `${c.host || ''}:${c.port || ''}/${c.database || ''}`;
+        return `<div class="flex items-center gap-2 p-2 bg-gray-800/40 rounded-lg border border-gray-700/50 hover:border-amber-500/30 transition group">
+            <i class="${typeIcon} text-sm"></i>
+            <div class="flex-1 min-w-0">
+                <p class="text-xs text-white font-medium truncate">${escapeHtml(c.name)}</p>
+                <p class="text-[10px] text-gray-500 truncate">${escapeHtml(summary)}</p>
+            </div>
+            <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition">
+                <button onclick="loadSavedConnection('${c.id}')" title="Load" class="text-[10px] px-1.5 py-0.5 bg-blue-600/30 hover:bg-blue-600/50 text-blue-300 rounded"><i class="fas fa-arrow-up"></i></button>
+                <button onclick="deleteSavedConnection('${c.id}')" title="Delete" class="text-[10px] px-1.5 py-0.5 bg-red-600/30 hover:bg-red-600/50 text-red-300 rounded"><i class="fas fa-trash"></i></button>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function populateTrainingConnSelect() {
+    const sel = document.getElementById('trainConnSelect');
+    if (!sel) return;
+    // Build list from saved connections
+    const saved = getSavedConnections();
+    // Add currently active connection (from form fields)
+    const formConn = {
+        host: document.getElementById('dbHost')?.value || '',
+        port: document.getElementById('dbPort')?.value || '',
+        database: document.getElementById('dbName')?.value || '',
+        username: document.getElementById('dbUser')?.value || '',
+        password: document.getElementById('dbPass')?.value || '',
+    };
+    let html = '';
+    if (formConn.host && formConn.database) {
+        html += `<option value='CURRENT'>📡 Current: ${formConn.host}:${formConn.port||3306}/${formConn.database}</option>`;
+    }
+    if (saved.length) {
+        html += '<optgroup label="── Saved Connections ──">';
+        saved.forEach(c => {
+            if (c.db_type === 'sqlite') return;
+            html += `<option value='${escHtml(c.id)}'>📁 ${escHtml(c.name)} (${escHtml(c.host)}:${c.port||3306}/${escHtml(c.database)})</option>`;
+        });
+        html += '</optgroup>';
+    }
+    if (!html) {
+        html = '<option value="">-- Connect & save a connection first --</option>';
+    } else {
+        html = '<option value="">-- Select a connection --</option>' + html;
+    }
+    sel.innerHTML = html;
+}
+
+function loadSavedConnection(id) {
+    const c = getSavedConnections().find(x => x.id === id);
+    if (!c) return;
+    selectDbType(c.db_type);
+    if (c.db_type === 'sqlite') {
+        document.getElementById('dbFilePath').value = c.file_path || '';
+    } else {
+        document.getElementById('dbHost').value = c.host || '';
+        document.getElementById('dbPort').value = c.port || '';
+        document.getElementById('dbName').value = c.database || '';
+        document.getElementById('dbUser').value = c.username || '';
+        document.getElementById('dbPass').value = c.password || '';
+    }
+    showToast('Loaded: ' + c.name);
+}
+
+function deleteSavedConnection(id) {
+    if (!confirm('Delete this saved connection?')) return;
+    const list = getSavedConnections().filter(x => x.id !== id);
+    persistSavedConnections(list);
+    renderSavedConnections();
+    showToast('Connection deleted');
+}
+
+function escapeHtml(t) {
+    const d = document.createElement('div');
+    d.textContent = t == null ? '' : String(t);
+    return d.innerHTML;
+}
+const escHtml = escapeHtml; // Alias for compatibility
 </script>
 {% endblock %}

@@ -765,13 +765,14 @@ LIMIT 100;</textarea>
 let totalRuns = 0, totalSuccess = 0, totalLatency = 0;
 let algoArray = [], algoOriginal = [], algoStepCount = 0, algoComparisons = 0, algoSwaps = 0;
 let algoStepsHistory = [], algoRunning = false, algoTimer = null;
+let algoOps = null, algoOpsIdx = 0;
 let dfdElements = [];
 let dfdDrag = null;
 let quizCorrect = 0, quizTotal = 0;
 let examQuestions = [], examAnswers = {}, examTimer = null;
 
-const AI_MODEL = 'qwen2.5-coder:1.5b';
 let currentAIModel = 'qwen2.5-coder:1.5b';
+const AI_MODEL = () => currentAIModel;
 
 function changeAIModel() {
     currentAIModel = document.getElementById('aiModelSelect').value;
@@ -852,8 +853,8 @@ function shareCode() {
     const lang = document.getElementById('codeLang').value;
     if (!code.trim()) { showToast('Nothing to share!', 'error'); return; }
     const encoded = btoa(unescape(encodeURIComponent(code)));
-    const url = window.location.origin + window.location.pathname + '?lang=' + lang + '&code=' + encoded.substring(0, 200);
-    navigator.clipboard.writeText(url).then(() => showToast('Share link copied to clipboard!', 'success')).catch(() => showToast('Copy the URL from the address bar', 'error'));
+    const url = window.location.origin + window.location.pathname + '?lang=' + lang + '#code=' + encoded;
+    navigator.clipboard.writeText(url).then(() => showToast('Share link copied to clipboard!', 'success')).catch(() => { window.prompt('Copy this share link:', url); });
 }
 
 async function runCode() {
@@ -870,10 +871,12 @@ async function runCode() {
         totalRuns++; if (data.success) totalSuccess++; totalLatency += data.latency_ms || 0;
         if (data.success) {
             out.innerHTML = `<span class="success">✓ Executed (${data.latency_ms}ms)</span>\n\n` + (data.stdout ? `<span class="stdout">${esc(data.stdout)}</span>` : '<span class="text-gray-500">(no output)</span>');
+        } else if (data.error) {
+            out.innerHTML = `<span class="error">✗ ${esc(data.error)}</span>` + (data.stderr ? `\n\n<span class="stderr">${esc(data.stderr)}</span>` : '');
         } else {
             out.innerHTML = `<span class="error">✗ Exit: ${data.exit_code}</span>\n\n` + (data.stdout ? `<span class="stdout">${esc(data.stdout)}</span>\n` : '') + (data.stderr ? `<span class="stderr">${esc(data.stderr)}</span>` : '');
         }
-        document.getElementById('codeLatency').textContent = data.latency_ms + 'ms';
+        document.getElementById('codeLatency').textContent = (data.latency_ms || 0) + 'ms';
         document.getElementById('totalRuns').textContent = totalRuns;
         document.getElementById('totalSuccess').textContent = totalSuccess;
         document.getElementById('avgLatency').textContent = Math.round(totalLatency / totalRuns) + 'ms';
@@ -948,11 +951,74 @@ const ALGO_CODES = {
     ]
 };
 
+// Precompute step-by-step operations for algorithms that are hard to step interactively
+function buildAlgoOps(sel) {
+    const ops = [];
+    const a = [...algoArray];
+    if (sel === 'merge') {
+        const msort = (lo, hi) => {
+            if (hi - lo <= 1) return;
+            const mid = (lo + hi) >> 1;
+            msort(lo, mid); msort(mid, hi);
+            const left = a.slice(lo, mid), right = a.slice(mid, hi);
+            let i = 0, j = 0, k = lo;
+            ops.push({ t: 'msg', msg: `Merge [${lo}..${mid-1}] + [${mid}..${hi-1}]`, i: lo, j: hi - 1, line: 5 });
+            while (i < left.length && j < right.length) {
+                ops.push({ t: 'cmp', i: lo + i, j: mid + j, msg: `Compare ${left[i]} vs ${right[j]}`, line: 5 });
+                if (left[i] <= right[j]) { a[k] = left[i]; ops.push({ t: 'set', i: k, v: left[i], msg: `Place ${left[i]} at index ${k}`, line: 5 }); i++; }
+                else { a[k] = right[j]; ops.push({ t: 'set', i: k, v: right[j], msg: `Place ${right[j]} at index ${k}`, line: 5 }); j++; }
+                k++;
+            }
+            while (i < left.length) { a[k] = left[i]; ops.push({ t: 'set', i: k, v: left[i], msg: `Copy remaining ${left[i]}`, line: 5 }); i++; k++; }
+            while (j < right.length) { a[k] = right[j]; ops.push({ t: 'set', i: k, v: right[j], msg: `Copy remaining ${right[j]}`, line: 5 }); j++; k++; }
+        };
+        msort(0, a.length);
+    } else if (sel === 'quick') {
+        const qs = (lo, hi) => {
+            if (lo >= hi) return;
+            const pivot = a[hi];
+            ops.push({ t: 'msg', msg: `Partition [${lo}..${hi}], pivot=${pivot}`, i: hi, pivot: hi, line: 2 });
+            let i = lo;
+            for (let j = lo; j < hi; j++) {
+                ops.push({ t: 'cmp', i: j, j: hi, pivot: hi, msg: `Compare ${a[j]} with pivot ${pivot}`, line: 2 });
+                if (a[j] < pivot) {
+                    [a[i], a[j]] = [a[j], a[i]];
+                    if (i !== j) ops.push({ t: 'swap', i, j, msg: `Swap ${a[j]} and ${a[i]}`, line: 3 });
+                    i++;
+                }
+            }
+            [a[i], a[hi]] = [a[hi], a[i]];
+            ops.push({ t: 'swap', i, j: hi, pivot: i, msg: `Pivot ${a[i]} settled at index ${i}`, line: 3 });
+            qs(lo, i - 1); qs(i + 1, hi);
+        };
+        qs(0, a.length - 1);
+    } else if (sel === 'binary') {
+        a.sort((x, y) => x - y);
+        const target = a[Math.floor(a.length / 2)];
+        ops.push({ t: 'msg', msg: `Array sorted. Target = ${target} (middle element)`, line: 0 });
+        let lo = 0, hi = a.length - 1;
+        while (lo <= hi) {
+            const mid = (lo + hi) >> 1;
+            ops.push({ t: 'cmp', i: mid, msg: `mid=${mid} → value ${a[mid]} (low=${lo}, high=${hi})`, line: 3 });
+            if (a[mid] === target) { ops.push({ t: 'done', i: mid, msg: `Found ${target} at index ${mid}!`, line: 3 }); break; }
+            else if (a[mid] < target) { ops.push({ t: 'msg', msg: `${a[mid]} < ${target} → search right half`, line: 4 }); lo = mid + 1; }
+            else { ops.push({ t: 'msg', msg: `${a[mid]} > ${target} → search left half`, line: 5 }); hi = mid - 1; }
+        }
+        if (lo > hi) ops.push({ t: 'done', msg: 'Target not found', line: 3 });
+    }
+    return ops;
+}
+
 function initAlgo() {
     algoStepCount = 0; algoComparisons = 0; algoSwaps = 0; algoStepsHistory = []; algoRunning = false;
+    algoOps = null; algoOpsIdx = 0;
     if (algoTimer) clearInterval(algoTimer);
     generateData('random');
     const sel = document.getElementById('algoSelect').value;
+    if (['merge', 'quick', 'binary'].includes(sel)) {
+        algoOps = buildAlgoOps(sel);
+        if (sel === 'binary') { algoArray.sort((a, b) => a - b); }
+    }
     const info = ALGO_INFO[sel] || ALGO_INFO.bubble;
     document.getElementById('algoInfo').innerHTML = `<p><strong class="text-white">${info.name}</strong></p><p>${info.desc}</p><div class="mt-3 space-y-1 text-xs"><p>Time: <span class="text-amber-400">${info.time}</span></p><p>Space: <span class="text-green-400">${info.space}</span></p><p>Stable: <span class="text-green-400">${info.stable}</span></p></div>`;
     document.getElementById('algoComparisons').innerHTML = '<i class="fas fa-exchange-alt mr-1"></i>Comparisons: 0';
@@ -974,6 +1040,7 @@ function generateData(type) {
     if (type === 'nearly') { algoArray.sort((a, b) => a - b); for (let i = 0; i < 3; i++) { const j = Math.floor(Math.random() * n); const k = Math.floor(Math.random() * n); [algoArray[j], algoArray[k]] = [algoArray[k], algoArray[j]]; } }
     algoOriginal = [...algoArray];
     algoStepCount = 0; algoComparisons = 0; algoSwaps = 0; algoStepsHistory = [];
+    algoOps = null; algoOpsIdx = 0;
     document.getElementById('algoArray').textContent = algoArray.join(', ');
     document.getElementById('algoStepLog').innerHTML = '<p class="text-xs">No steps yet</p>';
     renderBars();
@@ -1037,6 +1104,40 @@ function addStepLog(msg, color) {
 
 function stepAlgo() {
     const sel = document.getElementById('algoSelect').value;
+
+    // Algorithms with precomputed operation queues (merge, quick, binary)
+    if (algoOps) {
+        if (algoOpsIdx >= algoOps.length) {
+            document.getElementById('algoStatus').textContent = 'Done!';
+            renderBars({ sorted: algoArray.map((_, i) => i) });
+            renderAlgoCode(-1);
+            return;
+        }
+        const op = algoOps[algoOpsIdx++];
+        algoStepCount++;
+        if (op.t === 'cmp') algoComparisons++;
+        if (op.t === 'swap') { algoSwaps++; [algoArray[op.i], algoArray[op.j]] = [algoArray[op.j], algoArray[op.i]]; }
+        if (op.t === 'set') { algoSwaps++; algoArray[op.i] = op.v; }
+        const color = op.t === 'swap' || op.t === 'set' ? '#f59e0b' : op.t === 'done' ? '#10b981' : '#3b82f6';
+        addStepLog(op.msg || 'Step ' + algoStepCount, color);
+        updateLiveData(op.msg || '', { 'op': op.t, 'i': op.i ?? '-', 'j': op.j ?? '-' });
+        const hl = {};
+        if (op.i !== undefined && op.t !== 'done') hl.comparing = [op.i, ...(op.j !== undefined && op.j !== op.i ? [op.j] : [])];
+        if (op.pivot !== undefined) hl.pivot = op.pivot;
+        if (op.t === 'done') hl.sorted = [op.i ?? 0];
+        renderBars(hl);
+        renderAlgoCode(op.line ?? -1);
+        document.getElementById('algoComparisons').innerHTML = `<i class="fas fa-exchange-alt mr-1"></i>Comparisons: ${algoComparisons}`;
+        document.getElementById('algoSwaps').innerHTML = `<i class="fas fa-arrows-alt-h mr-1"></i>Swaps/Writes: ${algoSwaps}`;
+        document.getElementById('algoStatus').textContent = `Step ${algoStepCount}/${algoOps.length}`;
+        document.getElementById('algoArray').textContent = algoArray.join(', ');
+        if (algoOpsIdx >= algoOps.length) {
+            document.getElementById('algoStatus').textContent = 'Done!';
+            renderBars({ sorted: algoArray.map((_, i) => i) });
+        }
+        return;
+    }
+
     algoStepCount++;
 
     if (sel === 'bubble') {
@@ -1154,7 +1255,7 @@ async function explainCode() {
     document.getElementById('explainVars').innerHTML = '<p class="text-gray-500 text-xs">Analyzing variables...</p>';
     document.getElementById('explainFlow').innerHTML = '<p class="text-gray-500">Building flow diagram...</p>';
     try {
-        const resp = await fetch('/api/programming/explain', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({code, model: AI_MODEL}) });
+        const resp = await fetch('/api/programming/explain', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({code, model: AI_MODEL()}) });
         const data = await resp.json();
         if (data.success) {
             document.getElementById('explainOutput').innerHTML = formatMd(data.explanation);
@@ -1200,7 +1301,7 @@ async function generateQuiz() {
     document.getElementById('quizArea').innerHTML = '<div class="ph-card text-center py-8"><i class="fas fa-spinner fa-spin text-2xl text-blue-400 mb-3"></i><p class="text-gray-400">Generating quiz questions with AI...</p></div>';
     quizCorrect = 0; quizTotal = 0;
     try {
-        const resp = await fetch('/api/programming/skill-test', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({topic, difficulty, model: AI_MODEL}) });
+        const resp = await fetch('/api/programming/skill-test', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({topic, difficulty, model: AI_MODEL()}) });
         const data = await resp.json();
         if (data.success) {
             const questions = parseQuizFromText(data.quiz);
@@ -1306,7 +1407,7 @@ async function startExam() {
         const fd = new FormData();
         fd.append('file', fileInput.files[0]);
         fd.append('mode', 'quiz');
-        fd.append('model', AI_MODEL);
+        fd.append('model', AI_MODEL());
         fd.append('book_title', 'Exam Content');
         try {
             const resp = await fetch('/api/programming/book-upload', { method: 'POST', body: fd });
@@ -1323,7 +1424,7 @@ async function startExam() {
         const fd = new FormData();
         fd.append('url', url);
         fd.append('mode', 'quiz');
-        fd.append('model', AI_MODEL);
+        fd.append('model', AI_MODEL());
         fd.append('book_title', 'Web Content Exam');
         try {
             const resp = await fetch('/api/programming/book-upload', { method: 'POST', body: fd });
@@ -1337,7 +1438,7 @@ async function startExam() {
     }
 
     try {
-        const resp = await fetch('/api/programming/skill-test', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({topic: topic || 'general', difficulty, model: AI_MODEL}) });
+        const resp = await fetch('/api/programming/skill-test', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({topic: topic || 'general', difficulty, model: AI_MODEL()}) });
         const data = await resp.json();
         if (data.success) {
             const questions = parseQuizFromText(data.quiz);
@@ -1435,7 +1536,7 @@ async function analyzeBook() {
         const text = document.getElementById('bookText').value;
         if (!text.trim()) { showToast('Paste book text first!', 'error'); btn.disabled = false; btn.innerHTML = '<i class="fas fa-magic mr-2"></i>Analyze Book & Generate Q&A'; return; }
         try {
-            const resp = await fetch('/api/programming/book-qa', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({book_title: title, book_text: text, model: AI_MODEL}) });
+            const resp = await fetch('/api/programming/book-qa', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({book_title: title, book_text: text, model: AI_MODEL()}) });
             const data = await resp.json();
             if (data.success) { document.getElementById('bookOutput').innerHTML = formatMd(data.analysis); document.getElementById('bookLatency').textContent = `${data.latency_ms}ms · ${data.tokens} tokens`; }
             else document.getElementById('bookOutput').innerHTML = `<p class="text-red-400">Error: ${data.error}</p>`;
@@ -1443,7 +1544,7 @@ async function analyzeBook() {
     } else {
         const fd = new FormData();
         fd.append('mode', mode);
-        fd.append('model', AI_MODEL);
+        fd.append('model', AI_MODEL());
         fd.append('book_title', document.getElementById('bookTitle')?.value || 'Book');
         if (source === 'file') {
             const fileInput = document.getElementById('bookFile');
@@ -2146,7 +2247,7 @@ async function explainSql() {
     btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Analyzing...';
     document.getElementById('sqlOutput').innerHTML = '<p class="text-gray-500">AI is analyzing your SQL query...</p>';
     try {
-        const resp = await fetch('/api/programming/sql-explain', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({code, model: AI_MODEL}) });
+        const resp = await fetch('/api/programming/sql-explain', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({code, model: AI_MODEL()}) });
         const data = await resp.json();
         if (data.success) {
             document.getElementById('sqlOutput').innerHTML = formatMd(data.explanation);
@@ -2166,7 +2267,7 @@ async function optimizeQuery() {
     btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Analyzing...';
     document.getElementById('optOutput').innerHTML = '<p class="text-gray-500">AI is analyzing WHY and HOW to optimize...</p>';
     try {
-        const resp = await fetch('/api/programming/optimize', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({code, model: AI_MODEL}) });
+        const resp = await fetch('/api/programming/optimize', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({code, model: AI_MODEL()}) });
         const data = await resp.json();
         if (data.success) {
             document.getElementById('optOutput').innerHTML = formatMd(data.optimization);
@@ -2184,6 +2285,21 @@ function formatMd(text) { return text.replace(/\*\*(.*?)\*\*/g, '<strong class="
 function showToast(msg, type) { const t = document.getElementById('toast'); t.className = 'fixed bottom-6 right-6 text-white px-4 py-2.5 rounded-lg shadow-lg z-50 hidden flex items-center gap-2 text-sm font-medium ' + (type === 'error' ? 'bg-red-600' : 'bg-green-600'); document.getElementById('toastMsg').textContent = msg; t.classList.remove('hidden'); setTimeout(() => t.classList.add('hidden'), 3000); }
 
 // ============= Init =============
+(function loadSharedCode() {
+    try {
+        const params = new URLSearchParams(window.location.search);
+        const lang = params.get('lang');
+        if (lang) {
+            const sel = document.getElementById('codeLang');
+            if ([...sel.options].some(o => o.value === lang)) sel.value = lang;
+        }
+        const m = window.location.hash.match(/#code=([^&]+)/);
+        if (m) {
+            document.getElementById('codeEditor').value = decodeURIComponent(escape(atob(m[1])));
+            updateLineCount();
+        }
+    } catch (e) { /* ignore bad share links */ }
+})();
 initAlgo();
 </script>
 {% endblock %}

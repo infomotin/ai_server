@@ -1,4 +1,5 @@
 import json
+import os
 import httpx
 from datetime import datetime
 from typing import Optional, List, Dict, Any
@@ -6,71 +7,122 @@ from typing import Optional, List, Dict, Any
 from src.models.agent_models import AgentSession, AgentMessage, AgentProvider, AgentFile
 from src.services.file_service import (
     read_file, write_file, edit_file, search_files,
-    list_directory, run_command, get_file_info
+    list_directory, run_command, get_file_info, create_directory, delete_file
 )
 
-SYSTEM_PROMPT_PLAN = """You are an expert coding agent in PLAN mode. You analyze codebases and create detailed plans.
+SYSTEM_PROMPT_PLAN = """You are OpenLocalAI - an expert AI coding agent like Cursor AI or GitHub Copilot.
 
-CAPABILITIES:
-- Read and analyze code files
-- Search codebases for patterns
-- List directory structures
-- Run read-only commands
+## Your Capabilities
+- Read, write, edit, and analyze code files
+- Search across entire codebases with regex
+- Execute shell commands (builds, tests, git, etc.)
+- Create and delete files and directories
+- Understand project structure and dependencies
 
-When in PLAN mode:
-1. First understand the project structure
-2. Read relevant files to understand context
-3. Create a detailed, step-by-step plan
-4. Explain what changes are needed and why
-5. Do NOT make any changes - only plan
+## Operating Modes
+You have two modes:
+1. **PLAN mode** - Analyze code, understand structure, create detailed plans WITHOUT making changes
+2. **BUILD mode** - Execute plans, make actual code changes, run commands, verify work
 
-Available tools:
-- read_file(path, offset?, limit?): Read file contents
-- list_directory(path, max_depth?): List directory contents
-- search_files(path, pattern, file_pattern?): Search for patterns
-- run_command(command, cwd?): Run read-only commands
-- get_file_info(path): Get file metadata
+## How to Work
 
-Respond with structured plans using markdown. Be specific about file paths and code changes."""
+### In PLAN mode:
+1. First explore the project structure using list_directory
+2. Read relevant files to understand context and dependencies
+3. Use search_files to find specific patterns, functions, or implementations
+4. Create a detailed, actionable plan with specific file paths and changes
+5. DO NOT make any changes - only plan
 
-SYSTEM_PROMPT_BUILD = """You are an expert coding agent in BUILD mode. You implement code changes based on plans.
-
-CAPABILITIES:
-- Read and write code files
-- Edit existing code
-- Search codebases
-- Run commands (build, test, etc.)
-- Create new files and directories
-
-When in BUILD mode:
+### In BUILD mode:
 1. Execute the plan step by step
-2. Make changes to files as needed
-3. Verify changes work (run tests, builds)
-4. Report what was done
+2. Use write_file for new files, edit_file for modifications
+3. Run tests and builds to verify changes
+4. Report completion with specific details of what was done
+
+## Critical Rules
+- Always confirm file paths before modifying
+- Show diffs for significant changes
+- If a change fails, explain why and suggest alternatives
+- Use the project_path as the root for all relative paths
+
+## Communication Style
+- Be concise but thorough
+- Use markdown code blocks for code snippets
+- Show file paths prominently
+- List specific changes made at the end of BUILD mode
 
 Available tools:
-- read_file(path, offset?, limit?): Read file contents
-- write_file(path, content): Write to a file
-- edit_file(path, old_text, new_text): Edit specific parts of files
-- list_directory(path, max_depth?): List directory contents
-- search_files(path, pattern, file_pattern?): Search for patterns
-- run_command(command, cwd?): Run commands
-- create_directory(path): Create a directory
+- read_file(path, offset?, limit?): Read file contents (offset/limit are line numbers)
+- list_directory(path, max_depth?): List directory tree structure
+- search_files(path, pattern, file_pattern?, max_results?): Search with regex
+- run_command(command, cwd?, timeout?): Execute shell commands
+- get_file_info(path): Get file metadata (size, modified, permissions)
+- write_file(path, content): Create or overwrite a file
+- edit_file(path, old_text, new_text): Replace specific text in a file
+- create_directory(path): Create a directory and parents
+- delete_file(path): Delete file or directory
 
-IMPORTANT: Always confirm file changes. Show what you're changing before doing it."""
+Remember: In PLAN mode, never make changes. In BUILD mode, execute the plan and verify."""
+
+SYSTEM_PROMPT_BUILD = """You are OpenLocalAI - an expert AI coding agent like Cursor AI or GitHub Copilot in BUILD mode.
+
+## Your Mission
+You are tasked with implementing code changes. You MUST:
+1. Execute the plan step by step
+2. Make actual file changes
+3. Run tests and builds to verify
+4. Report completion with specific details
+
+## Tools Available
+- read_file(path, offset?, limit?): Read file contents
+- write_file(path, content): Create or overwrite file
+- edit_file(path, old_text, new_text): Replace specific text (MUST match exactly)
+- list_directory(path, max_depth?): List directory
+- search_files(path, pattern, file_pattern?, max_results?): Regex search
+- run_command(command, cwd?, timeout?): Execute commands
+- get_file_info(path): File metadata
+- create_directory(path): Create directory
+- delete_file(path): Delete file/directory
+
+## Critical Instructions
+
+### File Operations:
+- Always verify file exists before editing (use read_file first)
+- For edit_file: old_text MUST match exactly, including whitespace
+- For write_file: overwrites entire file, use with caution
+- Always confirm paths in your response before changes
+
+### Command Execution:
+- Run tests: `cd <project> && python -m pytest` or similar
+- Run builds: `cd <project> && npm run build` or similar
+- Verify syntax: `python -m py_compile <file>` for Python
+
+### Error Handling:
+- If edit fails: re-read file, find exact text, retry
+- If command fails: analyze error, fix issues, retry
+- Report all errors clearly
+
+### Completion:
+When done, summarize:
+- Files modified/created
+- Changes made
+- Tests run and results
+- Any remaining issues
+
+Work systematically through the plan. Make changes, verify them, then report."""
 
 TOOL_DEFINITIONS = [
     {
         "type": "function",
         "function": {
             "name": "read_file",
-            "description": "Read the contents of a file. Use offset and limit for large files.",
+            "description": "Read file contents. Use offset and limit (line numbers) for large files. Returns success, content, total_lines, has_more.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "path": {"type": "string", "description": "Absolute path to the file"},
                     "offset": {"type": "integer", "description": "Line number to start from (0-based)", "default": 0},
-                    "limit": {"type": "integer", "description": "Maximum number of lines to read", "default": 200}
+                    "limit": {"type": "integer", "description": "Max lines to read", "default": 200}
                 },
                 "required": ["path"]
             }
@@ -80,12 +132,12 @@ TOOL_DEFINITIONS = [
         "type": "function",
         "function": {
             "name": "write_file",
-            "description": "Write content to a file. Creates the file if it doesn't exist.",
+            "description": "Write content to a file. CREATES or OVERWRITES the file. Use edit_file instead for partial changes.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "path": {"type": "string", "description": "Absolute path to the file"},
-                    "content": {"type": "string", "description": "Content to write to the file"}
+                    "content": {"type": "string", "description": "Full content to write"}
                 },
                 "required": ["path", "content"]
             }
@@ -95,12 +147,12 @@ TOOL_DEFINITIONS = [
         "type": "function",
         "function": {
             "name": "edit_file",
-            "description": "Edit a specific part of a file by replacing old text with new text.",
+            "description": "Edit specific text in a file by replacing old_text with new_text. old_text MUST match exactly.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "path": {"type": "string", "description": "Absolute path to the file"},
-                    "old_text": {"type": "string", "description": "Exact text to find and replace"},
+                    "old_text": {"type": "string", "description": "Exact text to find and replace (must match exactly)"},
                     "new_text": {"type": "string", "description": "Text to replace with"}
                 },
                 "required": ["path", "old_text", "new_text"]
@@ -111,12 +163,12 @@ TOOL_DEFINITIONS = [
         "type": "function",
         "function": {
             "name": "list_directory",
-            "description": "List contents of a directory with optional depth limit.",
+            "description": "List directory contents with optional depth. Returns files and subdirectories with their types.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "path": {"type": "string", "description": "Directory path to list"},
-                    "max_depth": {"type": "integer", "description": "Maximum depth to traverse", "default": 2}
+                    "max_depth": {"type": "integer", "description": "Max traversal depth", "default": 2}
                 },
                 "required": ["path"]
             }
@@ -126,14 +178,14 @@ TOOL_DEFINITIONS = [
         "type": "function",
         "function": {
             "name": "search_files",
-            "description": "Search for a pattern in files using regex.",
+            "description": "Search for regex pattern in files. Returns file paths, line numbers, and matching content.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "path": {"type": "string", "description": "Directory to search in"},
-                    "pattern": {"type": "string", "description": "Regex pattern to search for"},
-                    "file_pattern": {"type": "string", "description": "File pattern (e.g., *.py)", "default": "*"},
-                    "max_results": {"type": "integer", "description": "Maximum results", "default": 30}
+                    "pattern": {"type": "string", "description": "Regex pattern"},
+                    "file_pattern": {"type": "string", "description": "File glob pattern", "default": "*"},
+                    "max_results": {"type": "integer", "description": "Max results", "default": 50}
                 },
                 "required": ["path", "pattern"]
             }
@@ -143,13 +195,13 @@ TOOL_DEFINITIONS = [
         "type": "function",
         "function": {
             "name": "run_command",
-            "description": "Execute a shell command.",
+            "description": "Execute shell command. Returns stdout, stderr, and return code.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "command": {"type": "string", "description": "Shell command to execute"},
+                    "command": {"type": "string", "description": "Shell command"},
                     "cwd": {"type": "string", "description": "Working directory", "default": "/www"},
-                    "timeout": {"type": "integer", "description": "Timeout in seconds", "default": 30}
+                    "timeout": {"type": "integer", "description": "Timeout seconds", "default": 30}
                 },
                 "required": ["command"]
             }
@@ -159,11 +211,11 @@ TOOL_DEFINITIONS = [
         "type": "function",
         "function": {
             "name": "get_file_info",
-            "description": "Get metadata about a file or directory.",
+            "description": "Get file metadata: exists, is_file, is_dir, size, modified, permissions.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "path": {"type": "string", "description": "Path to get info about"}
+                    "path": {"type": "string", "description": "Path to check"}
                 },
                 "required": ["path"]
             }
@@ -173,11 +225,25 @@ TOOL_DEFINITIONS = [
         "type": "function",
         "function": {
             "name": "create_directory",
-            "description": "Create a directory (and parents if needed).",
+            "description": "Create directory and any parent directories if needed.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "path": {"type": "string", "description": "Directory path to create"}
+                },
+                "required": ["path"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "delete_file",
+            "description": "Delete a file or directory. Cannot be undone!",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string", "description": "Path to delete"}
                 },
                 "required": ["path"]
             }
@@ -187,63 +253,65 @@ TOOL_DEFINITIONS = [
 
 
 def execute_tool(tool_name: str, arguments: dict, project_path: str = "/www") -> Any:
+    """Execute a tool and return its result."""
+    
+    def normalize_path(path):
+        """Normalize path to be within project directory."""
+        if not path:
+            return project_path
+        if os.path.isabs(path):
+            # If absolute path, check if it's within project_path
+            abs_project = os.path.abspath(project_path)
+            abs_path = os.path.abspath(path)
+            # If path starts with project_path, use it as-is
+            if abs_path.startswith(abs_project):
+                return path
+            # Otherwise, use project_path as base
+            return os.path.join(project_path, os.path.basename(path))
+        return os.path.join(project_path, path)
+    
     if tool_name == "read_file":
-        path = arguments.get("path", "")
-        if not os.path.isabs(path):
-            path = os.path.join(project_path, path)
-        result = read_file(path, arguments.get("offset", 0), arguments.get("limit", 200))
-        return result
+        path = normalize_path(arguments.get("path", ""))
+        return read_file(path, arguments.get("offset", 0), arguments.get("limit", 200))
 
     elif tool_name == "write_file":
-        path = arguments.get("path", "")
-        if not os.path.isabs(path):
-            path = os.path.join(project_path, path)
+        path = normalize_path(arguments.get("path", ""))
         return write_file(path, arguments.get("content", ""))
 
     elif tool_name == "edit_file":
-        path = arguments.get("path", "")
-        if not os.path.isabs(path):
-            path = os.path.join(project_path, path)
+        path = normalize_path(arguments.get("path", ""))
         return edit_file(path, arguments.get("old_text", ""), arguments.get("new_text", ""))
 
     elif tool_name == "list_directory":
-        path = arguments.get("path", project_path)
-        if not os.path.isabs(path):
-            path = os.path.join(project_path, path)
+        path = normalize_path(arguments.get("path", project_path))
         return list_directory(path, arguments.get("max_depth", 2))
 
     elif tool_name == "search_files":
-        path = arguments.get("path", project_path)
-        if not os.path.isabs(path):
-            path = os.path.join(project_path, path)
+        path = normalize_path(arguments.get("path", project_path))
         return search_files(
             path,
             arguments.get("pattern", ""),
             arguments.get("file_pattern", "*"),
-            arguments.get("max_results", 30)
+            arguments.get("max_results", 50)
         )
 
     elif tool_name == "run_command":
-        cwd = arguments.get("cwd", project_path)
+        cwd = normalize_path(arguments.get("cwd", project_path))
         return run_command(arguments.get("command", ""), cwd, arguments.get("timeout", 30))
 
     elif tool_name == "get_file_info":
-        path = arguments.get("path", "")
-        if not os.path.isabs(path):
-            path = os.path.join(project_path, path)
+        path = normalize_path(arguments.get("path", ""))
         return get_file_info(path)
 
     elif tool_name == "create_directory":
-        path = arguments.get("path", "")
-        if not os.path.isabs(path):
-            path = os.path.join(project_path, path)
-        from src.services.file_service import create_directory
+        path = normalize_path(arguments.get("path", ""))
         return create_directory(path)
 
+    elif tool_name == "delete_file":
+        path = normalize_path(arguments.get("path", ""))
+        return delete_file(path)
+
     return {"error": f"Unknown tool: {tool_name}"}
-
-
-import os
 
 
 PROVIDER_URLS = {
@@ -293,37 +361,31 @@ class AgentService:
 
         return headers
 
-    def _build_payload_anthropic(self, messages: List[Dict], tools: List[Dict] = None) -> dict:
-        system_msg = ""
-        filtered = []
-        for m in messages:
-            if m["role"] == "system":
-                system_msg = m["content"]
-            else:
-                filtered.append(m)
-
-        payload = {
-            "model": self.model,
-            "messages": filtered,
-            "max_tokens": 4096
-        }
-        if system_msg:
-            payload["system"] = system_msg
-        if tools:
-            payload["tools"] = [{
-                "name": t["function"]["name"],
-                "description": t["function"].get("description", ""),
-                "input_schema": t["function"].get("parameters", {})
-            } for t in tools]
-        return payload
-
-    def chat(self, messages: List[Dict], tools: List[Dict] = None,
-             tool_choice: str = "auto", max_tokens: int = 4096) -> Dict[str, Any]:
-        url = self._build_url()
-        headers = self._build_headers()
-
+    def _build_payload(self, messages: List[Dict], tools: List[Dict] = None,
+                       tool_choice: str = "auto", max_tokens: int = 4096) -> dict:
         if self.provider_type == "anthropic":
-            payload = self._build_payload_anthropic(messages, tools)
+            system_msg = ""
+            filtered = []
+            for m in messages:
+                if m["role"] == "system":
+                    system_msg = m["content"]
+                else:
+                    filtered.append(m)
+
+            payload = {
+                "model": self.model,
+                "messages": filtered,
+                "max_tokens": max_tokens
+            }
+            if system_msg:
+                payload["system"] = system_msg
+            if tools:
+                payload["tools"] = [{
+                    "name": t["function"]["name"],
+                    "description": t["function"].get("description", ""),
+                    "input_schema": t["function"].get("parameters", {})
+                } for t in tools]
+            return payload
         else:
             payload = {
                 "model": self.model,
@@ -334,13 +396,20 @@ class AgentService:
             if tools:
                 payload["tools"] = tools
                 payload["tool_choice"] = tool_choice
+            return payload
+
+    def chat(self, messages: List[Dict], tools: List[Dict] = None,
+             tool_choice: str = "auto", max_tokens: int = 4096) -> Dict[str, Any]:
+        url = self._build_url()
+        headers = self._build_headers()
+        payload = self._build_payload(messages, tools, tool_choice, max_tokens)
 
         try:
-            with httpx.Client(timeout=120.0, verify=False) as client:
+            with httpx.Client(timeout=180.0, verify=False) as client:
                 resp = client.post(url, json=payload, headers=headers)
 
                 if resp.status_code != 200:
-                    error_text = resp.text[:300]
+                    error_text = resp.text[:500]
                     return {"success": False, "error": f"HTTP {resp.status_code}: {error_text}"}
 
                 data = resp.json()
@@ -380,7 +449,7 @@ class AgentService:
                         "tokens": usage.get("total_tokens", 0)
                     }
         except httpx.TimeoutException:
-            return {"success": False, "error": "Request timed out (120s)"}
+            return {"success": False, "error": "Request timed out (180s)"}
         except httpx.ConnectError as e:
             return {"success": False, "error": f"Connection failed: {str(e)[:150]}"}
         except Exception as e:
@@ -388,9 +457,11 @@ class AgentService:
 
 
 def run_agent_turn(session: AgentSession, user_message: str, db=None) -> Dict[str, Any]:
+    """Run a single turn in the agent session."""
     if db is None:
         from src.models.engine import get_db_session
-        for s in get_db_session():
+        sessions = get_db_session()
+        for s in sessions:
             db = s
             break
 
@@ -426,7 +497,7 @@ def run_agent_turn(session: AgentSession, user_message: str, db=None) -> Dict[st
 
     agent = AgentService(provider)
     all_tool_results = []
-    max_iterations = 15
+    max_iterations = 20
 
     for iteration in range(max_iterations):
         response = agent.chat(messages, TOOL_DEFINITIONS, "auto")
