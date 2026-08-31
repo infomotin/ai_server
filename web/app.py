@@ -2948,9 +2948,6 @@ def api_models():
 
 @app.route("/assistants")
 def assistants():
-    if "access_token" not in session:
-        return redirect(url_for("login"))
-
     assistants = []
     stats = {"total_assistants": 0, "active_assistants": 0, "total_tasks": 0, "total_logs": 0}
 
@@ -3201,8 +3198,6 @@ def _assistants_proxy_forward(path):
 
 @app.route("/api/assistants/proxy/<path:path>", methods=["GET", "POST", "PUT", "DELETE"])
 def api_assistants_proxy(path):
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     return _assistants_proxy_forward(path)
 
 
@@ -3210,8 +3205,6 @@ def api_assistants_proxy(path):
 
 @app.route("/api/integrations/test", methods=["POST"])
 def api_integration_test():
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         data = request.get_json()
         resp = requests.post(f"{API_BASE_URL}/integrations/test", json=data, headers=get_api_headers(), timeout=15)
