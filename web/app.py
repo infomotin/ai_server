@@ -4141,3 +4141,156 @@ def api_assign_user_role(user_id):
         return resp.json(), resp.status_code
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+# ============= AI Chat Proxy (browser -> Flask -> API) =============
+@app.route("/api/ai/chat", methods=["POST"])
+def api_ai_chat_proxy():
+    data = request.get_json(silent=True) or {}
+    try:
+        resp = requests.post(f"{API_BASE_URL}/v1/chat/completions", json=data, headers=get_api_headers(), timeout=60)
+        return resp.json(), resp.status_code
+    except Exception as e:
+        return jsonify({"error": str(e)[:300]}), 500
+
+
+# ============= Integration AI - read messages proxy =============
+@app.route("/api/integrations/all/messages", methods=["GET"])
+def api_all_messages():
+    messages = []
+    storage_path = "/www/AI_server/data/whatsapp_messages.json"
+    import os
+    if os.path.exists(storage_path):
+        try:
+            with open(storage_path, 'r') as f:
+                import json as json_mod
+                wa_msgs = json_mod.load(f)
+                for m in wa_msgs[-50:]:
+                    m['platform'] = 'whatsapp'
+                    messages.append(m)
+        except:
+            pass
+    messages.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
+    return jsonify({"success": True, "messages": messages[:50]})
+
+
+@app.route("/api/integrations/email/messages", methods=["GET"])
+def api_email_messages_proxy():
+    return jsonify({"success": True, "messages": [], "info": "Configure IMAP in connected integrations"})
+
+
+@app.route("/api/integrations/facebook/messages", methods=["GET"])
+def api_facebook_messages_proxy():
+    return jsonify({"success": True, "messages": [], "info": "Connect Facebook Page in connected integrations"})
+
+
+@app.route("/api/integrations/telegram/messages", methods=["GET"])
+def api_telegram_messages_proxy():
+    return jsonify({"success": True, "messages": [], "info": "Configure Telegram Bot in connected integrations"})
+
+
+# ============= Video/Audio Call Endpoints =============
+@app.route("/api/call/video", methods=["POST"])
+def api_video_call():
+    data = request.get_json(silent=True) or {}
+    room_id = data.get("room_id", f"call-{int(__import__('time').time())}")
+    callee = data.get("callee", "")
+    caller = data.get("caller", "User")
+    return jsonify({
+        "success": True,
+        "room_id": room_id,
+        "join_url": f"/video-call/{room_id}",
+        "callee": callee,
+        "caller": caller
+    })
+
+
+@app.route("/api/call/audio", methods=["POST"])
+def api_audio_call():
+    data = request.get_json(silent=True) or {}
+    room_id = data.get("room_id", f"call-{int(__import__('time').time())}")
+    callee = data.get("callee", "")
+    caller = data.get("caller", "User")
+    return jsonify({
+        "success": True,
+        "room_id": room_id,
+        "join_url": f"/audio-call/{room_id}",
+        "callee": callee,
+        "caller": caller
+    })
+
+
+@app.route("/video-call/<room_id>")
+def video_call_page(room_id):
+    return """<!DOCTYPE html>
+<html><head><title>Video Call - """ + room_id + """</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<style>
+body{margin:0;background:#0f172a;font-family:system-ui;color:white;display:flex;flex-direction:column;height:100vh}
+#videos{flex:1;display:flex;gap:8px;padding:8px;min-height:0}
+video{flex:1;background:#1e293b;border-radius:12px;object-fit:cover;min-height:0}
+#controls{display:flex;justify-content:center;gap:12px;padding:16px;background:#1e293b}
+.ctrl-btn{width:56px;height:56px;border-radius:50%;border:none;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s}
+.btn-mute{background:#334155;color:white}
+.btn-video{background:#334155;color:white}
+.btn-end{background:#ef4444;color:white}
+.ctrl-btn:hover{transform:scale(1.1)}
+.status{text-align:center;padding:8px;color:#94a3b8;font-size:14px}
+</style></head><body>
+<div class="status" id="status">Connecting to room: """ + room_id + """...</div>
+<div id="videos"><video id="local" autoplay muted playsinline></video><video id="remote" autoplay playsinline></video></div>
+<div id="controls">
+<button class="ctrl-btn btn-mute" onclick="toggleMute()" title="Mute"><i class="fas fa-microphone"></i></button>
+<button class="ctrl-btn btn-video" onclick="toggleVideo()" title="Camera"><i class="fas fa-video"></i></button>
+<button class="ctrl-btn btn-end" onclick="endCall()" title="End"><i class="fas fa-phone-slash"></i></button>
+</div>
+<script>
+var localStream,muted=false,camOff=false;
+var localV=document.getElementById('local'),remoteV=document.getElementById('remote'),statusEl=document.getElementById('status');
+var ROOM='""" + room_id + """';
+async function init(){try{localStream=await navigator.mediaDevices.getUserMedia({video:true,audio:true});localV.srcObject=localStream;statusEl.textContent='In call - Room: '+ROOM;}catch(e){statusEl.textContent='Camera/mic access denied. '+e.message;}}
+init();
+function toggleMute(){muted=!muted;if(localStream)localStream.getAudioTracks().forEach(function(t){t.enabled=!muted});document.querySelector('.btn-mute').innerHTML=muted?'<i class="fas fa-microphone-slash"></i>':'<i class="fas fa-microphone"></i>';}
+function toggleVideo(){camOff=!camOff;if(localStream)localStream.getVideoTracks().forEach(function(t){t.enabled=!camOff});document.querySelector('.btn-video').innerHTML=camOff?'<i class="fas fa-video-slash"></i>':'<i class="fas fa-video"></i>';}
+function endCall(){if(localStream)localStream.getTracks().forEach(function(t){t.stop()});statusEl.textContent='Call ended';document.getElementById('controls').innerHTML='<a href="/integrations" class="ctrl-btn btn-mute" style="width:auto;border-radius:12px;padding:0 24px;text-decoration:none;color:white">Back to Integrations</a>';}
+</script></body></html>"""
+
+
+@app.route("/audio-call/<room_id>")
+def audio_call_page(room_id):
+    return """<!DOCTYPE html>
+<html><head><title>Audio Call - """ + room_id + """</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<style>
+body{margin:0;background:#0f172a;font-family:system-ui;color:white;display:flex;flex-direction:column;height:100vh;align-items:center;justify-content:center}
+.caller-avatar{width:120px;height:120px;border-radius:50%;background:linear-gradient(135deg,#6366f1,#8b5cf6);display:flex;align-items:center;justify-content:center;font-size:48px;margin-bottom:24px}
+.caller-name{font-size:24px;font-weight:600;margin-bottom:8px}
+.caller-status{color:#94a3b8;margin-bottom:40px}
+#controls{display:flex;gap:16px}
+.ctrl-btn{width:64px;height:64px;border-radius:50%;border:none;font-size:22px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s}
+.btn-mute{background:#334155;color:white}
+.btn-speaker{background:#334155;color:white}
+.btn-end{background:#ef4444;color:white}
+.ctrl-btn:hover{transform:scale(1.1)}
+.pulse{animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(99,102,241,.4)}50%{box-shadow:0 0 0 20px rgba(99,102,241,0)}}
+</style></head><body>
+<div class="caller-avatar pulse" id="avatar"><i class="fas fa-phone"></i></div>
+<div class="caller-name">Audio Call</div>
+<div class="caller-status" id="status">Room: """ + room_id + """</div>
+<div id="controls">
+<button class="ctrl-btn btn-mute" onclick="toggleMute()"><i class="fas fa-microphone"></i></button>
+<button class="ctrl-btn btn-speaker" onclick="toggleSpeaker()"><i class="fas fa-volume-up"></i></button>
+<button class="ctrl-btn btn-end" onclick="endCall()"><i class="fas fa-phone-slash"></i></button>
+</div>
+<script>
+var localStream,muted=false,speakerOn=true;
+var statusEl=document.getElementById('status');
+async function init(){try{localStream=await navigator.mediaDevices.getUserMedia({audio:true});statusEl.textContent='In call - Room: """ + room_id + """';}catch(e){statusEl.textContent='Mic access denied. '+e.message;}}
+init();
+function toggleMute(){muted=!muted;if(localStream)localStream.getAudioTracks().forEach(function(t){t.enabled=!muted});document.querySelector('.btn-mute').innerHTML=muted?'<i class="fas fa-microphone-slash"></i>':'<i class="fas fa-microphone"></i>';}
+function toggleSpeaker(){speakerOn=!speakerOn;document.querySelector('.btn-speaker').innerHTML=speakerOn?'<i class="fas fa-volume-up"></i>':'<i class="fas fa-volume-mute"></i>';}
+function endCall(){if(localStream)localStream.getTracks().forEach(function(t){t.stop()});statusEl.textContent='Call ended';document.querySelector('.caller-avatar').classList.remove('pulse');document.querySelector('.caller-avatar').innerHTML='<i class="fas fa-phone-slash"></i>';document.getElementById('controls').innerHTML='<a href="/integrations" class="ctrl-btn btn-mute" style="width:auto;border-radius:12px;padding:0 24px;text-decoration:none;color:white">Back</a>';}
+</script></body></html>"""
