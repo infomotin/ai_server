@@ -40,8 +40,14 @@
 .integration-platform-btn:hover{border-color:#8b5cf6;color:#c4b5fd}
 .integration-platform-btn.active{background:rgba(139,92,246,.2);border-color:#8b5cf6;color:#c4b5fd}
 .unified-inbox-item{padding:14px 16px;background:rgba(15,23,42,.4);border:1px solid rgba(51,65,85,.5);border-radius:12px;margin-bottom:8px;cursor:pointer;transition:all .2s}
-.unified-inbox-item:hover{border-color:rgba(139,92,246,.4);background:rgba(139,92,246,.05)}
+.unified-inbox-item:hover{border-color:rgba(139,92,246,.4);background:rgba(139,92,246,.05);transform:translateX(2px)}
 .unified-inbox-item.unread{border-left:3px solid #8b5cf6}
+.unified-inbox-item.selected{border-color:#8b5cf6;background:rgba(139,92,246,.15);box-shadow:0 0 0 1px rgba(139,92,246,.3),0 4px 12px rgba(139,92,246,.2)}
+.platform-badge{display:inline-block;padding:1px 6px;border-radius:4px;font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+.platform-whatsapp{background:rgba(34,197,94,.2);color:#4ade80}
+.platform-email{background:rgba(59,130,246,.2);color:#60a5fa}
+.platform-facebook{background:rgba(99,102,241,.2);color:#818cf8}
+.platform-telegram{background:rgba(14,165,233,.2);color:#38bdf8}
 .msg-bubble{max-width:80%;padding:10px 14px;border-radius:16px;font-size:13px;line-height:1.5}
 .msg-bubble.user{background:linear-gradient(135deg,#6366f1,#8b5cf6);color:white;border-bottom-right-radius:4px;margin-left:auto}
 .msg-bubble.assistant{background:rgba(51,65,85,.7);color:#e2e8f0;border:1px solid rgba(148,163,184,.15);border-bottom-left-radius:4px}
@@ -254,7 +260,7 @@
 
 <!-- ============= AI INTEGRATION ASSISTANT ============= -->
 <div id="panelAssistant" class="hidden fade-in">
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 h-[calc(100vh-220px)]">
+    <div class="grid grid-cols-1 lg:grid-cols-4 gap-4 h-[calc(100vh-220px)]">
         <!-- Left: Platform Selection & Unified Inbox -->
         <div class="glass-assistant flex flex-col overflow-hidden">
             <div class="ai-assistant-header">
@@ -277,6 +283,14 @@
                     <p class="text-xs text-gray-600 mt-1">or ask the AI to check for you</p>
                 </div>
             </div>
+            <div class="p-2 border-t border-gray-700/50 flex gap-2">
+                <button onclick="clearLearnedConversations()" class="flex-1 px-2 py-1.5 bg-red-600/20 border border-red-600/30 text-red-400 rounded text-xs hover:bg-red-600/30 transition" title="Clear all learned conversations">
+                    <i class="fas fa-trash mr-1"></i>Clear Memory
+                </button>
+                <button onclick="exportLearnedConversations()" class="flex-1 px-2 py-1.5 bg-indigo-600/20 border border-indigo-600/30 text-indigo-400 rounded text-xs hover:bg-indigo-600/30 transition" title="Export learned data">
+                    <i class="fas fa-download mr-1"></i>Export
+                </button>
+            </div>
         </div>
 
         <!-- Center: Chat Interface -->
@@ -297,6 +311,17 @@
                         <option value="concise">Concise</option>
                         <option value="detailed">Detailed</option>
                     </select>
+                </div>
+            </div>
+
+            <!-- Selected Message Context Bar -->
+            <div id="selectedMessageBar" class="hidden px-4 py-2 border-b border-gray-700/50 bg-blue-600/10">
+                <div class="flex items-center justify-between">
+                    <div class="flex-1 min-w-0">
+                        <p class="text-xs text-blue-300 font-semibold"><i class="fas fa-comment-dots mr-1"></i>Selected Message:</p>
+                        <p id="selectedMessagePreview" class="text-xs text-white truncate"></p>
+                    </div>
+                    <button onclick="clearSelectedMessage()" class="ml-2 text-gray-400 hover:text-red-400"><i class="fas fa-times"></i></button>
                 </div>
             </div>
 
@@ -328,6 +353,7 @@
                     <i class="fas fa-robot text-4xl text-gray-700 mb-3"></i>
                     <p class="text-sm text-gray-400">Ask me to read or send messages</p>
                     <p class="text-xs text-gray-600 mt-1">Example: "Read my WhatsApp messages" or "Send a reply to the last email"</p>
+                    <p class="text-xs text-gray-600 mt-1"><i class="fas fa-lightbulb text-yellow-400 mr-1"></i>Tip: Click a message on the left to read and reply</p>
                 </div>
             </div>
 
@@ -348,6 +374,37 @@
                     <span><i class="fas fa-info-circle mr-1"></i>AI can read & send messages</span>
                     <span><i class="fas fa-shield-alt mr-1"></i>Your data stays local</span>
                 </div>
+            </div>
+        </div>
+
+        <!-- Right: Contact Details & Reply Panel -->
+        <div class="glass-assistant flex flex-col overflow-hidden">
+            <div class="ai-assistant-header">
+                <h3 class="text-white font-semibold flex items-center gap-2"><i class="fas fa-user-circle text-blue-400"></i>Contact & Reply</h3>
+                <p class="text-xs text-gray-400 mt-1">Selected message details</p>
+            </div>
+            <div id="contactPanel" class="flex-1 overflow-y-auto p-3 scroll-thin">
+                <div class="text-center text-gray-500 py-8">
+                    <i class="fas fa-hand-pointer text-3xl mb-2 text-gray-600"></i>
+                    <p class="text-sm">No message selected</p>
+                    <p class="text-xs text-gray-600 mt-1">Click a message in the inbox to view details</p>
+                </div>
+            </div>
+            <div id="replyPanel" class="hidden p-3 border-t border-gray-700/50">
+                <p class="text-xs text-gray-400 mb-2 font-semibold"><i class="fas fa-reply mr-1"></i>AI Suggested Reply:</p>
+                <div id="aiReplySuggestion" class="bg-gray-800/50 rounded-lg p-3 text-sm text-white mb-2 max-h-40 overflow-y-auto"></div>
+                <div class="flex gap-2">
+                    <button onclick="regenerateReply()" class="flex-1 px-2 py-1.5 bg-indigo-600/20 border border-indigo-600/30 text-indigo-400 rounded text-xs hover:bg-indigo-600/30 transition">
+                        <i class="fas fa-sync mr-1"></i>Regenerate
+                    </button>
+                    <button onclick="learnAndSend()" class="flex-1 px-2 py-1.5 bg-green-600/20 border border-green-600/30 text-green-400 rounded text-xs hover:bg-green-600/30 transition">
+                        <i class="fas fa-paper-plane mr-1"></i>Learn & Send
+                    </button>
+                </div>
+            </div>
+            <div id="learnedConversations" class="p-3 border-t border-gray-700/50 max-h-32 overflow-y-auto scroll-thin hidden">
+                <p class="text-xs text-gray-400 mb-2 font-semibold"><i class="fas fa-brain mr-1"></i>Learned Conversations:</p>
+                <div id="learnedList"></div>
             </div>
         </div>
     </div>
@@ -960,13 +1017,16 @@ async function initAIAssistant() {
 2. WRITE/SEND new messages
 3. REPLY to existing messages
 4. Take STEP-BY-STEP actions with user confirmation
+5. LEARN from conversations to maintain context for continuous dialogue
 
 When a user asks to check messages, use the appropriate API endpoint to fetch them.
 When a user asks to send a message, collect the necessary details and use the send endpoint.
 Always confirm details with the user before taking action.
-Be helpful, clear, and guide users through multi-step processes.`}];
+Be helpful, clear, and guide users through multi-step processes.
+You remember learned conversations and use them to maintain conversational style.`}];
     }
     loadUnifiedInbox();
+    updateLearnedList();
 }
 
 function selectAssistantPlatform(platform) {
@@ -976,16 +1036,21 @@ function selectAssistantPlatform(platform) {
     loadUnifiedInbox();
 }
 
+let selectedMessage = null;
+let learnedConversations = JSON.parse(localStorage.getItem('ai_learned_conversations') || '[]');
+let allLoadedMessages = [];
+
 async function loadUnifiedInbox() {
     const el = document.getElementById('unifiedInbox');
     const platform = currentAssistantPlatform;
     let messages = [];
+    allLoadedMessages = [];
 
     try {
         if (platform === 'whatsapp' || platform === 'all') {
             const r = await fetch(API + '/whatsapp/messages');
             const d = await r.json();
-            if (d.messages) messages.push(...d.messages.map(m => ({...m, platform: 'whatsapp'})));
+            if (d.messages) messages.push(...d.messages.map(m => ({...m, platform: 'whatsapp', contact: m.from_name || m.from || m.from.replace('@c.us','')})));
         }
     } catch(e) { console.log('WhatsApp fetch error:', e); }
 
@@ -993,7 +1058,7 @@ async function loadUnifiedInbox() {
         if (platform === 'email' || platform === 'all') {
             const r = await fetch(API + '/email/messages');
             const d = await r.json();
-            if (d.messages) messages.push(...d.messages.map(m => ({...m, platform: 'email'})));
+            if (d.messages) messages.push(...d.messages.map(m => ({...m, platform: 'email', contact: m.from || m.from_name || 'Unknown'})));
         }
     } catch(e) { console.log('Email fetch error:', e); }
 
@@ -1001,7 +1066,7 @@ async function loadUnifiedInbox() {
         if (platform === 'facebook' || platform === 'all') {
             const r = await fetch(API + '/facebook/messages');
             const d = await r.json();
-            if (d.messages) messages.push(...d.messages.map(m => ({...m, platform: 'facebook'})));
+            if (d.messages) messages.push(...d.messages.map(m => ({...m, platform: 'facebook', contact: m.from || 'Unknown'})));
         }
     } catch(e) { console.log('Facebook fetch error:', e); }
 
@@ -1009,24 +1074,36 @@ async function loadUnifiedInbox() {
         if (platform === 'telegram' || platform === 'all') {
             const r = await fetch(API + '/telegram/messages');
             const d = await r.json();
-            if (d.messages) messages.push(...d.messages.map(m => ({...m, platform: 'telegram'})));
+            if (d.messages) messages.push(...d.messages.map(m => ({...m, platform: 'telegram', contact: m.from || 'Unknown'})));
         }
     } catch(e) { console.log('Telegram fetch error:', e); }
 
+    allLoadedMessages = messages;
+
     if (messages.length > 0) {
         messages.sort((a, b) => (b.timestamp || '').localeCompare(a.timestamp || ''));
-        el.innerHTML = messages.slice(0, 30).map(m => {
+        el.innerHTML = messages.slice(0, 30).map((m, idx) => {
             const plat = m.platform || 'whatsapp';
             const colors = {whatsapp:'green', email:'blue', facebook:'indigo', telegram:'sky'};
             const icons = {whatsapp:'fab fa-whatsapp', email:'fas fa-envelope', facebook:'fab fa-facebook', telegram:'fab fa-telegram'};
+            const names = {whatsapp:'WhatsApp', email:'Email', facebook:'Facebook', telegram:'Telegram'};
             const c = colors[plat] || 'gray';
+            const isSelected = selectedMessage && selectedMessage.id === (m.id || idx) && selectedMessage.platform === plat;
             return `
-                <div class="unified-inbox-item ${m.read ? '' : 'unread'}" onclick="selectMessage('${plat}', '${m.id || m.from || ''}')">
+                <div class="unified-inbox-item ${m.read ? '' : 'unread'} ${isSelected ? 'selected' : ''}" onclick="selectMessage(${idx}, '${plat}')" data-idx="${idx}">
                     <div class="flex items-center justify-between mb-1">
-                        <span class="text-${c}-400 font-mono text-xs"><i class="${icons[plat] || 'fas fa-plug'} platform-icon"></i>${esc(m.from || m.from_name || 'Unknown')}</span>
-                        <span class="text-gray-600 text-[10px]">${(m.timestamp || '').slice(11, 16) || (m.timestamp || '').slice(0, 10)}</span>
+                        <span class="text-${c}-400 font-mono text-xs flex items-center gap-1">
+                            <i class="${icons[plat] || 'fas fa-plug'} platform-icon"></i>
+                            <span class="platform-badge platform-${plat}">${names[plat] || plat}</span>
+                            <span class="text-white">${esc(m.contact || 'Unknown')}</span>
+                        </span>
+                        <span class="text-gray-600 text-[10px]">${formatTime(m.timestamp)}</span>
                     </div>
                     <p class="text-white text-sm truncate">${esc(m.text || m.body || '(no text)')}</p>
+                    <div class="flex items-center gap-2 mt-1">
+                        <span class="text-[9px] text-gray-500"><i class="fas fa-${m.direction === 'inbound' ? 'arrow-down' : 'arrow-up'} mr-1"></i>${m.direction || 'inbound'}</span>
+                        ${m.type && m.type !== 'text' ? `<span class="text-[9px] text-purple-400"><i class="fas fa-${m.type === 'image' || m.type === 'video' ? 'image' : 'file'} mr-1"></i>${m.type}</span>` : ''}
+                    </div>
                 </div>`;
         }).join('');
     } else {
@@ -1038,9 +1115,205 @@ async function loadUnifiedInbox() {
     }
 }
 
-function selectMessage(platform, id) {
-    document.getElementById('aiChatInput').value = `Show me the full message from ${platform} and help me reply to it`;
-    sendAIMessage();
+function formatTime(ts) {
+    if (!ts) return '';
+    try {
+        const d = new Date(ts);
+        const now = new Date();
+        const diffMs = now - d;
+        const diffH = diffMs / 3600000;
+        if (diffH < 24) {
+            return d.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+        }
+        return d.toLocaleDateString([], {month: 'short', day: 'numeric'});
+    } catch { return ts.slice(11, 16) || ts.slice(0, 10); }
+}
+
+function selectMessage(idx, platform) {
+    const m = allLoadedMessages[idx];
+    if (!m) return;
+    selectedMessage = {...m, id: m.id || idx};
+    document.querySelectorAll('.unified-inbox-item').forEach(el => el.classList.remove('selected'));
+    document.querySelector(`.unified-inbox-item[data-idx="${idx}"]`)?.classList.add('selected');
+    showContactPanel(selectedMessage);
+    generateReply(selectedMessage);
+    const bar = document.getElementById('selectedMessageBar');
+    document.getElementById('selectedMessagePreview').textContent = `[${platform}] ${m.contact}: ${(m.text || m.body || '').substring(0, 80)}`;
+    bar.classList.remove('hidden');
+    aiConversationHistory.push({role: 'system', content: `Selected message from ${platform}: "${m.text || m.body || ''}" from contact "${m.contact || 'Unknown'}".`});
+}
+
+function clearSelectedMessage() {
+    selectedMessage = null;
+    document.querySelectorAll('.unified-inbox-item').forEach(el => el.classList.remove('selected'));
+    document.getElementById('selectedMessageBar').classList.add('hidden');
+    document.getElementById('contactPanel').innerHTML = `<div class="text-center text-gray-500 py-8">
+        <i class="fas fa-hand-pointer text-3xl mb-2 text-gray-600"></i>
+        <p class="text-sm">No message selected</p>
+        <p class="text-xs text-gray-600 mt-1">Click a message in the inbox to view details</p>
+    </div>`;
+    document.getElementById('replyPanel').classList.add('hidden');
+}
+
+function showContactPanel(m) {
+    const plat = m.platform || 'whatsapp';
+    const colors = {whatsapp:'green', email:'blue', facebook:'indigo', telegram:'sky'};
+    const icons = {whatsapp:'fab fa-whatsapp', email:'fas fa-envelope', facebook:'fab fa-facebook', telegram:'fab fa-telegram'};
+    const c = colors[plat] || 'gray';
+    const phone = (m.from || '').replace('@c.us', '').replace('@g.us', '').replace('@s.whatsapp.net', '');
+    const panel = document.getElementById('contactPanel');
+    panel.innerHTML = `
+        <div class="space-y-3">
+            <div class="flex items-center gap-3 p-3 bg-${c}-600/10 border border-${c}-600/30 rounded-lg">
+                <div class="w-12 h-12 rounded-full bg-${c}-600/30 flex items-center justify-center">
+                    <i class="${icons[plat] || 'fas fa-plug'} text-${c}-400 text-xl"></i>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <p class="text-white font-semibold truncate">${esc(m.contact || m.from_name || 'Unknown')}</p>
+                    <p class="text-xs text-${c}-400"><i class="fas fa-${plat === 'email' ? 'envelope' : 'phone'} mr-1"></i>${esc(phone || m.from || m.email || 'N/A')}</p>
+                </div>
+            </div>
+            <div class="space-y-2 text-xs">
+                <div class="flex justify-between p-2 bg-gray-800/50 rounded">
+                    <span class="text-gray-400">Platform:</span>
+                    <span class="text-${c}-400 font-semibold">${plat.toUpperCase()}</span>
+                </div>
+                <div class="flex justify-between p-2 bg-gray-800/50 rounded">
+                    <span class="text-gray-400">Direction:</span>
+                    <span class="text-white">${esc(m.direction || 'inbound')}</span>
+                </div>
+                <div class="flex justify-between p-2 bg-gray-800/50 rounded">
+                    <span class="text-gray-400">Type:</span>
+                    <span class="text-white">${esc(m.type || 'text')}</span>
+                </div>
+                <div class="flex justify-between p-2 bg-gray-800/50 rounded">
+                    <span class="text-gray-400">Time:</span>
+                    <span class="text-white">${formatTime(m.timestamp)}</span>
+                </div>
+                ${m.to ? `<div class="flex justify-between p-2 bg-gray-800/50 rounded"><span class="text-gray-400">To:</span><span class="text-white">${esc(m.to)}</span></div>` : ''}
+                ${m.chat_name ? `<div class="flex justify-between p-2 bg-gray-800/50 rounded"><span class="text-gray-400">Group:</span><span class="text-white">${esc(m.chat_name)}</span></div>` : ''}
+                ${m.is_group !== undefined ? `<div class="flex justify-between p-2 bg-gray-800/50 rounded"><span class="text-gray-400">Is Group:</span><span class="text-white">${m.is_group ? 'Yes' : 'No'}</span></div>` : ''}
+            </div>
+            <div class="p-3 bg-gray-800/50 rounded-lg">
+                <p class="text-xs text-gray-400 mb-1">Full Message:</p>
+                <p class="text-sm text-white whitespace-pre-wrap">${esc(m.text || m.body || '(no text)')}</p>
+            </div>
+        </div>
+    `;
+}
+
+async function generateReply(message) {
+    const panel = document.getElementById('replyPanel');
+    const suggestion = document.getElementById('aiReplySuggestion');
+    panel.classList.remove('hidden');
+    suggestion.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Generating reply...';
+    const tone = document.getElementById('aiTone').value;
+    const model = document.getElementById('aiModel').value;
+    const plat = message.platform || 'whatsapp';
+    const replyPrompt = `Generate a ${tone} reply to this ${plat} message from "${message.contact}": "${message.text || message.body || ''}". Keep it short and natural. Just the reply text, no explanations.`;
+    try {
+        const r = await fetch('/api/ai/chat', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                model,
+                messages: [
+                    {role: 'system', content: 'You are a helpful assistant generating short, natural replies to messages. Just output the reply text.'},
+                    {role: 'user', content: replyPrompt}
+                ],
+                max_tokens: 200,
+                temperature: 0.7
+            })
+        });
+        const d = await r.json();
+        const reply = d.choices?.[0]?.message?.content || d.choices?.[0]?.text || d.message?.content || 'Hi! Thanks for your message.';
+        suggestion.textContent = reply.trim();
+    } catch(e) {
+        suggestion.textContent = 'Error generating reply: ' + e.message;
+    }
+}
+
+async function regenerateReply() {
+    if (selectedMessage) await generateReply(selectedMessage);
+}
+
+async function learnAndSend() {
+    if (!selectedMessage) return;
+    const replyText = document.getElementById('aiReplySuggestion').textContent.trim();
+    if (!replyText) { showToast('No reply to send', 'error'); return; }
+    const plat = selectedMessage.platform || 'whatsapp';
+    const learnEntry = {
+        id: Date.now(),
+        platform: plat,
+        contact: selectedMessage.contact || selectedMessage.from,
+        from_message: selectedMessage.text || selectedMessage.body || '',
+        ai_reply: replyText,
+        tone: document.getElementById('aiTone').value,
+        timestamp: new Date().toISOString(),
+        context: aiConversationHistory.slice(-3)
+    };
+    learnedConversations.push(learnEntry);
+    if (learnedConversations.length > 50) learnedConversations = learnedConversations.slice(-50);
+    localStorage.setItem('ai_learned_conversations', JSON.stringify(learnedConversations));
+    updateLearnedList();
+    showToast(`Learned & queued reply to ${selectedMessage.contact}`, 'success');
+    if (plat === 'whatsapp') {
+        const phone = (selectedMessage.from || '').replace('@c.us','').replace('@g.us','');
+        if (phone) {
+            try {
+                const r = await fetch(API + '/whatsapp/send-wa', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({session_id: waSessionId || 'wa_default', to: phone, text: replyText})
+                });
+                const d = await r.json();
+                if (d.success) showToast('Reply sent via WhatsApp!', 'success');
+                else showToast('Learned. Send failed: ' + (d.message || 'unknown'), 'warning');
+            } catch(e) {
+                showToast('Learned. Send error: ' + e.message, 'warning');
+            }
+        }
+    } else {
+        showToast('Learned! (Auto-send only for WhatsApp currently)', 'info');
+    }
+}
+
+function updateLearnedList() {
+    const list = document.getElementById('learnedList');
+    const container = document.getElementById('learnedConversations');
+    if (learnedConversations.length === 0) {
+        container.classList.add('hidden');
+        return;
+    }
+    container.classList.remove('hidden');
+    list.innerHTML = learnedConversations.slice(-5).reverse().map(c =>
+        `<div class="text-[10px] text-gray-400 p-1 border-b border-gray-800 truncate" title="${esc(c.from_message)} -> ${esc(c.ai_reply)}">
+            <i class="fas fa-${c.platform === 'whatsapp' ? 'whatsapp' : c.platform === 'email' ? 'envelope' : 'plug'} text-${c.platform === 'whatsapp' ? 'green' : 'blue'}-400 mr-1"></i>
+            <b>${esc(c.contact)}</b>: ${esc(c.ai_reply.substring(0, 40))}...
+        </div>`
+    ).join('');
+}
+
+function clearLearnedConversations() {
+    if (learnedConversations.length === 0) { showToast('Nothing to clear', 'info'); return; }
+    if (confirm(`Clear all ${learnedConversations.length} learned conversations?`)) {
+        learnedConversations = [];
+        localStorage.removeItem('ai_learned_conversations');
+        updateLearnedList();
+        showToast('Memory cleared', 'success');
+    }
+}
+
+function exportLearnedConversations() {
+    if (learnedConversations.length === 0) { showToast('No data to export', 'info'); return; }
+    const blob = new Blob([JSON.stringify(learnedConversations, null, 2)], {type: 'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `ai_learned_conversations_${new Date().toISOString().slice(0,10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('Exported!', 'success');
 }
 
 function sendAIAction(action) {
@@ -1067,9 +1340,29 @@ async function sendAIMessage(takeAction = false) {
     aiConversationHistory.push({role: 'user', content: text});
 
     try {
+        // Build system prompt with learned context
+        let learnedContext = '';
+        if (learnedConversations.length > 0) {
+            const recent = learnedConversations.slice(-3);
+            learnedContext = '\n\nLearned from previous conversations:\n' + recent.map((c, i) =>
+                `${i+1}. [${c.platform}] User "${c.contact}" said: "${c.from_message}" -> You replied: "${c.ai_reply}"`
+            ).join('\n');
+        }
+
+        let selectedContext = '';
+        if (selectedMessage) {
+            const m = selectedMessage;
+            selectedContext = `\n\nCurrently selected message:
+- Platform: ${m.platform}
+- From: ${m.contact || m.from}
+- Time: ${m.timestamp}
+- Message: "${m.text || m.body || ''}"
+- Direction: ${m.direction || 'inbound'}`;
+        }
+
         const systemPrompt = `You are an Integration AI Assistant. Connected platforms: WhatsApp, Email, Facebook, Telegram.
 ${takeAction ? 'The user wants you to TAKE ACTION. Provide step-by-step instructions.' : 'Answer the user\'s question about reading/writing/replying to messages.'}
-Tone: ${tone}. Be concise and helpful.`;
+Tone: ${tone}. Be concise and helpful. Use the learned context to maintain conversational style.${learnedContext}${selectedContext}`;
 
         const r = await fetch('/api/ai/chat', {
             method: 'POST',
