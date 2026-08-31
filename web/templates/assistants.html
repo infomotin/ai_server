@@ -11,7 +11,8 @@
 <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/languages/bash.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/languages/json.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/atom-one-dark.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
 
 <style>
 :root {
@@ -100,9 +101,39 @@ textarea.input-field { resize: vertical; min-height: 80px; }
 .conv-item:hover { background: rgba(51, 65, 85, 0.5); }
 .conv-item.active { background: rgba(139, 92, 246, 0.18); border: 1px solid rgba(139, 92, 246, 0.3); }
 .avatar-gradient { background: linear-gradient(135deg, var(--accent), var(--accent-2)); display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; }
+
+/* Jarvas Command Palette */
+.command-palette { position: fixed; top: 20%; left: 50%; transform: translateX(-50%); width: 600px; max-width: 95vw; z-index: 200; }
+.command-input { width: 100%; padding: 16px 20px; background: rgba(15, 23, 42, 0.95); border: 2px solid var(--accent); border-radius: 16px; color: white; font-size: 16px; outline: none; }
+.command-results { max-height: 400px; overflow-y: auto; background: rgba(15, 23, 42, 0.98); border: 1px solid var(--glass-border-strong); border-top: none; border-radius: 0 0 16px 16px; }
+.command-item { padding: 12px 20px; cursor: pointer; display: flex; align-items: center; gap: 12px; transition: background .15s; }
+.command-item:hover, .command-item.selected { background: rgba(139, 92, 246, 0.2); }
+.command-item i { width: 24px; text-align: center; color: var(--accent-2); }
+.command-item span { color: var(--text-primary); font-size: 14px; }
+.command-item small { color: var(--text-muted); margin-left: auto; }
+
+/* Quick Actions */
+.quick-actions { display: flex; gap: 8px; flex-wrap: wrap; padding: 12px 16px; background: rgba(15, 23, 42, 0.5); border-radius: 12px; margin-bottom: 12px; }
+.quick-btn { padding: 8px 14px; border-radius: 20px; border: 1px solid var(--glass-border-strong); background: rgba(30, 41, 59, 0.5); color: var(--text-secondary); font-size: 12px; cursor: pointer; transition: all .2s; display: flex; align-items: center; gap: 6px; }
+.quick-btn:hover { border-color: var(--accent); color: var(--accent); background: rgba(139, 92, 246, 0.1); }
+.quick-btn i { font-size: 12px; }
+
+/* Task execution cards */
+.task-exec-card { background: rgba(139, 92, 246, 0.1); border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 12px; padding: 16px; margin: 8px 0; }
+.task-exec-card h4 { color: #c4b5fd; font-size: 14px; margin-bottom: 8px; }
+.task-exec-card p { color: var(--text-secondary); font-size: 12px; }
+
+/* Scheduled task item */
+.scheduled-task { background: linear-gradient(135deg, rgba(245, 158, 11, 0.1), rgba(139, 92, 246, 0.05)); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 12px; padding: 14px; }
+.scheduled-task .task-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.scheduled-task .task-name { color: white; font-weight: 600; font-size: 14px; }
+.scheduled-task .task-schedule { color: #f59e0b; font-size: 11px; }
+.scheduled-task .task-actions { display: flex; gap: 8px; }
+
 @media (max-width: 768px) {
     .stats-row { grid-template-columns: repeat(2, 1fr) !important; }
     .assistant-grid { grid-template-columns: 1fr !important; }
+    .command-palette { width: 95vw; }
 }
 </style>
 
@@ -111,14 +142,18 @@ textarea.input-field { resize: vertical; min-height: 80px; }
         <h1 class="text-2xl font-bold text-white flex items-center gap-2">
             <i class="fas fa-robot text-purple-400"></i>
             AI <span class="gradient-text">Assistants</span>
+            <span class="badge badge-active ml-2" style="font-size:9px;">v3.0</span>
         </h1>
-        <p class="text-sm text-gray-400 mt-1">Build, customize, and chat with intelligent assistants</p>
+        <p class="text-sm text-gray-400 mt-1">Your personal AI workforce - chat, automate, and delegate tasks</p>
     </div>
     <div class="flex items-center gap-2 flex-wrap">
         <div class="search-input">
             <i class="fas fa-search"></i>
             <input type="text" id="searchInput" placeholder="Search assistants..." class="input-field" style="min-width: 220px;" oninput="filterAssistants()">
         </div>
+        <button onclick="openCommandPalette()" class="btn btn-secondary" title="Command Palette (Ctrl+K)">
+            <i class="fas fa-terminal"></i> Commands
+        </button>
         <div class="view-toggle">
             <button id="viewGridBtn" class="active" onclick="setView('grid')"><i class="fas fa-th-large"></i></button>
             <button id="viewListBtn" onclick="setView('list')"><i class="fas fa-list"></i></button>
@@ -126,6 +161,55 @@ textarea.input-field { resize: vertical; min-height: 80px; }
         <button onclick="openCreateModal()" class="btn btn-primary">
             <i class="fas fa-plus"></i> New Assistant
         </button>
+    </div>
+</div>
+
+<!-- Command Palette Modal -->
+<div id="commandPaletteModal" class="modal-overlay hidden">
+    <div class="command-palette">
+        <input type="text" id="commandInput" class="command-input" placeholder="Type a command... (e.g., 'weather today', 'set reminder', 'check email')" oninput="searchCommands()" onkeydown="handleCommandKeydown(event)">
+        <div class="command-results" id="commandResults">
+            <div class="command-item" onclick="executeCommand('weather')">
+                <i class="fas fa-cloud-sun"></i>
+                <span>Weather</span>
+                <small>Check current weather</small>
+            </div>
+            <div class="command-item" onclick="executeCommand('todo')">
+                <i class="fas fa-list-check"></i>
+                <span>Todo List</span>
+                <small>Manage your tasks</small>
+            </div>
+            <div class="command-item" onclick="executeCommand('reminder')">
+                <i class="fas fa-bell"></i>
+                <span>Set Reminder</span>
+                <small>Create a reminder</small>
+            </div>
+            <div class="command-item" onclick="executeCommand('email')">
+                <i class="fas fa-envelope"></i>
+                <span>Check Email</span>
+                <small>Read your emails</small>
+            </div>
+            <div class="command-item" onclick="executeCommand('whatsapp')">
+                <i class="fab fa-whatsapp"></i>
+                <span>WhatsApp</span>
+                <small>Check messages</small>
+            </div>
+            <div class="command-item" onclick="executeCommand('schedule')">
+                <i class="fas fa-calendar-plus"></i>
+                <span>Schedule Task</span>
+                <small>Set up automation</small>
+            </div>
+            <div class="command-item" onclick="executeCommand('news')">
+                <i class="fas fa-newspaper"></i>
+                <span>Read News</span>
+                <small>Get latest headlines</small>
+            </div>
+            <div class="command-item" onclick="executeCommand('research')">
+                <i class="fas fa-flask"></i>
+                <span>Research Paper</span>
+                <small>Analyze a paper</small>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -155,10 +239,28 @@ textarea.input-field { resize: vertical; min-height: 80px; }
     </div>
     <div class="stat-card">
         <div class="flex items-center justify-between mb-2">
-            <span class="text-gray-400 text-xs uppercase tracking-wider">Tasks Run</span>
-            <div class="w-8 h-8 bg-amber-600/20 rounded-lg flex items-center justify-center"><i class="fas fa-bolt text-amber-400 text-sm"></i></div>
+            <span class="text-gray-400 text-xs uppercase tracking-wider">Tasks Scheduled</span>
+            <div class="w-8 h-8 bg-amber-600/20 rounded-lg flex items-center justify-center"><i class="fas fa-clock text-amber-400 text-sm"></i></div>
         </div>
         <p class="text-2xl font-bold text-white">{{ stats.total_tasks_run or 0 }}</p>
+    </div>
+</div>
+
+<!-- Jarvas Quick Actions -->
+<div class="glass p-4 mb-6">
+    <div class="flex items-center justify-between mb-3">
+        <h2 class="text-white font-semibold text-sm"><i class="fas fa-wand-magic-sparkles text-purple-400 mr-2"></i>Jarvas Quick Actions</h2>
+        <span class="text-xs text-gray-500">Click to execute</span>
+    </div>
+    <div class="quick-actions">
+        <button class="quick-btn" onclick="executeCommand('weather')"><i class="fas fa-cloud-sun"></i> Weather</button>
+        <button class="quick-btn" onclick="executeCommand('todo')"><i class="fas fa-list-check"></i> Todo List</button>
+        <button class="quick-btn" onclick="executeCommand('reminder')"><i class="fas fa-bell"></i> Reminder</button>
+        <button class="quick-btn" onclick="executeCommand('email')"><i class="fas fa-envelope-open"></i> Check Email</button>
+        <button class="quick-btn" onclick="executeCommand('whatsapp')"><i class="fab fa-whatsapp"></i> WhatsApp</button>
+        <button class="quick-btn" onclick="executeCommand('schedule')"><i class="fas fa-calendar-plus"></i> Schedule</button>
+        <button class="quick-btn" onclick="executeCommand('news')"><i class="fas fa-newspaper"></i> News</button>
+        <button class="quick-btn" onclick="executeCommand('research')"><i class="fas fa-book"></i> Research</button>
     </div>
 </div>
 
@@ -169,6 +271,67 @@ textarea.input-field { resize: vertical; min-height: 80px; }
         <button onclick="filterByTemplate(null)" class="text-xs text-cyan-400 hover:text-cyan-300">Show all</button>
     </div>
     <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3" id="templateGrid"></div>
+</div>
+
+<!-- Personal Assistant Templates (Jarvas v3) -->
+<div class="glass p-5 mb-6">
+    <div class="flex items-center justify-between mb-3">
+        <h2 class="text-white font-semibold text-sm"><i class="fas fa-user-tie text-amber-400 mr-2"></i>Personal Assistant (Jarvas v3)</h2>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="assistant-card" onclick="createJarvasAssistant('personal')" style="cursor:pointer;">
+            <div class="flex items-center gap-3 mb-3">
+                <div class="w-12 h-12 rounded-full bg-gradient-to-br from-purple-600 to-cyan-600 flex items-center justify-center">
+                    <i class="fas fa-user-circle text-white text-xl"></i>
+                </div>
+                <div>
+                    <h3 class="text-white font-semibold">Personal Jarvas</h3>
+                    <p class="text-xs text-gray-500">Your daily AI companion</p>
+                </div>
+            </div>
+            <div class="flex flex-wrap gap-1 mb-3">
+                <span class="badge badge-tag text-[9px]">Weather</span>
+                <span class="badge badge-tag text-[9px]">Reminders</span>
+                <span class="badge badge-tag text-[9px]">Todo</span>
+                <span class="badge badge-tag text-[9px]">Email</span>
+            </div>
+            <p class="text-xs text-gray-400">Manages your daily tasks, weather, reminders, and smart scheduling</p>
+        </div>
+        <div class="assistant-card" onclick="createJarvasAssistant('researcher')" style="cursor:pointer;">
+            <div class="flex items-center gap-3 mb-3">
+                <div class="w-12 h-12 rounded-full bg-gradient-to-br from-cyan-600 to-blue-600 flex items-center justify-center">
+                    <i class="fas fa-flask text-white text-xl"></i>
+                </div>
+                <div>
+                    <h3 class="text-white font-semibold">Research Agent</h3>
+                    <p class="text-xs text-gray-500">Deep research assistant</p>
+                </div>
+            </div>
+            <div class="flex flex-wrap gap-1 mb-3">
+                <span class="badge badge-tag text-[9px]">Papers</span>
+                <span class="badge badge-tag text-[9px]">News</span>
+                <span class="badge badge-tag text-[9px]">Summary</span>
+            </div>
+            <p class="text-xs text-gray-400">Reads papers, summarizes news, and tracks trends</p>
+        </div>
+        <div class="assistant-card" onclick="createJarvasAssistant('social')" style="cursor:pointer;">
+            <div class="flex items-center gap-3 mb-3">
+                <div class="w-12 h-12 rounded-full bg-gradient-to-br from-pink-600 to-purple-600 flex items-center justify-center">
+                    <i class="fas fa-share-nodes text-white text-xl"></i>
+                </div>
+                <div>
+                    <h3 class="text-white font-semibold">Social Manager</h3>
+                    <p class="text-xs text-gray-500">Content & scheduling</p>
+                </div>
+            </div>
+            <div class="flex flex-wrap gap-1 mb-3">
+                <span class="badge badge-tag text-[9px]">Facebook</span>
+                <span class="badge badge-tag text-[9px]">Schedule</span>
+                <span class="badge badge-tag text-[9px]">Posts</span>
+            </div>
+            <p class="text-xs text-gray-400">Manages social media, creates posts, and schedules content</p>
+        </div>
+    </div>
 </div>
 
 <!-- Assistants Container -->
@@ -266,15 +429,24 @@ textarea.input-field { resize: vertical; min-height: 80px; }
                     <button onclick="setTab('chat')" id="tabChat" class="tab-btn active"><i class="fas fa-comments mr-1"></i>Chat</button>
                     <button onclick="setTab('integrations')" id="tabIntegrations" class="tab-btn"><i class="fas fa-plug mr-1"></i>Integrations</button>
                     <button onclick="setTab('tasks')" id="tabTasks" class="tab-btn"><i class="fas fa-bolt mr-1"></i>Tasks</button>
+                    <button onclick="setTab('schedule')" id="tabSchedule" class="tab-btn"><i class="fas fa-calendar mr-1"></i>Schedule</button>
                     <button onclick="setTab('analytics')" id="tabAnalytics" class="tab-btn"><i class="fas fa-chart-line mr-1"></i>Analytics</button>
-                    <button onclick="setTab('logs')" id="tabLogs" class="tab-btn"><i class="fas fa-list mr-1"></i>Logs</button>
                 </div>
                 <!-- Chat tab -->
                 <div id="panelChat" class="flex-1 flex flex-col overflow-hidden">
+                    <!-- Quick Actions Bar -->
+                    <div class="quick-actions" style="margin: 12px 16px 0; padding: 10px 14px;">
+                        <button class="quick-btn" onclick="sendQuickAction('weather')"><i class="fas fa-cloud-sun"></i> Weather</button>
+                        <button class="quick-btn" onclick="sendQuickAction('todo')"><i class="fas fa-list-check"></i> Todo</button>
+                        <button class="quick-btn" onclick="sendQuickAction('reminder')"><i class="fas fa-bell"></i> Reminder</button>
+                        <button class="quick-btn" onclick="sendQuickAction('email')"><i class="fas fa-envelope"></i> Email</button>
+                        <button class="quick-btn" onclick="sendQuickAction('schedule')"><i class="fas fa-calendar-plus"></i> Schedule</button>
+                    </div>
                     <div class="flex-1 overflow-y-auto p-4 scroll-thin" id="chatMessages">
                         <div class="empty-state">
                             <i class="fas fa-robot text-4xl text-gray-700 mb-3"></i>
                             <p class="text-sm">Start a conversation with this assistant</p>
+                            <p class="text-xs text-gray-600 mt-1">Or use quick actions above</p>
                         </div>
                     </div>
                     <div class="border-t border-gray-700/50 p-4 bg-black/20">
@@ -289,7 +461,7 @@ textarea.input-field { resize: vertical; min-height: 80px; }
                         </div>
                     </div>
                 </div>
-                <!-- Integrations tab -->
+                <!-- integrations tab -->
                 <div id="panelIntegrations" class="flex-1 hidden overflow-y-auto p-4 scroll-thin">
                     <div class="flex items-center justify-between mb-4">
                         <h3 class="text-white font-semibold"><i class="fas fa-plug text-cyan-400 mr-2"></i>Integrations</h3>
@@ -302,11 +474,82 @@ textarea.input-field { resize: vertical; min-height: 80px; }
                 <!-- Tasks tab -->
                 <div id="panelTasks" class="flex-1 hidden overflow-y-auto p-4 scroll-thin">
                     <div class="flex items-center justify-between mb-4">
-                        <h3 class="text-white font-semibold"><i class="fas fa-bolt text-amber-400 mr-2"></i>Scheduled Tasks</h3>
-                        <button onclick="openAddTaskModal()" class="btn btn-primary text-xs"><i class="fas fa-plus mr-1"></i>Add</button>
+                        <h3 class="text-white font-semibold"><i class="fas fa-bolt text-amber-400 mr-2"></i>Task Commands</h3>
+                        <button onclick="openAddTaskModal()" class="btn btn-primary text-xs"><i class="fas fa-plus mr-1"></i>Add Task</button>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+                        <div class="task-exec-card" onclick="sendQuickAction('weather')">
+                            <h4><i class="fas fa-cloud-sun mr-2"></i>Weather Check</h4>
+                            <p>Get current weather and forecast</p>
+                        </div>
+                        <div class="task-exec-card" onclick="sendQuickAction('todo')">
+                            <h4><i class="fas fa-list-check mr-2"></i>Todo List</h4>
+                            <p>Add, view, or complete tasks</p>
+                        </div>
+                        <div class="task-exec-card" onclick="sendQuickAction('reminder')">
+                            <h4><i class="fas fa-bell mr-2"></i>Set Reminder</h4>
+                            <p>Create time-based reminders</p>
+                        </div>
+                        <div class="task-exec-card" onclick="sendQuickAction('email')">
+                            <h4><i class="fas fa-envelope mr-2"></i>Email Summary</h4>
+                            <p>Check and manage emails</p>
+                        </div>
                     </div>
                     <div id="tasksList" class="space-y-2">
-                        <p class="text-sm text-gray-500">No tasks configured</p>
+                        <p class="text-sm text-gray-500">No custom tasks configured</p>
+                    </div>
+                </div>
+                <!-- Schedule tab -->
+                <div id="panelSchedule" class="flex-1 hidden overflow-y-auto p-4 scroll-thin">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-white font-semibold"><i class="fas fa-calendar-alt text-purple-400 mr-2"></i>Scheduled Automations</h3>
+                        <button onclick="openScheduleModal()" class="btn btn-primary text-xs"><i class="fas fa-plus mr-1"></i>New Schedule</button>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+                        <div class="scheduled-task">
+                            <div class="task-header">
+                                <span class="task-name"><i class="fas fa-newspaper mr-2"></i>Daily News</span>
+                                <span class="task-schedule">Every 8:00 AM</span>
+                            </div>
+                            <p class="text-xs text-gray-400 mb-2">Reads top news and summarizes for you</p>
+                            <div class="task-actions">
+                                <button class="btn btn-secondary text-xs" onclick="sendQuickAction('news')"><i class="fas fa-play mr-1"></i>Run Now</button>
+                                <button class="btn btn-ghost text-xs" onclick="toggleSchedule('news')"><i class="fas fa-toggle-on mr-1"></i>Enabled</button>
+                            </div>
+                        </div>
+                        <div class="scheduled-task">
+                            <div class="task-header">
+                                <span class="task-name"><i class="fas fa-envelope-open-text mr-2"></i>Email Digest</span>
+                                <span class="task-schedule">Every 9:00 AM</span>
+                            </div>
+                            <p class="text-xs text-gray-400 mb-2">Summarizes new emails</p>
+                            <div class="task-actions">
+                                <button class="btn btn-secondary text-xs" onclick="sendQuickAction('email')"><i class="fas fa-play mr-1"></i>Run Now</button>
+                                <button class="btn btn-ghost text-xs" onclick="toggleSchedule('email')"><i class="fas fa-toggle-on mr-1"></i>Enabled</button>
+                            </div>
+                        </div>
+                        <div class="scheduled-task">
+                            <div class="task-header">
+                                <span class="task-name"><i class="fas fa-book mr-2"></i>Research Digest</span>
+                                <span class="task-schedule">Every 6:00 PM</span>
+                            </div>
+                            <p class="text-xs text-gray-400 mb-2">Reads papers and highlights key findings</p>
+                            <div class="task-actions">
+                                <button class="btn btn-secondary text-xs" onclick="sendQuickAction('research')"><i class="fas fa-play mr-1"></i>Run Now</button>
+                                <button class="btn btn-ghost text-xs" onclick="toggleSchedule('research')"><i class="fas fa-toggle-off mr-1"></i>Disabled</button>
+                            </div>
+                        </div>
+                        <div class="scheduled-task">
+                            <div class="task-header">
+                                <span class="task-name"><i class="fab fa-facebook mr-2"></i>Social Update</span>
+                                <span class="task-schedule">Every 12:00 PM</span>
+                            </div>
+                            <p class="text-xs text-gray-400 mb-2">Facebook page stats and post ideas</p>
+                            <div class="task-actions">
+                                <button class="btn btn-secondary text-xs" onclick="sendQuickAction('facebook')"><i class="fas fa-play mr-1"></i>Run Now</button>
+                                <button class="btn btn-ghost text-xs" onclick="toggleSchedule('facebook')"><i class="fas fa-toggle-off mr-1"></i>Disabled</button>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <!-- Analytics tab -->
@@ -318,13 +561,6 @@ textarea.input-field { resize: vertical; min-height: 80px; }
                         <div class="stat-card"><p class="text-xs text-gray-400">Tasks Run</p><p class="text-xl font-bold text-white" id="anaTasksRun">0</p></div>
                     </div>
                     <div class="glass p-4" style="height:280px;"><canvas id="activityChart"></canvas></div>
-                </div>
-                <!-- Logs tab -->
-                <div id="panelLogs" class="flex-1 hidden overflow-y-auto p-4 scroll-thin">
-                    <h3 class="text-white font-semibold mb-4"><i class="fas fa-list text-gray-400 mr-2"></i>Activity Logs</h3>
-                    <div id="logsList" class="space-y-2">
-                        <p class="text-sm text-gray-500">No activity yet</p>
-                    </div>
                 </div>
             </div>
             <!-- Right: Info -->
@@ -340,16 +576,10 @@ textarea.input-field { resize: vertical; min-height: 80px; }
                         <div class="flex justify-between p-2 bg-white/5 rounded-lg"><span class="text-gray-400">Model</span><span id="infoModel" class="text-cyan-400">—</span></div>
                         <div class="flex justify-between p-2 bg-white/5 rounded-lg"><span class="text-gray-400">Personality</span><span id="infoPersonality" class="text-purple-400">—</span></div>
                         <div class="flex justify-between p-2 bg-white/5 rounded-lg"><span class="text-gray-400">Temperature</span><span id="infoTemp" class="text-amber-400">—</span></div>
-                        <div class="flex justify-between p-2 bg-white/5 rounded-lg"><span class="text-gray-400">Max Tokens</span><span id="infoTokens" class="text-amber-400">—</span></div>
-                        <div class="flex justify-between p-2 bg-white/5 rounded-lg"><span class="text-gray-400">Created</span><span id="infoCreated" class="text-gray-300">—</span></div>
                     </div>
                     <div>
                         <h4 class="text-xs text-gray-400 font-semibold mb-2 uppercase tracking-wider">Tags</h4>
                         <div id="infoTags" class="flex flex-wrap gap-1"></div>
-                    </div>
-                    <div>
-                        <h4 class="text-xs text-gray-400 font-semibold mb-2 uppercase tracking-wider">System Prompt</h4>
-                        <p id="infoPrompt" class="text-xs text-gray-500 bg-white/5 p-3 rounded-lg max-h-40 overflow-y-auto scroll-thin">—</p>
                     </div>
                 </div>
             </div>
@@ -365,49 +595,18 @@ textarea.input-field { resize: vertical; min-height: 80px; }
             <button onclick="closeSettingsPanel()" class="btn btn-ghost text-gray-500 hover:text-white"><i class="fas fa-times"></i></button>
         </div>
         <form id="settingsForm" class="space-y-3">
-            <div>
-                <label class="block text-sm font-medium text-gray-300 mb-1">Name</label>
-                <input type="text" name="name" id="setName" class="input-field" required>
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-300 mb-1">Description</label>
-                <input type="text" name="description" id="setDescription" class="input-field">
+            <div><label class="block text-sm font-medium text-gray-300 mb-1">Name</label><input type="text" name="name" id="setName" class="input-field" required></div>
+            <div><label class="block text-sm font-medium text-gray-300 mb-1">Description</label><input type="text" name="description" id="setDescription" class="input-field"></div>
+            <div class="grid grid-cols-2 gap-3">
+                <div><label class="block text-sm font-medium text-gray-300 mb-1">Model</label><select name="model_id" id="setModel" class="input-field"></select></div>
+                <div><label class="block text-sm font-medium text-gray-300 mb-1">Personality</label><select name="personality" id="setPersonality" class="input-field"><option value="professional">Professional</option><option value="friendly">Friendly</option><option value="concise">Concise</option><option value="detailed">Detailed</option><option value="technical">Technical</option><option value="creative">Creative</option></select></div>
             </div>
             <div class="grid grid-cols-2 gap-3">
-                <div>
-                    <label class="block text-sm font-medium text-gray-300 mb-1">Model</label>
-                    <select name="model_id" id="setModel" class="input-field"></select>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-300 mb-1">Personality</label>
-                    <select name="personality" id="setPersonality" class="input-field">
-                        <option value="professional">Professional</option>
-                        <option value="friendly">Friendly</option>
-                        <option value="concise">Concise</option>
-                        <option value="detailed">Detailed</option>
-                        <option value="technical">Technical</option>
-                        <option value="creative">Creative</option>
-                    </select>
-                </div>
+                <div><label class="block text-xs text-gray-400 mb-1">Temperature: <span id="setTempVal" class="text-purple-400">0.7</span></label><input type="range" name="temperature" id="setTemp" min="0" max="2" step="0.1" value="0.7" class="w-full" oninput="document.getElementById('setTempVal').textContent=this.value"></div>
+                <div><label class="block text-xs text-gray-400 mb-1">Max tokens: <span id="setTokensVal" class="text-cyan-400">1000</span></label><input type="range" name="max_tokens" id="setTokens" min="100" max="4000" step="100" value="1000" class="w-full" oninput="document.getElementById('setTokensVal').textContent=this.value"></div>
             </div>
-            <div class="grid grid-cols-2 gap-3">
-                <div>
-                    <label class="block text-xs text-gray-400 mb-1">Temperature: <span id="setTempVal" class="text-purple-400">0.7</span></label>
-                    <input type="range" name="temperature" id="setTemp" min="0" max="2" step="0.1" value="0.7" class="w-full" oninput="document.getElementById('setTempVal').textContent=this.value">
-                </div>
-                <div>
-                    <label class="block text-xs text-gray-400 mb-1">Max tokens: <span id="setTokensVal" class="text-cyan-400">1000</span></label>
-                    <input type="range" name="max_tokens" id="setTokens" min="100" max="4000" step="100" value="1000" class="w-full" oninput="document.getElementById('setTokensVal').textContent=this.value">
-                </div>
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-300 mb-1">System Prompt</label>
-                <textarea name="system_prompt" id="setPrompt" rows="4" class="input-field font-mono text-xs"></textarea>
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-300 mb-1">Tags (comma-separated)</label>
-                <input type="text" name="tags" id="setTags" class="input-field">
-            </div>
+            <div><label class="block text-sm font-medium text-gray-300 mb-1">System Prompt</label><textarea name="system_prompt" id="setPrompt" rows="4" class="input-field font-mono text-xs"></textarea></div>
+            <div><label class="block text-sm font-medium text-gray-300 mb-1">Tags (comma-separated)</label><input type="text" name="tags" id="setTags" class="input-field"></div>
             <div class="flex justify-end gap-2 pt-3 border-t border-gray-700/50">
                 <button type="button" onclick="closeSettingsPanel()" class="btn btn-secondary">Cancel</button>
                 <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save</button>
@@ -424,17 +623,9 @@ textarea.input-field { resize: vertical; min-height: 80px; }
             <button onclick="closeIntegrationModal()" class="btn btn-ghost text-gray-500 hover:text-white"><i class="fas fa-times"></i></button>
         </div>
         <form id="integrationForm" class="space-y-3">
-            <div>
-                <label class="block text-sm font-medium text-gray-300 mb-1">Type</label>
-                <select name="integration_type" id="integrationTypeSelect" class="input-field" onchange="onIntegrationTypeChange()"></select>
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-300 mb-1">Display name</label>
-                <input type="text" name="name" class="input-field" placeholder="My Email integration">
-            </div>
-            <div id="integrationConfigFields" class="space-y-2 pt-3 border-t border-gray-700/50">
-                <p class="text-xs text-gray-500">Select a type to see configuration options.</p>
-            </div>
+            <div><label class="block text-sm font-medium text-gray-300 mb-1">Type</label><select name="integration_type" id="integrationTypeSelect" class="input-field" onchange="onIntegrationTypeChange()"></select></div>
+            <div><label class="block text-sm font-medium text-gray-300 mb-1">Display name</label><input type="text" name="name" class="input-field" placeholder="My integration"></div>
+            <div id="integrationConfigFields" class="space-y-2 pt-3 border-t border-gray-700/50"><p class="text-xs text-gray-500">Select a type to see options.</p></div>
             <div class="flex justify-end gap-2 pt-3 border-t border-gray-700/50">
                 <button type="button" onclick="closeIntegrationModal()" class="btn btn-secondary">Cancel</button>
                 <button type="submit" class="btn btn-primary"><i class="fas fa-plus"></i>Add</button>
@@ -451,21 +642,35 @@ textarea.input-field { resize: vertical; min-height: 80px; }
             <button onclick="closeTaskModal()" class="btn btn-ghost text-gray-500 hover:text-white"><i class="fas fa-times"></i></button>
         </div>
         <form id="taskForm" class="space-y-3">
-            <div>
-                <label class="block text-sm font-medium text-gray-300 mb-1">Task Type</label>
-                <select name="task_type" id="taskTypeSelect" class="input-field"></select>
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-300 mb-1">Name</label>
-                <input type="text" name="name" class="input-field" placeholder="Daily email check">
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-300 mb-1">Schedule (cron-style)</label>
-                <input type="text" name="schedule" class="input-field" placeholder="0 9 * * * (every day at 9am)">
-            </div>
+            <div><label class="block text-sm font-medium text-gray-300 mb-1">Task Type</label><select name="task_type" id="taskTypeSelect" class="input-field"></select></div>
+            <div><label class="block text-sm font-medium text-gray-300 mb-1">Name</label><input type="text" name="name" class="input-field" placeholder="Daily email check"></div>
+            <div><label class="block text-sm font-medium text-gray-300 mb-1">Schedule (cron-style)</label><input type="text" name="schedule" class="input-field" placeholder="0 9 * * * (every day 9am)"></div>
             <div class="flex justify-end gap-2 pt-3 border-t border-gray-700/50">
                 <button type="button" onclick="closeTaskModal()" class="btn btn-secondary">Cancel</button>
                 <button type="submit" class="btn btn-primary"><i class="fas fa-plus"></i>Add</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Schedule Modal -->
+<div id="scheduleModal" class="modal-overlay hidden">
+    <div class="modal-content glass-strong w-full max-w-md p-5">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-white font-semibold"><i class="fas fa-calendar-plus text-purple-400 mr-2"></i>New Schedule</h3>
+            <button onclick="closeScheduleModal()" class="btn btn-ghost text-gray-500 hover:text-white"><i class="fas fa-times"></i></button>
+        </div>
+        <form id="scheduleForm" class="space-y-3">
+            <div><label class="block text-sm font-medium text-gray-300 mb-1">Task</label><select name="task_type" class="input-field"><option value="news">Daily News Digest</option><option value="email">Email Summary</option><option value="research">Research Paper Review</option><option value="facebook">Social Media Update</option><option value="weather">Weather Report</option><option value="custom">Custom Task</option></select></div>
+            <div><label class="block text-sm font-medium text-gray-300 mb-1">Name</label><input type="text" name="name" class="input-field" placeholder="My daily briefing"></div>
+            <div class="grid grid-cols-2 gap-3">
+                <div><label class="block text-sm font-medium text-gray-300 mb-1">Time</label><input type="time" name="time" class="input-field" value="09:00"></div>
+                <div><label class="block text-sm font-medium text-gray-300 mb-1">Frequency</label><select name="frequency" class="input-field"><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option></select></div>
+            </div>
+            <div><label class="block text-sm font-medium text-gray-300 mb-1">Day of Week (if weekly)</label><select name="day_of_week" class="input-field"><option value="">Any</option><option value="0">Sunday</option><option value="1">Monday</option><option value="2">Tuesday</option><option value="3">Wednesday</option><option value="4">Thursday</option><option value="5">Friday</option><option value="6">Saturday</option></select></div>
+            <div class="flex justify-end gap-2 pt-3 border-t border-gray-700/50">
+                <button type="button" onclick="closeScheduleModal()" class="btn btn-secondary">Cancel</button>
+                <button type="submit" class="btn btn-primary"><i class="fas fa-plus"></i>Schedule</button>
             </div>
         </form>
     </div>
@@ -476,4 +681,133 @@ textarea.input-field { resize: vertical; min-height: 80px; }
 
 {% block scripts %}
 <script src="/static/js/assistants.js?v=3"></script>
+<script>
+// Jarvas Command Palette Functions
+const COMMANDS = [
+    { id: 'weather', name: 'Weather', desc: 'Check current weather and forecast', icon: 'fa-cloud-sun', prompt: 'What is the weather today?' },
+    { id: 'todo', name: 'Todo List', desc: 'Manage your tasks', icon: 'fa-list-check', prompt: 'Show my todo list and let me add/edit tasks' },
+    { id: 'reminder', name: 'Set Reminder', desc: 'Create a reminder', icon: 'fa-bell', prompt: 'Help me set a reminder. Ask me what I want to be reminded about and when.' },
+    { id: 'email', name: 'Check Email', desc: 'Read and manage emails', icon: 'fa-envelope', prompt: 'Check my email inbox and show me recent messages' },
+    { id: 'whatsapp', name: 'WhatsApp Messages', desc: 'Check WhatsApp messages', icon: 'fab fa-whatsapp', prompt: 'Check my recent WhatsApp messages' },
+    { id: 'schedule', name: 'Schedule Task', desc: 'Set up automated task', icon: 'fa-calendar-plus', prompt: 'Help me schedule a recurring task. What would you like to automate?' },
+    { id: 'news', name: 'Read News', desc: 'Get latest headlines', icon: 'fa-newspaper', prompt: 'Get the latest news headlines for today' },
+    { id: 'research', name: 'Research Paper', desc: 'Analyze a paper', icon: 'fa-book', prompt: 'I want to analyze a research paper. Please help me summarize and highlight key findings.' },
+    { id: 'facebook', name: 'Facebook Update', desc: 'Social media summary', icon: 'fab fa-facebook', prompt: 'Check my Facebook page and summarize recent activity' },
+];
+
+function openCommandPalette() {
+    document.getElementById('commandPaletteModal').classList.remove('hidden');
+    document.getElementById('commandInput').focus();
+}
+
+function closeCommandPalette() {
+    document.getElementById('commandPaletteModal').classList.add('hidden');
+}
+
+function searchCommands() {
+    const query = document.getElementById('commandInput').value.toLowerCase();
+    const results = document.getElementById('commandResults');
+    
+    if (!query) {
+        results.innerHTML = COMMANDS.map(c => `
+            <div class="command-item" onclick="executeCommand('${c.id}')">
+                <i class="fas ${c.icon}"></i>
+                <span>${c.name}</span>
+                <small>${c.desc}</small>
+            </div>
+        `).join('');
+        return;
+    }
+    
+    const filtered = COMMANDS.filter(c => 
+        c.name.toLowerCase().includes(query) || 
+        c.desc.toLowerCase().includes(query)
+    );
+    
+    results.innerHTML = filtered.length ? filtered.map(c => `
+        <div class="command-item" onclick="executeCommand('${c.id}')">
+            <i class="fas ${c.icon}"></i>
+            <span>${c.name}</span>
+            <small>${c.desc}</small>
+        </div>
+    `).join('') : '<div class="p-4 text-center text-gray-500">No commands found</div>';
+}
+
+function handleCommandKeydown(e) {
+    if (e.key === 'Escape') closeCommandPalette();
+    if (e.key === 'Enter') {
+        const first = document.querySelector('.command-item');
+        if (first) first.click();
+    }
+}
+
+function executeCommand(cmdId) {
+    closeCommandPalette();
+    const cmd = COMMANDS.find(c => c.id === cmdId);
+    if (!cmd) return;
+    
+    // If an assistant is open, send the command
+    if (currentAssistantId) {
+        document.getElementById('chatInput').value = cmd.prompt;
+        sendMessage();
+    } else {
+        // Show toast with command info
+        showToast(`${cmd.name}: ${cmd.desc}`, 'info');
+    }
+}
+
+function sendQuickAction(action) {
+    const prompts = {
+        weather: 'What is the weather today in my location? Give me a brief summary.',
+        todo: 'Show my todo list. Let me add, complete, or delete tasks.',
+        reminder: 'Help me set a reminder. Ask me what I want to be reminded about and when.',
+        email: 'Check my email inbox and show me the 5 most recent messages with sender and subject.',
+        schedule: 'I want to schedule a recurring task. Ask me what task, when, and how often.',
+        news: 'Get the latest news headlines from today. Summarize the top 5 stories.',
+        research: 'I want to analyze a research paper. Please read and summarize the key findings.',
+        facebook: 'Check my Facebook page and summarize recent activity, engagement, and post ideas.'
+    };
+    
+    const prompt = prompts[action];
+    if (prompt && currentAssistantId) {
+        document.getElementById('chatInput').value = prompt;
+        sendMessage();
+    } else if (prompt) {
+        showToast(`${action}: ${prompt.substring(0, 50)}...`, 'info');
+    }
+}
+
+function openScheduleModal() {
+    document.getElementById('scheduleModal').classList.remove('hidden');
+}
+
+function closeScheduleModal() {
+    document.getElementById('scheduleModal').classList.add('hidden');
+}
+
+function toggleSchedule(id) {
+    showToast(`Schedule ${id} toggled`, 'info');
+}
+
+// Keyboard shortcut for command palette
+document.addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        openCommandPalette();
+    }
+});
+
+// Close palette on outside click
+document.getElementById('commandPaletteModal')?.addEventListener('click', e => {
+    if (e.target.id === 'commandPaletteModal') closeCommandPalette();
+});
+
+// Schedule form submit
+document.getElementById('scheduleForm')?.addEventListener('submit', async e => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    showToast('Schedule created successfully!', 'success');
+    closeScheduleModal();
+});
+</script>
 {% endblock %}
