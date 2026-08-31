@@ -294,7 +294,7 @@
         </div>
 
         <!-- Center: Chat Interface -->
-        <div class="glass-assistant flex flex-col overflow-hidden lg:col-span-2">
+        <div class="glass-assistant flex flex-col overflow-hidden md:col-span-1 xl:col-span-2">
             <div class="ai-assistant-header flex items-center justify-between">
                 <div>
                     <h3 class="text-white font-semibold flex items-center gap-2"><i class="fas fa-robot text-cyan-400"></i>AI Assistant</h3>
@@ -378,7 +378,7 @@
         </div>
 
         <!-- Right: Contact Details & Reply Panel -->
-        <div class="glass-assistant flex flex-col overflow-hidden">
+        <div class="glass-assistant flex flex-col overflow-hidden hidden xl:flex">
             <div class="ai-assistant-header">
                 <h3 class="text-white font-semibold flex items-center gap-2"><i class="fas fa-user-circle text-blue-400"></i>Contact & Reply</h3>
                 <p class="text-xs text-gray-400 mt-1">Selected message details</p>
@@ -1506,20 +1506,36 @@ async function testMonitor(monitorId) {
         const r = await fetch('/api/crawl', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({url: m.url})});
         const d = await r.json();
         if (d.success) {
-            let html = `<div class="p-2 bg-green-600/10 border border-green-600/30 rounded-lg">`;
-            html += `<p class="text-green-400 font-semibold mb-1"><i class="fas fa-check-circle mr-1"></i>Crawl successful</p>`;
-            html += `<p class="text-white mb-1"><b>Title:</b> ${esc(d.title || 'N/A')}</p>`;
-            html += `<p class="text-gray-400 mb-1">${d.links_count || 0} links, ${d.images_count || 0} images, ${d.text_length || 0} chars</p>`;
-            if (d.prices_found && d.prices_found.length) html += `<p class="text-yellow-400 mb-1">Prices found: ${d.prices_found.map(p => p.price).join(', ')}</p>`;
-            html += `<p class="text-gray-500 truncate">${esc((d.text_preview || '').substring(0, 200))}...</p>`;
-            html += `<p class="text-gray-600 mt-1 text-[10px]">Hash: ${d.content_hash}</p>`;
-            html += `</div>`;
+            let html = '<div class="p-3 bg-green-600/10 border border-green-600/30 rounded-lg">';
+            html += '<p class="text-green-400 font-semibold mb-2"><i class="fas fa-check-circle mr-1"></i>Crawl Successful</p>';
+            html += '<p class="text-white mb-1"><b>Title:</b> ' + esc(d.title || 'N/A') + '</p>';
+            if (d.meta_description) html += '<p class="text-gray-400 text-[11px] mb-1">' + esc(d.meta_description) + '</p>';
+            html += '<div class="flex gap-3 text-[11px] text-gray-400 mb-2">';
+            html += '<span><i class="fas fa-link mr-1"></i>' + (d.links_count||0) + ' links</span>';
+            html += '<span><i class="fas fa-image mr-1"></i>' + (d.images_count||0) + ' images</span>';
+            html += '<span><i class="fas fa-file-alt mr-1"></i>' + (d.text_length||0) + ' chars</span>';
+            html += '</div>';
+            if (d.prices_found && d.prices_found.length) {
+                html += '<p class="text-yellow-400 text-xs mb-1"><i class="fas fa-tag mr-1"></i>Prices: ' + d.prices_found.join(', ') + '</p>';
+            }
+            if (d.headings && d.headings.length) {
+                html += '<div class="mb-1"><p class="text-gray-500 text-[10px] uppercase tracking-wider mb-1">Headings:</p>';
+                d.headings.slice(0,5).forEach(function(h){ html += '<p class="text-gray-300 text-[11px] ml-2">- ' + esc(h) + '</p>'; });
+                html += '</div>';
+            }
+            if (d.structured_items && d.structured_items.length) {
+                html += '<div class="mb-1"><p class="text-gray-500 text-[10px] uppercase tracking-wider mb-1">Content Items:</p>';
+                d.structured_items.slice(0,3).forEach(function(s){ html += '<p class="text-gray-400 text-[11px] ml-2 truncate">- ' + esc(s.substring(0,120)) + '</p>'; });
+                html += '</div>';
+            }
+            html += '<p class="text-gray-600 mt-1 text-[10px]">Hash: ' + d.content_hash + '</p>';
+            html += '</div>';
             if (resultEl) resultEl.innerHTML = html;
         } else {
-            if (resultEl) resultEl.innerHTML = `<div class="p-2 bg-red-600/10 border border-red-600/30 rounded-lg text-red-400">${esc(d.message || 'Failed')}</div>`;
+            if (resultEl) resultEl.innerHTML = '<div class="p-2 bg-red-600/10 border border-red-600/30 rounded-lg text-red-400 text-xs">' + esc(d.message || 'Failed to crawl') + '</div>';
         }
     } catch(e) {
-        if (resultEl) resultEl.innerHTML = `<div class="p-2 bg-red-600/10 border border-red-600/30 rounded-lg text-red-400">${esc(e.message)}</div>`;
+        if (resultEl) resultEl.innerHTML = '<div class="p-2 bg-red-600/10 border border-red-600/30 rounded-lg text-red-400 text-xs">' + esc(e.message) + '</div>';
     }
 }
 

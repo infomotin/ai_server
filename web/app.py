@@ -4326,26 +4326,52 @@ def api_monitor_notify():
 def api_crawl():
     data = request.get_json(silent=True) or {}
     url = data.get("url", "")
+    extract = data.get("extract", "auto")
     if not url:
         return jsonify({"success": False, "message": "URL required"}), 400
     try:
         import httpx
+        import re as re_mod
         from bs4 import BeautifulSoup
-        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
-        with httpx.Client(timeout=30.0, follow_redirects=True) as client:
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.5",
+        }
+        with httpx.Client(timeout=30.0, follow_redirects=True, verify=False) as client:
             resp = client.get(url, headers=headers)
             soup = BeautifulSoup(resp.text, 'html.parser')
-            title = soup.title.string if soup.title else ""
-            text = soup.get_text(separator=' ', strip=True)[:5000]
-            links = [{"href": a.get('href',''), "text": a.get_text(strip=True)[:100]} for a in soup.find_all('a', href=True)[:20]]
-            images = [{"src": img.get('src',''), "alt": img.get('alt','')} for img in soup.find_all('img')[:10]]
-            prices = [{"price": el.get_text(strip=True)[:50]} for el in soup.find_all(string=lambda t: t and ('$' in t or '\u09f3' in t or '\u20b9' in t or '\u20ac' in t or '\u00a3' in t))[:10]]
+            title = soup.title.string.strip() if soup.title and soup.title.string else ""
+            full_text = soup.get_text(separator=' ', strip=True)
+            text = full_text[:8000]
+            links = [{"href": a.get('href',''), "text": a.get_text(strip=True)[:100]} for a in soup.find_all('a', href=True)[:30]]
+            images = [{"src": img.get('src','') or img.get('data-src',''), "alt": img.get('alt','')} for img in soup.find_all('img')[:15]]
+            price_patterns = re_mod.findall(r'[\$৳₹€£PKR]\s*[\d,]+\.?\d*|\d[\d,]*\.?\d*\s*(?:taka|bdt|usd|tk|rs)', full_text, re_mod.I)
+            prices = list(set([p.strip() for p in price_patterns if len(p.strip()) > 2]))[:15]
+            meta_desc = ""
+            meta_tag = soup.find('meta', attrs={'name': 'description'})
+            if meta_tag:
+                meta_desc = meta_tag.get('content', '')[:300]
+            og_title = ""
+            og_tag = soup.find('meta', property='og:title')
+            if og_tag:
+                og_title = og_tag.get('content', '')[:200]
+            headings = [h.get_text(strip=True)[:100] for h in soup.find_all(['h1','h2','h3'])[:10]]
+            structured = []
+            for item in soup.find_all(['div','article'], class_=lambda c: c and any(k in str(c).lower() for k in ['product','item','card','post','article']))[:10]:
+                item_text = item.get_text(separator=' ', strip=True)[:300]
+                if len(item_text) > 20:
+                    structured.append(item_text)
             return jsonify({
                 "success": True, "url": url, "status": resp.status_code,
-                "title": title, "text_preview": text[:2000], "text_length": len(text),
+                "title": og_title or title, "meta_description": meta_desc,
+                "text_preview": text[:3000], "text_length": len(full_text),
                 "links_count": len(soup.find_all('a', href=True)), "links": links,
                 "images_count": len(soup.find_all('img')), "images": images,
-                "prices_found": prices, "content_hash": str(hash(text))
+                "prices_found": prices,
+                "headings": headings,
+                "structured_items": structured[:5],
+                "content_hash": str(hash(full_text))
             })
     except Exception as e:
         return jsonify({"success": False, "message": str(e)[:300]}), 500
