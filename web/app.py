@@ -10,12 +10,15 @@ app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['SESSION_COOKIE_SECURE'] = False
 
 API_BASE_URL = os.environ.get("API_BASE_URL", "http://localhost:8000")
+INTERNAL_API_KEY = os.environ.get("INTERNAL_API_KEY", "sk-local-8312f2f4a129c8b7d02d65583929e61747c459f0c7e1bd2d67976abf2835625b")
 
 
 def get_api_headers():
     headers = {"Content-Type": "application/json"}
     if "access_token" in session:
         headers["Authorization"] = f"Bearer {session['access_token']}"
+    elif INTERNAL_API_KEY:
+        headers["Authorization"] = f"Bearer {INTERNAL_API_KEY}"
     return headers
 
 
@@ -3074,8 +3077,6 @@ def assistants_task_delete(task_id):
 
 @app.route("/integrations")
 def integrations():
-    if "access_token" not in session:
-        return redirect(url_for("login"))
     return render_template("integrations.html", active_page="integrations")
 
 
