@@ -1069,7 +1069,8 @@ Tone: ${tone}. Be concise and helpful.`;
         });
 
         const d = await r.json();
-        const response = d.choices?.[0]?.message?.content || 'I couldn\'t generate a response. Please try again.';
+        console.log('AI response:', d);
+        const response = d.choices?.[0]?.message?.content || d.choices?.[0]?.text || d.message?.content || d.content || d.response || d.error?.message || 'I couldn\'t generate a response. Please try again.';
 
         document.getElementById('typingBubble')?.remove();
         aiConversationHistory.push({role: 'assistant', content: response});

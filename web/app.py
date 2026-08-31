@@ -3077,7 +3077,11 @@ def assistants_task_delete(task_id):
 
 @app.route("/integrations")
 def integrations():
-    return render_template("integrations.html", active_page="integrations")
+    resp = make_response(render_template("integrations.html", active_page="integrations"))
+    resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    resp.headers["Pragma"] = "no-cache"
+    resp.headers["Expires"] = "0"
+    return resp
 
 
 @app.route("/agent")
@@ -4150,7 +4154,8 @@ def api_ai_chat_proxy():
     data = request.get_json(silent=True) or {}
     try:
         resp = requests.post(f"{API_BASE_URL}/v1/chat/completions", json=data, headers=get_api_headers(), timeout=60)
-        return resp.json(), resp.status_code
+        result = resp.json()
+        return jsonify(result), resp.status_code
     except Exception as e:
         return jsonify({"error": str(e)[:300]}), 500
 
