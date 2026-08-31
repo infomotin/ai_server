@@ -4143,7 +4143,7 @@ def api_assign_user_role(user_id):
 def api_ai_chat_proxy():
     data = request.get_json(silent=True) or {}
     try:
-        resp = requests.post(f"{API_BASE_URL}/v1/chat/completions", json=data, headers=get_api_headers(), timeout=60)
+        resp = requests.post(f"{API_BASE_URL}/v1/chat/completions", json=data, headers=get_api_headers(), timeout=180)
         result = resp.json()
         return jsonify(result), resp.status_code
     except Exception as e:
