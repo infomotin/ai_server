@@ -265,11 +265,11 @@
 <!-- ============= AI INTEGRATION ASSISTANT ============= -->
 <div id="panelAssistant" class="hidden fade-in">
     <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 h-[calc(100vh-220px)]">
-        <!-- Left: Platform Selection & Unified Inbox -->
+        <!-- Left: Contact List (Chat Style) -->
         <div class="glass-assistant flex flex-col overflow-hidden">
             <div class="ai-assistant-header">
-                <h3 class="text-white font-semibold flex items-center gap-2"><i class="fas fa-brain text-purple-400"></i>Integration AI</h3>
-                <p class="text-xs text-gray-400 mt-1">Unified inbox + AI-powered actions</p>
+                <h3 class="text-white font-semibold flex items-center gap-2"><i class="fas fa-brain text-purple-400"></i>Chats</h3>
+                <p class="text-xs text-gray-400 mt-1">Select a conversation</p>
             </div>
             <div class="p-3 border-b border-gray-700/50">
                 <div class="flex flex-wrap gap-1.5">
@@ -279,119 +279,70 @@
                     <button onclick="selectAssistantPlatform('facebook')" class="integration-platform-btn" data-platform="facebook"><i class="fab fa-facebook mr-1"></i>Facebook</button>
                     <button onclick="selectAssistantPlatform('telegram')" class="integration-platform-btn" data-platform="telegram"><i class="fab fa-telegram mr-1"></i>Telegram</button>
                 </div>
+                <input type="text" id="chatSearchInput" class="w-full mt-2 bg-gray-700/50 border border-gray-600 rounded-lg px-3 py-1.5 text-white text-xs" placeholder="Search contacts..." oninput="filterContacts()">
             </div>
-            <div class="flex-1 overflow-y-auto p-3 scroll-thin" id="unifiedInbox">
+            <div class="flex-1 overflow-y-auto scroll-thin" id="contactList">
                 <div class="text-center text-gray-500 py-8">
-                    <i class="fas fa-inbox text-3xl mb-2 text-gray-600"></i>
-                    <p class="text-sm">Select a platform to view messages</p>
-                    <p class="text-xs text-gray-600 mt-1">or ask the AI to check for you</p>
+                    <i class="fas fa-comments text-3xl mb-2 text-gray-600"></i>
+                    <p class="text-sm">Loading conversations...</p>
                 </div>
             </div>
             <div class="p-2 border-t border-gray-700/50 flex gap-2">
-                <button onclick="clearLearnedConversations()" class="flex-1 px-2 py-1.5 bg-red-600/20 border border-red-600/30 text-red-400 rounded text-xs hover:bg-red-600/30 transition" title="Clear all learned conversations">
-                    <i class="fas fa-trash mr-1"></i>Clear Memory
-                </button>
-                <button onclick="exportLearnedConversations()" class="flex-1 px-2 py-1.5 bg-indigo-600/20 border border-indigo-600/30 text-indigo-400 rounded text-xs hover:bg-indigo-600/30 transition" title="Export learned data">
-                    <i class="fas fa-download mr-1"></i>Export
-                </button>
+                <button onclick="clearLearnedConversations()" class="flex-1 px-2 py-1.5 bg-red-600/20 border border-red-600/30 text-red-400 rounded text-xs hover:bg-red-600/30 transition"><i class="fas fa-trash mr-1"></i>Clear</button>
+                <button onclick="exportLearnedConversations()" class="flex-1 px-2 py-1.5 bg-indigo-600/20 border border-indigo-600/30 text-indigo-400 rounded text-xs hover:bg-indigo-600/30 transition"><i class="fas fa-download mr-1"></i>Export</button>
             </div>
         </div>
 
-        <!-- Center: Chat Interface -->
+        <!-- Center: Chat Conversation (Chat Box Style) -->
         <div class="glass-assistant flex flex-col overflow-hidden md:col-span-1 xl:col-span-2">
-            <div class="ai-assistant-header flex items-center justify-between">
-                <div>
-                    <h3 class="text-white font-semibold flex items-center gap-2"><i class="fas fa-robot text-cyan-400"></i>AI Assistant</h3>
-                    <p class="text-xs text-gray-400 mt-1">Read, Write, Reply, and Take Action</p>
+            <div id="chatHeader" class="ai-assistant-header flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div id="chatAvatar" class="w-10 h-10 rounded-full bg-gray-700 flex items-center justify-center text-gray-400">
+                        <i class="fas fa-user"></i>
+                    </div>
+                    <div>
+                        <h3 id="chatContactName" class="text-white font-semibold text-sm">Select a chat</h3>
+                        <p id="chatContactInfo" class="text-xs text-gray-400">Click a contact to open conversation</p>
+                    </div>
                 </div>
                 <div class="flex items-center gap-2">
-                    <select id="aiModel" class="bg-gray-700/50 border border-gray-600 rounded-lg px-2 py-1 text-white text-xs">
-                        <option value="qwen2.5-coder:1.5b">Qwen 1.5B</option>
-                        <option value="llama3.2:1b">Llama 3.2 1B</option>
-                        <option value="qwen2.5:0.5b">Qwen 0.5B</option>
-                    </select>
-                    <select id="aiTone" class="bg-gray-700/50 border border-gray-600 rounded-lg px-2 py-1 text-white text-xs">
-                        <option value="helpful">Helpful</option>
-                        <option value="concise">Concise</option>
-                        <option value="detailed">Detailed</option>
-                    </select>
+                    <button onclick="callContact()" id="callContactBtn" class="hidden px-3 py-1.5 bg-green-600/20 border border-green-600/30 text-green-400 rounded-lg text-xs hover:bg-green-600/30 transition"><i class="fas fa-phone mr-1"></i>Call</button>
+                    <button onclick="aiVoiceAssist()" id="aiVoiceBtn" class="hidden px-3 py-1.5 bg-purple-600/20 border border-purple-600/30 text-purple-400 rounded-lg text-xs hover:bg-purple-600/30 transition"><i class="fas fa-microphone mr-1"></i>AI Voice</button>
                 </div>
             </div>
 
-            <!-- Selected Message Context Bar -->
-            <div id="selectedMessageBar" class="hidden px-4 py-2 border-b border-gray-700/50 bg-blue-600/10">
-                <div class="flex items-center justify-between">
-                    <div class="flex-1 min-w-0">
-                        <p class="text-xs text-blue-300 font-semibold"><i class="fas fa-comment-dots mr-1"></i>Selected Message:</p>
-                        <p id="selectedMessagePreview" class="text-xs text-white truncate"></p>
+            <!-- Chat Messages Area -->
+            <div class="flex-1 overflow-y-auto p-4 scroll-thin" id="chatMessages">
+                <div class="empty-state text-center text-gray-500 py-16">
+                    <i class="fas fa-comments text-5xl mb-4 text-gray-700"></i>
+                    <p class="text-sm text-gray-400">Select a conversation to start chatting</p>
+                    <p class="text-xs text-gray-600 mt-2">Messages from WhatsApp, Email, Facebook, Telegram appear here</p>
+                    <div class="mt-6 space-y-2">
+                        <p class="text-xs text-gray-500"><i class="fas fa-lightbulb text-yellow-400 mr-1"></i>AI can read & reply to messages</p>
+                        <p class="text-xs text-gray-500"><i class="fas fa-phone text-green-400 mr-1"></i>Call contacts or use AI Voice assistant</p>
                     </div>
-                    <button onclick="clearSelectedMessage()" class="ml-2 text-gray-400 hover:text-red-400"><i class="fas fa-times"></i></button>
                 </div>
             </div>
 
-            <!-- Quick Actions Bar -->
-            <div class="px-4 py-2 border-b border-gray-700/50 flex flex-wrap gap-2">
-                <button onclick="sendAIAction('Check my WhatsApp messages')" class="px-3 py-1.5 bg-green-600/20 border border-green-600/30 text-green-400 rounded-lg text-xs hover:bg-green-600/30 transition">
-                    <i class="fab fa-whatsapp mr-1"></i>Check WhatsApp
-                </button>
-                <button onclick="sendAIAction('Show me recent emails')" class="px-3 py-1.5 bg-blue-600/20 border border-blue-600/30 text-blue-400 rounded-lg text-xs hover:bg-blue-600/30 transition">
-                    <i class="fas fa-envelope mr-1"></i>Check Emails
-                </button>
-                <button onclick="sendAIAction('Check my Facebook page posts')" class="px-3 py-1.5 bg-indigo-600/20 border border-indigo-600/30 text-indigo-400 rounded-lg text-xs hover:bg-indigo-600/30 transition">
-                    <i class="fab fa-facebook mr-1"></i>Check Facebook
-                </button>
-                <button onclick="sendAIAction('Summarize all unread messages across platforms')" class="px-3 py-1.5 bg-purple-600/20 border border-purple-600/30 text-purple-400 rounded-lg text-xs hover:bg-purple-600/30 transition">
-                    <i class="fas fa-layer-group mr-1"></i>Unified Summary
-                </button>
-                <button onclick="startVideoCall()" class="px-3 py-1.5 bg-red-600/20 border border-red-600/30 text-red-400 rounded-lg text-xs hover:bg-red-600/30 transition">
-                    <i class="fas fa-video mr-1"></i>Video Call
-                </button>
-                <button onclick="startAudioCall()" class="px-3 py-1.5 bg-amber-600/20 border border-amber-600/30 text-amber-400 rounded-lg text-xs hover:bg-amber-600/30 transition">
-                    <i class="fas fa-phone mr-1"></i>Audio Call
-                </button>
-            </div>
-
-            <!-- Chat Messages -->
-            <div class="flex-1 overflow-y-auto p-4 scroll-thin" id="aiChatMessages">
-                <div class="empty-state">
-                    <i class="fas fa-robot text-4xl text-gray-700 mb-3"></i>
-                    <p class="text-sm text-gray-400">Ask me to read or send messages</p>
-                    <p class="text-xs text-gray-600 mt-1">Example: "Read my WhatsApp messages" or "Send a reply to the last email"</p>
-                    <p class="text-xs text-gray-600 mt-1"><i class="fas fa-lightbulb text-yellow-400 mr-1"></i>Tip: Click a message on the left to read and reply</p>
-                </div>
-            </div>
-
-            <!-- Action Steps Display -->
-            <div id="actionSteps" class="px-4 py-2 border-t border-gray-700/50 max-h-32 overflow-y-auto scroll-thin hidden">
-                <p class="text-xs text-gray-500 mb-2 flex items-center"><i class="fas fa-list-ol mr-1"></i>Action Steps:</p>
-                <div id="actionStepsList"></div>
-            </div>
-
-            <!-- Input Area -->
-            <div class="p-4 border-t border-gray-700/50">
+            <!-- Chat Input -->
+            <div id="chatInputArea" class="p-3 border-t border-gray-700/50 hidden">
                 <div class="flex gap-2">
-                    <input type="text" id="aiChatInput" class="flex-1 bg-gray-700/50 border border-gray-600 rounded-xl px-4 py-2.5 text-white text-sm" placeholder="Ask me to read, write, reply, or take action..." onkeydown="if(event.key==='Enter')sendAIMessage()">
-                    <button onclick="sendAIMessage()" class="px-4 py-2.5 bg-gradient-to-r from-purple-600 to-cyan-600 text-white rounded-xl text-sm font-medium hover:opacity-90 transition"><i class="fas fa-paper-plane"></i></button>
-                    <button onclick="sendAIMessage(true)" class="px-3 py-2.5 bg-gray-700 border border-gray-600 text-gray-400 rounded-xl text-sm hover:text-white transition" title="Take Action"><i class="fas fa-play"></i></button>
-                </div>
-                <div class="flex items-center gap-4 mt-2 text-[10px] text-gray-500">
-                    <span><i class="fas fa-info-circle mr-1"></i>AI can read & send messages</span>
-                    <span><i class="fas fa-shield-alt mr-1"></i>Your data stays local</span>
+                    <input type="text" id="chatInput" class="flex-1 bg-gray-700/50 border border-gray-600 rounded-xl px-4 py-2.5 text-white text-sm" placeholder="Type a message or ask AI..." onkeydown="if(event.key==='Enter')sendChatMessage()">
+                    <button onclick="sendChatMessage()" class="px-4 py-2.5 bg-gradient-to-r from-green-600 to-green-500 text-white rounded-xl text-sm font-medium hover:opacity-90 transition"><i class="fas fa-paper-plane"></i></button>
+                    <button onclick="sendChatMessage(true)" class="px-3 py-2.5 bg-purple-600/20 border border-purple-600/30 text-purple-400 rounded-xl text-sm hover:bg-purple-600/30 transition" title="AI Reply"><i class="fas fa-robot"></i></button>
                 </div>
             </div>
         </div>
 
-        <!-- Right: Contact Details & Reply Panel -->
+        <!-- Right: Contact Details & Reply Panel (hidden on smaller screens) -->
         <div class="glass-assistant flex flex-col overflow-hidden hidden xl:flex">
             <div class="ai-assistant-header">
-                <h3 class="text-white font-semibold flex items-center gap-2"><i class="fas fa-user-circle text-blue-400"></i>Contact & Reply</h3>
-                <p class="text-xs text-gray-400 mt-1">Selected message details</p>
+                <h3 class="text-white font-semibold flex items-center gap-2"><i class="fas fa-user-circle text-blue-400"></i>Contact Info</h3>
             </div>
             <div id="contactPanel" class="flex-1 overflow-y-auto p-3 scroll-thin">
                 <div class="text-center text-gray-500 py-8">
                     <i class="fas fa-hand-pointer text-3xl mb-2 text-gray-600"></i>
-                    <p class="text-sm">No message selected</p>
-                    <p class="text-xs text-gray-600 mt-1">Click a message in the inbox to view details</p>
+                    <p class="text-sm">Select a conversation</p>
                 </div>
             </div>
             <div id="replyPanel" class="hidden p-3 border-t border-gray-700/50">
@@ -1069,201 +1020,291 @@ function selectAssistantPlatform(platform) {
 let selectedMessage = null;
 let learnedConversations = JSON.parse(localStorage.getItem('ai_learned_conversations') || '[]');
 let allLoadedMessages = [];
+let allConversations = {};
+let activeConversation = null;
 
 async function loadUnifiedInbox() {
-    const el = document.getElementById('unifiedInbox');
+    const el = document.getElementById('contactList');
     const platform = currentAssistantPlatform;
     let messages = [];
     allLoadedMessages = [];
+    allConversations = {};
 
     try {
         if (platform === 'whatsapp' || platform === 'all') {
             const r = await fetch(API + '/whatsapp/messages');
             const d = await r.json();
-            if (d.messages) messages.push(...d.messages.map(m => ({...m, platform: 'whatsapp', contact: m.from_name || m.from || m.from.replace('@c.us','')})));
+            if (d.messages) messages.push(...d.messages.map(function(m){return Object.assign({}, m, {platform: 'whatsapp', contact: m.from_name || m.from || (m.from||'').replace('@c.us','')});}));
         }
     } catch(e) { console.log('WhatsApp fetch error:', e); }
-
     try {
         if (platform === 'email' || platform === 'all') {
             const r = await fetch(API + '/email/messages');
             const d = await r.json();
-            if (d.messages) messages.push(...d.messages.map(m => ({...m, platform: 'email', contact: m.from || m.from_name || 'Unknown'})));
+            if (d.messages) messages.push(...d.messages.map(function(m){return Object.assign({}, m, {platform: 'email', contact: m.from || m.from_name || 'Unknown'});}));
         }
     } catch(e) { console.log('Email fetch error:', e); }
-
     try {
         if (platform === 'facebook' || platform === 'all') {
             const r = await fetch(API + '/facebook/messages');
             const d = await r.json();
-            if (d.messages) messages.push(...d.messages.map(m => ({...m, platform: 'facebook', contact: m.from || 'Unknown'})));
+            if (d.messages) messages.push(...d.messages.map(function(m){return Object.assign({}, m, {platform: 'facebook', contact: m.from || 'Unknown'});}));
         }
     } catch(e) { console.log('Facebook fetch error:', e); }
-
     try {
         if (platform === 'telegram' || platform === 'all') {
             const r = await fetch(API + '/telegram/messages');
             const d = await r.json();
-            if (d.messages) messages.push(...d.messages.map(m => ({...m, platform: 'telegram', contact: m.from || 'Unknown'})));
+            if (d.messages) messages.push(...d.messages.map(function(m){return Object.assign({}, m, {platform: 'telegram', contact: m.from || 'Unknown'});}));
         }
     } catch(e) { console.log('Telegram fetch error:', e); }
 
     allLoadedMessages = messages;
+    messages.forEach(function(m) {
+        var key = (m.from || m.contact || 'unknown') + '_' + m.platform;
+        if (!allConversations[key]) allConversations[key] = {contact: m.contact, platform: m.platform, from: m.from, messages: [], lastTime: m.timestamp};
+        allConversations[key].messages.push(m);
+        if (m.timestamp > allConversations[key].lastTime) allConversations[key].lastTime = m.timestamp;
+    });
 
-    if (messages.length > 0) {
-        messages.sort((a, b) => (b.timestamp || '').localeCompare(a.timestamp || ''));
-        el.innerHTML = messages.slice(0, 30).map((m, idx) => {
-            const plat = m.platform || 'whatsapp';
-            const colors = {whatsapp:'green', email:'blue', facebook:'indigo', telegram:'sky'};
-            const icons = {whatsapp:'fab fa-whatsapp', email:'fas fa-envelope', facebook:'fab fa-facebook', telegram:'fab fa-telegram'};
-            const names = {whatsapp:'WhatsApp', email:'Email', facebook:'Facebook', telegram:'Telegram'};
-            const c = colors[plat] || 'gray';
-            const isSelected = selectedMessage && selectedMessage.id === (m.id || idx) && selectedMessage.platform === plat;
-            return `
-                <div class="unified-inbox-item ${m.read ? '' : 'unread'} ${isSelected ? 'selected' : ''}" onclick="selectMessage(${idx}, '${plat}')" data-idx="${idx}">
-                    <div class="flex items-center justify-between mb-1">
-                        <span class="text-${c}-400 font-mono text-xs flex items-center gap-1">
-                            <i class="${icons[plat] || 'fas fa-plug'} platform-icon"></i>
-                            <span class="platform-badge platform-${plat}">${names[plat] || plat}</span>
-                            <span class="text-white">${esc(m.contact || 'Unknown')}</span>
-                        </span>
-                        <span class="text-gray-600 text-[10px]">${formatTime(m.timestamp)}</span>
-                    </div>
-                    <p class="text-white text-sm truncate">${esc(m.text || m.body || '(no text)')}</p>
-                    <div class="flex items-center gap-2 mt-1">
-                        <span class="text-[9px] text-gray-500"><i class="fas fa-${m.direction === 'inbound' ? 'arrow-down' : 'arrow-up'} mr-1"></i>${m.direction || 'inbound'}</span>
-                        ${m.type && m.type !== 'text' ? `<span class="text-[9px] text-purple-400"><i class="fas fa-${m.type === 'image' || m.type === 'video' ? 'image' : 'file'} mr-1"></i>${m.type}</span>` : ''}
-                    </div>
-                </div>`;
+    var convKeys = Object.keys(allConversations).sort(function(a,b){ return (allConversations[b].lastTime||'').localeCompare(allConversations[a].lastTime||''); });
+
+    if (convKeys.length > 0) {
+        el.innerHTML = convKeys.map(function(key) {
+            var conv = allConversations[key];
+            var plat = conv.platform;
+            var colors = {whatsapp:'green', email:'blue', facebook:'indigo', telegram:'sky'};
+            var icons = {whatsapp:'fab fa-whatsapp', email:'fas fa-envelope', facebook:'fab fa-facebook', telegram:'fab fa-telegram'};
+            var c = colors[plat] || 'gray';
+            var lastMsg = conv.messages[conv.messages.length - 1];
+            var preview = (lastMsg.text || lastMsg.body || '').substring(0, 40);
+            var unread = conv.messages.filter(function(m){return !m.read && m.direction === 'inbound'}).length;
+            var isActive = activeConversation === key;
+            return '<div class="unified-inbox-item ' + (isActive ? 'selected' : '') + '" onclick="selectConversation(\'' + esc(key) + '\')" data-key="' + esc(key) + '">' +
+                '<div class="flex items-center gap-3">' +
+                    '<div class="w-10 h-10 rounded-full bg-' + c + '-600/30 flex items-center justify-center flex-shrink-0">' +
+                        '<i class="' + (icons[plat]||'fas fa-plug') + ' text-' + c + '-400"></i>' +
+                    '</div>' +
+                    '<div class="flex-1 min-w-0">' +
+                        '<div class="flex items-center justify-between">' +
+                            '<span class="text-white text-sm font-medium truncate">' + esc(conv.contact || 'Unknown') + '</span>' +
+                            '<span class="text-gray-600 text-[10px]">' + formatTime(conv.lastTime) + '</span>' +
+                        '</div>' +
+                        '<div class="flex items-center justify-between">' +
+                            '<p class="text-gray-400 text-xs truncate">' + esc(preview || '(no text)') + '</p>' +
+                            (unread > 0 ? '<span class="bg-green-500 text-white text-[10px] rounded-full px-1.5 py-0.5 ml-1">' + unread + '</span>' : '') +
+                        '</div>' +
+                    '</div>' +
+                '</div>' +
+            '</div>';
         }).join('');
     } else {
-        el.innerHTML = `<div class="text-center text-gray-500 py-8">
-            <i class="fas fa-inbox text-3xl mb-2 text-gray-600"></i>
-            <p class="text-sm">No messages found</p>
-            <p class="text-xs text-gray-600 mt-1">Connect a platform to see messages</p>
-        </div>`;
+        el.innerHTML = '<div class="text-center text-gray-500 py-8"><i class="fas fa-comments text-3xl mb-2 text-gray-600"></i><p class="text-sm">No conversations yet</p><p class="text-xs text-gray-600 mt-1">Connect a platform to start chatting</p></div>';
     }
+}
+
+function filterContacts() {
+    var q = (document.getElementById('chatSearchInput').value || '').toLowerCase();
+    document.querySelectorAll('#contactList .unified-inbox-item').forEach(function(el) {
+        var key = el.getAttribute('data-key') || '';
+        el.style.display = (!q || key.toLowerCase().includes(q)) ? '' : 'none';
+    });
+}
+
+function selectConversation(key) {
+    var conv = allConversations[key];
+    if (!conv) return;
+    activeConversation = key;
+    document.querySelectorAll('#contactList .unified-inbox-item').forEach(function(el) { el.classList.remove('selected'); });
+    var el = document.querySelector('#contactList [data-key="' + key + '"]');
+    if (el) el.classList.add('selected');
+
+    var plat = conv.platform;
+    var colors = {whatsapp:'green', email:'blue', facebook:'indigo', telegram:'sky'};
+    var icons = {whatsapp:'fab fa-whatsapp', email:'fas fa-envelope', facebook:'fab fa-facebook', telegram:'fab fa-telegram'};
+    var c = colors[plat] || 'gray';
+
+    document.getElementById('chatAvatar').className = 'w-10 h-10 rounded-full bg-' + c + '-600/30 flex items-center justify-center';
+    document.getElementById('chatAvatar').innerHTML = '<i class="' + (icons[plat]||'fas fa-plug') + ' text-' + c + '-400"></i>';
+    document.getElementById('chatContactName').textContent = conv.contact || 'Unknown';
+    document.getElementById('chatContactInfo').textContent = plat.toUpperCase() + ' \u2022 ' + conv.messages.length + ' messages';
+    document.getElementById('callContactBtn').classList.remove('hidden');
+    document.getElementById('aiVoiceBtn').classList.remove('hidden');
+    document.getElementById('chatInputArea').classList.remove('hidden');
+
+    var chatEl = document.getElementById('chatMessages');
+    var sortedMsgs = conv.messages.slice().sort(function(a,b){ return (a.timestamp||'').localeCompare(b.timestamp||''); });
+    chatEl.innerHTML = sortedMsgs.map(function(m) {
+        var isInbound = m.direction === 'inbound';
+        var align = isInbound ? 'justify-start' : 'justify-end';
+        var bg = isInbound ? 'bg-gray-700/70' : 'bg-green-600/30';
+        var dir = isInbound ? '' : '<span class="text-[9px] text-green-300/60"><i class="fas fa-check-double mr-1"></i>sent</span>';
+        return '<div class="flex ' + align + ' mb-3">' +
+            '<div class="max-w-[80%] ' + bg + ' rounded-2xl px-4 py-2.5">' +
+                '<p class="text-white text-sm whitespace-pre-wrap">' + esc(m.text || m.body || '(no text)') + '</p>' +
+                '<div class="flex items-center justify-end gap-2 mt-1">' +
+                    '<span class="text-[9px] text-gray-500">' + formatTime(m.timestamp) + '</span>' +
+                    dir +
+                '</div>' +
+            '</div>' +
+        '</div>';
+    }).join('');
+    chatEl.scrollTop = chatEl.scrollHeight;
+
+    showContactPanel(conv);
+    generateReply(conv.messages[conv.messages.length - 1]);
+    selectedMessage = conv.messages[conv.messages.length - 1];
 }
 
 function formatTime(ts) {
     if (!ts) return '';
     try {
-        const d = new Date(ts);
-        const now = new Date();
-        const diffMs = now - d;
-        const diffH = diffMs / 3600000;
-        if (diffH < 24) {
-            return d.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
-        }
+        var d = new Date(ts);
+        var now = new Date();
+        var diffMs = now - d;
+        var diffH = diffMs / 3600000;
+        if (diffH < 24) return d.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
         return d.toLocaleDateString([], {month: 'short', day: 'numeric'});
-    } catch { return ts.slice(11, 16) || ts.slice(0, 10); }
+    } catch(e) { return (ts || '').slice(11, 16) || (ts || '').slice(0, 10); }
 }
 
-function selectMessage(idx, platform) {
-    const m = allLoadedMessages[idx];
-    if (!m) return;
-    selectedMessage = {...m, id: m.id || idx};
-    document.querySelectorAll('.unified-inbox-item').forEach(el => el.classList.remove('selected'));
-    document.querySelector(`.unified-inbox-item[data-idx="${idx}"]`)?.classList.add('selected');
-    showContactPanel(selectedMessage);
-    generateReply(selectedMessage);
-    const bar = document.getElementById('selectedMessageBar');
-    document.getElementById('selectedMessagePreview').textContent = `[${platform}] ${m.contact}: ${(m.text || m.body || '').substring(0, 80)}`;
-    bar.classList.remove('hidden');
-    aiConversationHistory.push({role: 'system', content: `Selected message from ${platform}: "${m.text || m.body || ''}" from contact "${m.contact || 'Unknown'}".`});
+function showContactPanel(conv) {
+    var plat = conv.platform || 'whatsapp';
+    var colors = {whatsapp:'green', email:'blue', facebook:'indigo', telegram:'sky'};
+    var icons = {whatsapp:'fab fa-whatsapp', email:'fas fa-envelope', facebook:'fab fa-facebook', telegram:'fab fa-telegram'};
+    var c = colors[plat] || 'gray';
+    var phone = (conv.from || '').replace('@c.us', '').replace('@g.us', '').replace('@s.whatsapp.net', '');
+    var panel = document.getElementById('contactPanel');
+    var inbound = conv.messages.filter(function(m){return m.direction === 'inbound'}).length;
+    var outbound = conv.messages.filter(function(m){return m.direction !== 'inbound'}).length;
+    panel.innerHTML = '<div class="space-y-3">' +
+        '<div class="flex items-center gap-3 p-3 bg-' + c + '-600/10 border border-' + c + '-600/30 rounded-lg">' +
+            '<div class="w-12 h-12 rounded-full bg-' + c + '-600/30 flex items-center justify-center"><i class="' + (icons[plat]||'fas fa-plug') + ' text-' + c + '-400 text-xl"></i></div>' +
+            '<div class="flex-1 min-w-0"><p class="text-white font-semibold truncate">' + esc(conv.contact || 'Unknown') + '</p><p class="text-xs text-' + c + '-400">' + esc(phone || conv.from || '') + '</p></div>' +
+        '</div>' +
+        '<div class="space-y-2 text-xs">' +
+            '<div class="flex justify-between p-2 bg-gray-800/50 rounded"><span class="text-gray-400">Platform</span><span class="text-' + c + '-400 font-semibold">' + plat.toUpperCase() + '</span></div>' +
+            '<div class="flex justify-between p-2 bg-gray-800/50 rounded"><span class="text-gray-400">Total Messages</span><span class="text-white">' + conv.messages.length + '</span></div>' +
+            '<div class="flex justify-between p-2 bg-gray-800/50 rounded"><span class="text-gray-400">Received</span><span class="text-green-400">' + inbound + '</span></div>' +
+            '<div class="flex justify-between p-2 bg-gray-800/50 rounded"><span class="text-gray-400">Sent</span><span class="text-blue-400">' + outbound + '</span></div>' +
+            '<div class="flex justify-between p-2 bg-gray-800/50 rounded"><span class="text-gray-400">Last Active</span><span class="text-white">' + formatTime(conv.lastTime) + '</span></div>' +
+        '</div>' +
+    '</div>';
 }
 
-function clearSelectedMessage() {
-    selectedMessage = null;
-    document.querySelectorAll('.unified-inbox-item').forEach(el => el.classList.remove('selected'));
-    document.getElementById('selectedMessageBar').classList.add('hidden');
-    document.getElementById('contactPanel').innerHTML = `<div class="text-center text-gray-500 py-8">
-        <i class="fas fa-hand-pointer text-3xl mb-2 text-gray-600"></i>
-        <p class="text-sm">No message selected</p>
-        <p class="text-xs text-gray-600 mt-1">Click a message in the inbox to view details</p>
-    </div>`;
-    document.getElementById('replyPanel').classList.add('hidden');
-}
+async function sendChatMessage(aiMode) {
+    if (!activeConversation || !allConversations[activeConversation]) return;
+    var conv = allConversations[activeConversation];
+    var input = document.getElementById('chatInput');
+    var text = input.value.trim();
+    if (!text && !aiMode) return;
 
-function showContactPanel(m) {
-    const plat = m.platform || 'whatsapp';
-    const colors = {whatsapp:'green', email:'blue', facebook:'indigo', telegram:'sky'};
-    const icons = {whatsapp:'fab fa-whatsapp', email:'fas fa-envelope', facebook:'fab fa-facebook', telegram:'fab fa-telegram'};
-    const c = colors[plat] || 'gray';
-    const phone = (m.from || '').replace('@c.us', '').replace('@g.us', '').replace('@s.whatsapp.net', '');
-    const panel = document.getElementById('contactPanel');
-    panel.innerHTML = `
-        <div class="space-y-3">
-            <div class="flex items-center gap-3 p-3 bg-${c}-600/10 border border-${c}-600/30 rounded-lg">
-                <div class="w-12 h-12 rounded-full bg-${c}-600/30 flex items-center justify-center">
-                    <i class="${icons[plat] || 'fas fa-plug'} text-${c}-400 text-xl"></i>
-                </div>
-                <div class="flex-1 min-w-0">
-                    <p class="text-white font-semibold truncate">${esc(m.contact || m.from_name || 'Unknown')}</p>
-                    <p class="text-xs text-${c}-400"><i class="fas fa-${plat === 'email' ? 'envelope' : 'phone'} mr-1"></i>${esc(phone || m.from || m.email || 'N/A')}</p>
-                </div>
-            </div>
-            <div class="space-y-2 text-xs">
-                <div class="flex justify-between p-2 bg-gray-800/50 rounded">
-                    <span class="text-gray-400">Platform:</span>
-                    <span class="text-${c}-400 font-semibold">${plat.toUpperCase()}</span>
-                </div>
-                <div class="flex justify-between p-2 bg-gray-800/50 rounded">
-                    <span class="text-gray-400">Direction:</span>
-                    <span class="text-white">${esc(m.direction || 'inbound')}</span>
-                </div>
-                <div class="flex justify-between p-2 bg-gray-800/50 rounded">
-                    <span class="text-gray-400">Type:</span>
-                    <span class="text-white">${esc(m.type || 'text')}</span>
-                </div>
-                <div class="flex justify-between p-2 bg-gray-800/50 rounded">
-                    <span class="text-gray-400">Time:</span>
-                    <span class="text-white">${formatTime(m.timestamp)}</span>
-                </div>
-                ${m.to ? `<div class="flex justify-between p-2 bg-gray-800/50 rounded"><span class="text-gray-400">To:</span><span class="text-white">${esc(m.to)}</span></div>` : ''}
-                ${m.chat_name ? `<div class="flex justify-between p-2 bg-gray-800/50 rounded"><span class="text-gray-400">Group:</span><span class="text-white">${esc(m.chat_name)}</span></div>` : ''}
-                ${m.is_group !== undefined ? `<div class="flex justify-between p-2 bg-gray-800/50 rounded"><span class="text-gray-400">Is Group:</span><span class="text-white">${m.is_group ? 'Yes' : 'No'}</span></div>` : ''}
-            </div>
-            <div class="p-3 bg-gray-800/50 rounded-lg">
-                <p class="text-xs text-gray-400 mb-1">Full Message:</p>
-                <p class="text-sm text-white whitespace-pre-wrap">${esc(m.text || m.body || '(no text)')}</p>
-            </div>
-        </div>
-    `;
-}
+    var chatEl = document.getElementById('chatMessages');
+    if (aiMode) {
+        var lastMsg = conv.messages[conv.messages.length - 1];
+        text = text || 'Generate a reply to: "' + (lastMsg.text || lastMsg.body || '') + '"';
+        chatEl.innerHTML += '<div class="flex justify-center mb-3"><div class="bg-purple-600/20 text-purple-300 text-xs px-3 py-1 rounded-full"><i class="fas fa-robot mr-1"></i>AI is thinking...</div></div>';
+        chatEl.scrollTop = chatEl.scrollHeight;
+        try {
+            var r = await fetch('/api/ai/chat', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({
+                model: document.getElementById('aiModel') ? document.getElementById('aiModel').value : 'qwen2.5-coder:1.5b',
+                messages: [{role:'system', content:'You are a helpful assistant. Generate a short, natural reply.'}, {role:'user', content:text}],
+                max_tokens: 200, temperature: 0.7
+            })});
+            var d = await r.json();
+            var reply = d.choices?.[0]?.message?.content || 'Thanks for your message.';
+            input.value = reply;
+            sendChatMessage(false);
+        } catch(e) { showToast('AI error: ' + e.message, 'error'); }
+        return;
+    }
 
-async function generateReply(message) {
-    const panel = document.getElementById('replyPanel');
-    const suggestion = document.getElementById('aiReplySuggestion');
-    panel.classList.remove('hidden');
-    suggestion.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Generating reply...';
-    const tone = document.getElementById('aiTone').value;
-    const model = document.getElementById('aiModel').value;
-    const plat = message.platform || 'whatsapp';
-    const replyPrompt = `Generate a ${tone} reply to this ${plat} message from "${message.contact}": "${message.text || message.body || ''}". Keep it short and natural. Just the reply text, no explanations.`;
-    try {
-        const r = await fetch('/api/ai/chat', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({
-                model,
-                messages: [
-                    {role: 'system', content: 'You are a helpful assistant generating short, natural replies to messages. Just output the reply text.'},
-                    {role: 'user', content: replyPrompt}
-                ],
-                max_tokens: 200,
-                temperature: 0.7
-            })
-        });
-        const d = await r.json();
-        const reply = d.choices?.[0]?.message?.content || d.choices?.[0]?.text || d.message?.content || 'Hi! Thanks for your message.';
-        suggestion.textContent = reply.trim();
-    } catch(e) {
-        suggestion.textContent = 'Error generating reply: ' + e.message;
+    var chatId = conv.from || '';
+    if (conv.platform === 'whatsapp' && chatId) {
+        try {
+            var r = await fetch(API + '/whatsapp/send-wa', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({session_id: 'wa_default', to: chatId.replace('@c.us','').replace('@g.us',''), text: text})});
+            var d = await r.json();
+            if (d.success) {
+                conv.messages.push({from: chatId, text: text, direction: 'outbound', timestamp: new Date().toISOString(), platform: conv.platform, contact: conv.contact});
+                chatEl.innerHTML += '<div class="flex justify-end mb-3"><div class="bg-green-600/30 rounded-2xl px-4 py-2.5 max-w-[80%]"><p class="text-white text-sm whitespace-pre-wrap">' + esc(text) + '</p><div class="flex items-center justify-end mt-1"><span class="text-[9px] text-gray-500">just now</span><span class="text-[9px] text-green-300/60 ml-2"><i class="fas fa-check-double mr-1"></i>sent</span></div></div></div>';
+                chatEl.scrollTop = chatEl.scrollHeight;
+                input.value = '';
+            } else {
+                showToast('Send failed: ' + (d.message || d.error), 'error');
+            }
+        } catch(e) { showToast('Error: ' + e.message, 'error'); }
+    } else {
+        conv.messages.push({from: 'you', text: text, direction: 'outbound', timestamp: new Date().toISOString(), platform: conv.platform, contact: conv.contact});
+        chatEl.innerHTML += '<div class="flex justify-end mb-3"><div class="bg-green-600/30 rounded-2xl px-4 py-2.5 max-w-[80%]"><p class="text-white text-sm whitespace-pre-wrap">' + esc(text) + '</p><div class="flex items-center justify-end mt-1"><span class="text-[9px] text-gray-500">just now</span></div></div></div>';
+        chatEl.scrollTop = chatEl.scrollHeight;
+        input.value = '';
     }
 }
 
-async function regenerateReply() {
+function callContact() {
+    if (!activeConversation || !allConversations[activeConversation]) return;
+    var conv = allConversations[activeConversation];
+    var phone = (conv.from || '').replace('@c.us', '').replace('@g.us', '').replace('@s.whatsapp.net', '');
+    if (conv.platform === 'whatsapp' && phone) {
+        window.open('https://wa.me/' + phone, '_blank');
+    } else {
+        startAudioCall();
+    }
+}
+
+async function aiVoiceAssist() {
+    var conv = activeConversation ? allConversations[activeConversation] : null;
+    var contactName = conv ? conv.contact : 'there';
+    var lastMsg = conv && conv.messages.length ? conv.messages[conv.messages.length - 1] : null;
+    var context = lastMsg ? 'Last message from ' + contactName + ': "' + (lastMsg.text || lastMsg.body || '') + '"' : '';
+
+    if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
+        showToast('Speech recognition not supported in this browser. Use Chrome.', 'error');
+        return;
+    }
+
+    var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    var recognition = new SpeechRecognition();
+    recognition.lang = 'en-US';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    var chatEl = document.getElementById('chatMessages');
+    chatEl.innerHTML += '<div class="flex justify-center mb-3"><div class="bg-purple-600/20 text-purple-300 text-xs px-3 py-1 rounded-full" id="aiVoiceStatus"><i class="fas fa-microphone mr-1"></i>Listening... Say something</div></div>';
+    chatEl.scrollTop = chatEl.scrollHeight;
+
+    recognition.onresult = async function(event) {
+        var transcript = event.results[0][0].transcript;
+        document.getElementById('aiVoiceStatus').innerHTML = '<i class="fas fa-check mr-1"></i>Heard: "' + transcript + '" - AI thinking...';
+        try {
+            var r = await fetch('/api/ai/chat', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({
+                model: 'qwen2.5-coder:1.5b',
+                messages: [{role:'system', content:'You are a voice assistant. ' + context + '. Give a short, helpful spoken response.'}, {role:'user', content:transcript}],
+                max_tokens: 200, temperature: 0.7
+            })});
+            var d = await r.json();
+            var reply = d.choices?.[0]?.message?.content || 'I did not catch that.';
+            document.getElementById('aiVoiceStatus').innerHTML = '<i class="fas fa-robot mr-1"></i>AI: ' + reply;
+            var utterance = new SpeechSynthesisUtterance(reply);
+            utterance.lang = 'en-US';
+            utterance.rate = 1.0;
+            speechSynthesis.speak(utterance);
+            if (activeConversation && conv) {
+                conv.messages.push({from: 'ai-voice', text: '[Voice] ' + reply, direction: 'outbound', timestamp: new Date().toISOString(), platform: conv.platform, contact: conv.contact});
+            }
+        } catch(e) {
+            document.getElementById('aiVoiceStatus').innerHTML = '<i class="fas fa-exclamation-triangle mr-1"></i>AI error: ' + e.message;
+        }
+    };
+    recognition.onerror = function(event) {
+        var statusEl = document.getElementById('aiVoiceStatus');
+        if (statusEl) statusEl.innerHTML = '<i class="fas fa-exclamation mr-1"></i>Error: ' + event.error;
+    };
+    recognition.onend = function() {
+        setTimeout(function(){ var s = document.getElementById('aiVoiceStatus'); if (s) s.remove(); }, 5000);
+    };
+    recognition.start();
+}
     if (selectedMessage) await generateReply(selectedMessage);
 }
 
@@ -1346,93 +1387,68 @@ function exportLearnedConversations() {
     showToast('Exported!', 'success');
 }
 
-function sendAIAction(action) {
-    document.getElementById('aiChatInput').value = action;
-    sendAIMessage();
+async function generateReply(message) {
+    var panel = document.getElementById('replyPanel');
+    var suggestion = document.getElementById('aiReplySuggestion');
+    if (!panel || !suggestion) return;
+    panel.classList.remove('hidden');
+    suggestion.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Generating reply...';
+    var model = document.getElementById('aiModel') ? document.getElementById('aiModel').value : 'qwen2.5-coder:1.5b';
+    var plat = message.platform || 'whatsapp';
+    var replyPrompt = 'Generate a helpful reply to this ' + plat + ' message from "' + (message.contact || 'Unknown') + '": "' + (message.text || message.body || '') + '". Keep it short and natural. Just the reply text.';
+    try {
+        var r = await fetch('/api/ai/chat', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({
+            model: model, messages: [{role:'system', content:'You are a helpful assistant. Generate short, natural replies.'}, {role:'user', content:replyPrompt}],
+            max_tokens: 200, temperature: 0.7
+        })});
+        var d = await r.json();
+        var reply = d.choices?.[0]?.message?.content || 'Thanks for your message.';
+        suggestion.textContent = reply.trim();
+    } catch(e) { suggestion.textContent = 'Error: ' + e.message; }
 }
 
-async function sendAIMessage(takeAction = false) {
-    const input = document.getElementById('aiChatInput');
-    const text = input.value.trim();
+function regenerateReply() {
+    if (selectedMessage) generateReply(selectedMessage);
+}
+
+function sendAIAction(action) {
+    var input = document.getElementById('chatInput');
+    if (input) { input.value = action; sendChatMessage(); }
+}
+
+async function sendAIMessage(takeAction) {
+    var input = document.getElementById('chatInput');
+    if (!input) return;
+    var text = input.value.trim();
     if (!text) return;
     input.value = '';
 
-    const el = document.getElementById('aiChatMessages');
-    if (el.querySelector('.empty-state')) el.innerHTML = '';
+    var chatEl = document.getElementById('chatMessages');
+    chatEl.innerHTML += '<div class="flex justify-end mb-3"><div class="bg-gray-700/70 rounded-2xl px-4 py-2.5 max-w-[80%]"><p class="text-white text-sm">' + esc(text) + '</p></div></div>';
+    chatEl.innerHTML += '<div class="flex justify-start mb-3" id="typingBubble"><div class="bg-purple-600/20 rounded-2xl px-4 py-2.5"><div class="typing-indicator"><span></span><span></span><span></span></div></div></div>';
+    chatEl.scrollTop = chatEl.scrollHeight;
 
-    el.innerHTML += `<div class="flex justify-end mb-3"><div class="msg-bubble user">${esc(text)}</div></div>`;
-    el.innerHTML += `<div class="flex justify-start mb-3" id="typingBubble"><div class="msg-bubble assistant"><div class="typing-indicator"><span></span><span></span><span></span></div></div></div>`;
-    el.scrollTop = el.scrollHeight;
-
-    const model = document.getElementById('aiModel').value;
-    const tone = document.getElementById('aiTone').value;
-
-    aiConversationHistory.push({role: 'user', content: text});
+    var model = document.getElementById('aiModel') ? document.getElementById('aiModel').value : 'qwen2.5-coder:1.5b';
+    var conv = activeConversation ? allConversations[activeConversation] : null;
+    var systemPrompt = 'You are an Integration AI Assistant. Connected platforms: WhatsApp, Email, Facebook, Telegram. ' + (takeAction ? 'The user wants ACTION. Provide steps.' : 'Answer questions about reading/writing/replying to messages.') + ' Be concise and helpful.';
 
     try {
-        // Build system prompt with learned context
-        let learnedContext = '';
-        if (learnedConversations.length > 0) {
-            const recent = learnedConversations.slice(-3);
-            learnedContext = '\n\nLearned from previous conversations:\n' + recent.map((c, i) =>
-                `${i+1}. [${c.platform}] User "${c.contact}" said: "${c.from_message}" -> You replied: "${c.ai_reply}"`
-            ).join('\n');
-        }
-
-        let selectedContext = '';
-        if (selectedMessage) {
-            const m = selectedMessage;
-            selectedContext = `\n\nCurrently selected message:
-- Platform: ${m.platform}
-- From: ${m.contact || m.from}
-- Time: ${m.timestamp}
-- Message: "${m.text || m.body || ''}"
-- Direction: ${m.direction || 'inbound'}`;
-        }
-
-        const systemPrompt = `You are an Integration AI Assistant. Connected platforms: WhatsApp, Email, Facebook, Telegram.
-${takeAction ? 'The user wants you to TAKE ACTION. Provide step-by-step instructions.' : 'Answer the user\'s question about reading/writing/replying to messages.'}
-Tone: ${tone}. Be concise and helpful. Use the learned context to maintain conversational style.${learnedContext}${selectedContext}`;
-
-        const r = await fetch('/api/ai/chat', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({
-                model,
-                messages: [{role: 'system', content: systemPrompt}, ...aiConversationHistory.slice(-10)],
-                max_tokens: 800,
-                temperature: 0.7
-            })
+        var r = await fetch('/api/ai/chat', {method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({model:model, messages:[{role:'system',content:systemPrompt},{role:'user',content:text}], max_tokens:800, temperature:0.7})
         });
 
-        const d = await r.json();
-        console.log('AI response:', d);
-        const response = d.choices?.[0]?.message?.content || d.choices?.[0]?.text || d.message?.content || d.content || d.response || d.error?.message || 'I couldn\'t generate a response. Please try again.';
+        var d = await r.json();
+        var response = d.choices?.[0]?.message?.content || d.choices?.[0]?.text || d.message?.content || d.error?.message || 'No response.';
 
-        document.getElementById('typingBubble')?.remove();
-        aiConversationHistory.push({role: 'assistant', content: response});
+        var typing = document.getElementById('typingBubble');
+        if (typing) typing.remove();
 
-        let displayResponse = response;
-        if (typeof marked !== 'undefined') {
-            try {
-                displayResponse = marked.parse(response, {breaks: true, gfm: true});
-                if (typeof DOMPurify !== 'undefined') displayResponse = DOMPurify.sanitize(displayResponse);
-            } catch(e) { displayResponse = esc(response); }
-        } else {
-            displayResponse = esc(response);
-        }
-
-        el.innerHTML += `<div class="flex justify-start mb-3"><div class="msg-bubble assistant">${displayResponse}</div></div>`;
-        el.scrollTop = el.scrollHeight;
-
-        // If AI suggests actions, show them
-        if (response.includes('Step 1') || response.includes('step') || takeAction) {
-            showActionSteps(response);
-        }
-
+        chatEl.innerHTML += '<div class="flex justify-start mb-3"><div class="bg-purple-600/20 rounded-2xl px-4 py-2.5 max-w-[80%]"><p class="text-white text-sm whitespace-pre-wrap">' + esc(response) + '</p></div></div>';
+        chatEl.scrollTop = chatEl.scrollHeight;
     } catch(e) {
-        document.getElementById('typingBubble')?.remove();
-        el.innerHTML += `<div class="flex justify-start mb-3"><div class="msg-bubble assistant" style="background:rgba(239,68,68,.2);border-color:#ef4444;">Error: ${esc(e.message)}</div></div>`;
+        var typing = document.getElementById('typingBubble');
+        if (typing) typing.remove();
+        chatEl.innerHTML += '<div class="flex justify-start mb-3"><div class="bg-red-600/20 rounded-2xl px-4 py-2.5 max-w-[80%]"><p class="text-red-300 text-sm">Error: ' + esc(e.message) + '</p></div></div>';
     }
 }
 
