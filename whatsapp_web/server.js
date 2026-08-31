@@ -238,10 +238,33 @@ app.post('/sessions/:id/send', async (req, res) => {
     if (!to || !text) return res.status(400).json({ success: false, message: 'Recipient and text required' });
 
     try {
-        const cleanTo = to.replace(/[^\d]/g, '');
+        let cleanTo = to.replace(/[^\d]/g, '');
+        if (cleanTo.length < 10) return res.json({ success: false, message: 'Phone number too short. Include country code (e.g., 14155552671).' });
         const chatId = cleanTo.includes('@') ? cleanTo : `${cleanTo}@c.us`;
-        const result = await session.client.sendMessage(chatId, text);
-        res.json({ success: true, messageId: result.id._serialized });
+
+        // Try direct send first
+        try {
+            const result = await session.client.sendMessage(chatId, text);
+            return res.json({ success: true, messageId: result.id._serialized });
+        } catch (lidErr) {
+            // Fallback: try getNumberId and send via LID
+            try {
+                const numberId = await session.client.getNumberId(cleanTo);
+                if (numberId && numberId._serialized) {
+                    const result2 = await session.client.sendMessage(numberId._serialized, text);
+                    return res.json({ success: true, messageId: result2.id._serialized });
+                }
+                return res.json({
+                    success: false,
+                    message: 'Cannot send to this number. It may not be on WhatsApp, or the number needs a valid country code. Try: +CountryCode + Number (e.g., 14155552671 for US).'
+                });
+            } catch (e2) {
+                return res.json({
+                    success: false,
+                    message: 'Number not found on WhatsApp. Make sure: 1) Number is on WhatsApp, 2) Use full international format with country code, 3) No leading zeros.'
+                });
+            }
+        }
     } catch (e) {
         res.json({ success: false, message: e.message });
     }
