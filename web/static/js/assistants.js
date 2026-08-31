@@ -382,10 +382,13 @@ function populateDetail(data) {
 }
 
 function setTab(tab) {
-    ['chat', 'integrations', 'tasks', 'analytics', 'logs'].forEach(t => {
-        document.getElementById('tab' + t.charAt(0).toUpperCase() + t.slice(1)).classList.toggle('active', t === tab);
-        document.getElementById('panel' + t.charAt(0).toUpperCase() + t.slice(1)).classList.toggle('hidden', t !== tab);
+    ['chat', 'integrations', 'tasks', 'monitors', 'schedule', 'analytics', 'logs'].forEach(t => {
+        const tabEl = document.getElementById('tab' + t.charAt(0).toUpperCase() + t.slice(1));
+        const panelEl = document.getElementById('panel' + t.charAt(0).toUpperCase() + t.slice(1));
+        if (tabEl) tabEl.classList.toggle('active', t === tab);
+        if (panelEl) panelEl.classList.toggle('hidden', t !== tab);
     });
+    if (tab === 'monitors') initMonitorsTab();
 }
 
 function renderConversations(conversations) {
@@ -887,14 +890,108 @@ function renderLogs(logs) {
     }).join('');
 }
 
+// ============= Monitors (Mr. Robot style) =============
+let assistantMonitors = JSON.parse(localStorage.getItem('asm_monitors') || '{}');
+
+function initMonitorsTab() {
+    if (!currentAssistantId) return;
+    const monitors = assistantMonitors[currentAssistantId] || [];
+    const el = document.getElementById('assistantMonitorsList');
+    if (monitors.length === 0) {
+        el.innerHTML = `<div class="text-center text-gray-500 py-6">
+            <i class="fas fa-eye-slash text-2xl mb-2 text-gray-600"></i>
+            <p class="text-xs">No monitors configured for this assistant</p>
+            <p class="text-xs text-gray-600 mt-1">Click "Add Monitor" or use quick presets above</p>
+        </div>`;
+        return;
+    }
+    el.innerHTML = monitors.map(m => `
+        <div class="glass p-4 rounded-xl" style="border-left: 3px solid ${m.active ? '#10b981' : '#6b7280'}">
+            <div class="flex items-center justify-between mb-2">
+                <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 rounded-lg flex items-center justify-center ${m.type === 'facebook' ? 'bg-blue-600/20' : m.type === 'ecommerce' ? 'bg-green-600/20' : 'bg-cyan-600/20'}">
+                        <i class="${m.type === 'facebook' ? 'fab fa-facebook' : m.type === 'ecommerce' ? 'fas fa-shopping-cart' : 'fas fa-globe'} ${m.type === 'facebook' ? 'text-blue-400' : m.type === 'ecommerce' ? 'text-green-400' : 'text-cyan-400'}"></i>
+                    </div>
+                    <div>
+                        <p class="text-white text-sm font-medium">${escapeHtml(m.name)}</p>
+                        <p class="text-[10px] text-gray-500">${escapeHtml(m.url || '').substring(0, 50)}</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full ${m.active ? 'bg-green-400' : 'bg-gray-500'} ${m.active ? 'animate-pulse' : ''}"></span>
+                    <button onclick="toggleAssistantMonitor('${m.id}')" class="px-2 py-1 bg-${m.active ? 'green' : 'gray'}-600/20 text-${m.active ? 'green' : 'gray'}-400 rounded text-[10px]">
+                        ${m.active ? 'Active' : 'Paused'}
+                    </button>
+                    <button onclick="deleteAssistantMonitor('${m.id}')" class="px-2 py-1 bg-red-600/20 text-red-400 rounded text-[10px]"><i class="fas fa-trash"></i></button>
+                </div>
+            </div>
+            <div class="flex flex-wrap gap-2 mt-2">
+                <span class="text-[10px] px-2 py-1 bg-white/5 rounded text-gray-400"><i class="fas fa-clock mr-1"></i>Every ${m.interval || 15}m</span>
+                <span class="text-[10px] px-2 py-1 bg-white/5 rounded text-gray-400"><i class="fas fa-bell mr-1"></i>${m.notify || 'WhatsApp'}</span>
+                ${m.keywords ? `<span class="text-[10px] px-2 py-1 bg-amber-600/10 rounded text-amber-400"><i class="fas fa-key mr-1"></i>${escapeHtml(m.keywords.split(',')[0])}</span>` : ''}
+            </div>
+        </div>
+    `).join('');
+}
+
+function openAddMonitorModal() {
+    document.getElementById('addMonitorModal')?.classList.remove('hidden');
+}
+
+function closeAddMonitorModal() {
+    document.getElementById('addMonitorModal')?.classList.add('hidden');
+}
+
+function createQuickMonitor(type) {
+    if (!currentAssistantId) { showToast('Open an assistant first', 'error'); return; }
+    const preset = {
+        facebook: { name: 'Facebook Page Monitor', type: 'facebook', url: 'https://facebook.com/', keywords: 'new post,like,comment,share', interval: 30, notify: 'whatsapp' },
+        ecommerce: { name: 'E-commerce Monitor', type: 'ecommerce', url: '', keywords: 'sale,discount,price drop,offer', interval: 60, notify: 'whatsapp' },
+        website: { name: 'Website Monitor', type: 'website', url: '', keywords: 'update,change,new', interval: 15, notify: 'whatsapp' }
+    };
+    const p = preset[type];
+    if (!p) return;
+
+    if (!assistantMonitors[currentAssistantId]) assistantMonitors[currentAssistantId] = [];
+    assistantMonitors[currentAssistantId].push({
+        id: 'm_' + Date.now(),
+        ...p,
+        active: true,
+        created: new Date().toISOString()
+    });
+    localStorage.setItem('asm_monitors', JSON.stringify(assistantMonitors));
+    initMonitorsTab();
+    showToast(`${p.name} created!`);
+}
+
+function toggleAssistantMonitor(id) {
+    if (!currentAssistantId || !assistantMonitors[currentAssistantId]) return;
+    const m = assistantMonitors[currentAssistantId].find(m => m.id === id);
+    if (m) {
+        m.active = !m.active;
+        localStorage.setItem('asm_monitors', JSON.stringify(assistantMonitors));
+        initMonitorsTab();
+    }
+}
+
+function deleteAssistantMonitor(id) {
+    if (!currentAssistantId || !assistantMonitors[currentAssistantId]) return;
+    if (!confirm('Delete this monitor?')) return;
+    assistantMonitors[currentAssistantId] = assistantMonitors[currentAssistantId].filter(m => m.id !== id);
+    localStorage.setItem('asm_monitors', JSON.stringify(assistantMonitors));
+    initMonitorsTab();
+    showToast('Monitor deleted');
+}
+
 // ============= Init =============
-['createModal', 'detailModal', 'settingsModal', 'integrationModal', 'taskModal'].forEach(id => {
+['createModal', 'detailModal', 'settingsModal', 'integrationModal', 'taskModal', 'addMonitorModal'].forEach(id => {
     const m = document.getElementById(id);
     if (m) m.addEventListener('click', e => { if (e.target === m) {
         if (id === 'createModal') closeCreateModal();
         else if (id === 'settingsModal') closeSettingsPanel();
         else if (id === 'integrationModal') closeIntegrationModal();
         else if (id === 'taskModal') closeTaskModal();
+        else if (id === 'addMonitorModal') closeAddMonitorModal();
     }});
 });
 

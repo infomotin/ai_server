@@ -26,7 +26,8 @@ from src.routers import (
     mcp_router,
     training_router,
     camera_router,
-    rbac_router
+    rbac_router,
+    monitoring_router
 )
 
 logging.basicConfig(
@@ -113,6 +114,7 @@ app.include_router(mcp_router)
 app.include_router(training_router.router)
 app.include_router(camera_router.router)
 app.include_router(rbac_router)
+app.include_router(monitoring_router.router)
 
 
 @app.get("/")

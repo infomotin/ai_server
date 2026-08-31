@@ -3,6 +3,8 @@
 {% block header_title %}Integrations Hub{% endblock %}
 
 {% block content %}
+<script src="https://cdn.jsdelivr.net/npm/marked@13.0.3/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
 <style>
 .int-card{background:#1e293b;border:1px solid #334155;border-radius:14px;padding:20px;transition:all .3s;cursor:pointer}
 .int-card:hover{border-color:rgba(139,92,246,.4);box-shadow:0 8px 32px rgba(0,0,0,.3);transform:translateY(-2px)}
@@ -30,6 +32,37 @@
 .scan-line{position:absolute;width:100%;height:2px;background:linear-gradient(90deg,transparent,#6366f1,transparent);animation:scanMove 2s linear infinite}
 @keyframes scanMove{0%{top:0}100%{top:100%}}
 .result-box{background:rgba(15,23,42,.8);border:1px solid #334155;border-radius:10px;padding:16px}
+
+/* AI Assistant Styles */
+.glass-assistant{background:rgba(30,41,59,.7);backdrop-filter:blur(16px);border:1px solid rgba(148,163,184,.15);border-radius:16px}
+.ai-assistant-header{background:linear-gradient(135deg,rgba(139,92,246,.2),rgba(6,182,212,.1));border-bottom:1px solid rgba(148,163,184,.1);padding:16px 20px;border-radius:16px 16px 0 0}
+.integration-platform-btn{padding:8px 14px;border-radius:10px;border:1px solid rgba(148,163,184,.2);background:rgba(15,23,42,.5);color:#94a3b8;cursor:pointer;transition:all .2s;font-size:12px}
+.integration-platform-btn:hover{border-color:#8b5cf6;color:#c4b5fd}
+.integration-platform-btn.active{background:rgba(139,92,246,.2);border-color:#8b5cf6;color:#c4b5fd}
+.unified-inbox-item{padding:14px 16px;background:rgba(15,23,42,.4);border:1px solid rgba(51,65,85,.5);border-radius:12px;margin-bottom:8px;cursor:pointer;transition:all .2s}
+.unified-inbox-item:hover{border-color:rgba(139,92,246,.4);background:rgba(139,92,246,.05)}
+.unified-inbox-item.unread{border-left:3px solid #8b5cf6}
+.msg-bubble{max-width:80%;padding:10px 14px;border-radius:16px;font-size:13px;line-height:1.5}
+.msg-bubble.user{background:linear-gradient(135deg,#6366f1,#8b5cf6);color:white;border-bottom-right-radius:4px;margin-left:auto}
+.msg-bubble.assistant{background:rgba(51,65,85,.7);color:#e2e8f0;border:1px solid rgba(148,163,184,.15);border-bottom-left-radius:4px}
+.msg-bubble .platform-icon{font-size:10px;margin-right:4px}
+.action-step{padding:10px 14px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:10px;margin:6px 0;font-size:12px;color:#fde68a}
+.action-step.executing{background:rgba(16,185,129,.1);border-color:rgba(16,185,129,.3);color:#6ee7b7}
+.action-step.completed{background:rgba(16,185,129,.05);border-color:rgba(16,185,129,.2);color:#94a3b8}
+.action-step .step-num{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:rgba(245,158,11,.3);margin-right:8px;font-size:10px}
+.action-step.executing .step-num{background:rgba(16,185,129,.3)}
+.action-step.completed .step-num{background:rgba(16,185,129,.2)}
+.monitor-card{background:linear-gradient(135deg,rgba(239,68,68,.08),rgba(139,92,246,.05));border:1px solid rgba(139,92,246,.2);border-radius:14px;padding:16px;margin-bottom:12px}
+.monitor-card.active{border-color:rgba(16,185,129,.4)}
+.monitor-status{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.monitor-status.running{background:#10b981;box-shadow:0 0 8px rgba(16,185,129,.5);animation:pulse 2s infinite}
+.monitor-status.stopped{background:#6b7280}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(16,185,129,.6)}70%{box-shadow:0 0 0 8px rgba(16,185,129,0)}100%{box-shadow:0 0 0 0 rgba(16,185,129,0)}}
+.typing-indicator span{display:inline-block;width:6px;height:6px;border-radius:50%;background:#94a3b8;margin:0 2px;animation:bounce 1.2s infinite}
+.typing-indicator span:nth-child(2){animation-delay:.15s}
+.typing-indicator span:nth-child(3){animation-delay:.3s}
+@keyframes bounce{0%,60%,100%{transform:translateY(0);opacity:.5}30%{transform:translateY(-6px);opacity:1}}
+.notification-badge{position:absolute;top:-4px;right:-4px;min-width:18px;height:18px;border-radius:999px;background:#ef4444;color:white;font-size:10px;display:flex;align-items:center;justify-content:center;padding:0 5px}
 </style>
 
 <!-- Top Tabs -->
@@ -39,12 +72,12 @@
     <button onclick="showTab('scanner')" class="tab-btn" id="tabScanner"><i class="fas fa-camera mr-1"></i>QR / Barcode</button>
     <button onclick="showTab('webhooks')" class="tab-btn" id="tabWebhooks"><i class="fas fa-plug mr-1"></i>Webhooks</button>
     <button onclick="showTab('apitester')" class="tab-btn" id="tabApitester"><i class="fas fa-flask mr-1"></i>API Tester</button>
-    <button onclick="showTab('chat')" class="tab-btn" id="tabChat"><i class="fas fa-comments mr-1"></i>Chat</button>
+    <button onclick="showTab('assistant')" class="tab-btn" id="tabAssistant"><i class="fas fa-robot mr-1"></i>AI Assistant</button>
+    <button onclick="showTab('monitor')" class="tab-btn" id="tabMonitor"><i class="fas fa-satellite-dish mr-1"></i>Monitors</button>
 </div>
 
 <!-- ============= SERVICE CATALOG ============= -->
 <div id="panelCatalog" class="fade-in">
-    <!-- Category Filter -->
     <div class="flex items-center gap-2 mb-5 flex-wrap">
         <button onclick="filterCat('all')" class="cat-pill active" data-cat="all"><i class="fas fa-globe"></i> All</button>
         <button onclick="filterCat('messaging')" class="cat-pill" data-cat="messaging"><i class="fas fa-comment"></i> Messaging</button>
@@ -54,6 +87,7 @@
         <button onclick="filterCat('ai')" class="cat-pill" data-cat="ai"><i class="fas fa-brain"></i> AI</button>
         <button onclick="filterCat('iot')" class="cat-pill" data-cat="iot"><i class="fas fa-microchip"></i> IoT</button>
         <button onclick="filterCat('automation')" class="cat-pill" data-cat="automation"><i class="fas fa-bolt"></i> Automation</button>
+        <button onclick="filterCat('monitoring')" class="cat-pill" data-cat="monitoring"><i class="fas fa-eye"></i> Monitoring</button>
         <button onclick="filterCat('custom')" class="cat-pill" data-cat="custom"><i class="fas fa-plug"></i> Custom</button>
     </div>
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4" id="catalogGrid">
@@ -75,7 +109,6 @@
 <!-- ============= QR / BARCODE SCANNER ============= -->
 <div id="panelScanner" class="hidden fade-in">
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <!-- QR Generator -->
         <div class="bg-gray-800 rounded-xl border border-gray-700 p-6">
             <h3 class="text-white font-semibold mb-4 flex items-center gap-2"><i class="fas fa-qrcode text-indigo-400"></i>QR Code Generator</h3>
             <div class="space-y-3">
@@ -93,70 +126,38 @@
 
             <div class="mt-6 pt-4 border-t border-gray-700">
                 <h4 class="text-white text-sm font-semibold mb-3"><i class="fab fa-whatsapp text-green-400 mr-1"></i>WhatsApp Web Connection</h4>
-
                 <div class="bg-green-900/20 border border-green-600/30 rounded-lg p-3 mb-3">
-                    <p class="text-xs text-green-300 leading-relaxed">
-                        <i class="fas fa-info-circle mr-1"></i>
-                        Connect your WhatsApp account by scanning a real QR code. Works with iPhone WhatsApp & WhatsApp Business.
-                    </p>
+                    <p class="text-xs text-green-300 leading-relaxed"><i class="fas fa-info-circle mr-1"></i>Connect your WhatsApp account by scanning a QR code.</p>
                 </div>
-
                 <div class="flex gap-2 mb-3">
-                    <button onclick="initWhatsAppWeb()" id="waInitBtn" class="flex-1 px-3 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg text-xs font-medium transition">
-                        <i class="fas fa-qrcode mr-1"></i>Start & Get QR Code
-                    </button>
-                    <button onclick="logoutWhatsAppWeb()" class="px-3 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg text-xs font-medium transition">
-                        <i class="fas fa-sign-out-alt"></i>
-                    </button>
+                    <button onclick="initWhatsAppWeb()" id="waInitBtn" class="flex-1 px-3 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg text-xs font-medium transition"><i class="fas fa-qrcode mr-1"></i>Start & Get QR</button>
+                    <button onclick="logoutWhatsAppWeb()" class="px-3 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg text-xs font-medium transition"><i class="fas fa-sign-out-alt"></i></button>
                 </div>
-
                 <div id="waStatusBox" class="mb-3 p-2 rounded-lg text-xs bg-gray-800/50 border border-gray-700">
                     <div class="flex items-center gap-2">
                         <span id="waStatusDot" class="status-dot gray"></span>
                         <span id="waStatusText" class="text-gray-400">Not connected</span>
                     </div>
                 </div>
-
                 <div id="waQrResult" class="text-center mt-3 hidden">
                     <div class="qr-box inline-block bg-white p-2 rounded-lg"><img id="waQrImage" class="w-56 h-56"></div>
-                    <div class="mt-3 text-left bg-gray-800/50 rounded-lg p-3">
-                        <p class="text-xs text-cyan-400 font-semibold mb-2"><i class="fas fa-mobile-alt mr-1"></i>How to scan on iPhone:</p>
-                        <ol class="text-[10px] text-gray-300 space-y-1 list-decimal list-inside leading-relaxed">
-                            <li>Open <strong>WhatsApp Business</strong> on your iPhone</li>
-                            <li>Tap the <strong>Settings</strong> tab (bottom right, gear icon)</li>
-                            <li>Tap <strong>Linked Devices</strong></li>
-                            <li>Tap <strong>Link a Device</strong></li>
-                            <li>Point your camera at the QR code above</li>
-                        </ol>
-                    </div>
                     <p class="text-[10px] text-gray-500 mt-2" id="waQrTimer">QR refreshes automatically</p>
                 </div>
-
                 <div id="waConnectedBox" class="mt-3 hidden">
                     <div class="p-3 bg-green-900/20 border border-green-600/40 rounded-lg">
                         <div class="flex items-center gap-2 mb-2">
                             <i class="fas fa-check-circle text-green-400 text-lg"></i>
                             <span class="text-green-300 font-semibold text-sm">WhatsApp Connected!</span>
                         </div>
-                        <p class="text-[10px] text-gray-400">You can now send and receive messages. Incoming messages will appear below.</p>
+                        <p class="text-[10px] text-gray-400">You can now send and receive messages.</p>
                     </div>
                 </div>
-
                 <div class="border-t border-gray-700 pt-3 mt-3">
-                    <p class="text-xs text-gray-400 mb-2 font-semibold"><i class="fas fa-paper-plane mr-1"></i>Send Message (via WhatsApp Web)</p>
+                    <p class="text-xs text-gray-400 mb-2 font-semibold"><i class="fas fa-paper-plane mr-1"></i>Send Message</p>
                     <div class="space-y-2">
                         <input type="text" id="waRecipient" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-xs" placeholder="Recipient phone (e.g. 14155552671)">
                         <textarea id="waText" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-xs" rows="2" placeholder="Message text"></textarea>
-                        <button onclick="sendWhatsAppWebMessage()" id="waSendBtn" class="w-full px-3 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg text-xs font-medium transition">
-                            <i class="fas fa-paper-plane mr-1"></i>Send
-                        </button>
-                    </div>
-                </div>
-
-                <div class="border-t border-gray-700 pt-3 mt-3">
-                    <p class="text-xs text-gray-400 mb-2 font-semibold"><i class="fas fa-inbox mr-1"></i>Incoming Messages</p>
-                    <div id="waMessagesList" class="space-y-1 max-h-48 overflow-y-auto">
-                        <p class="text-[10px] text-gray-500 italic">No messages yet</p>
+                        <button onclick="sendWhatsAppWebMessage()" id="waSendBtn" class="w-full px-3 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg text-xs font-medium transition"><i class="fas fa-paper-plane mr-1"></i>Send</button>
                     </div>
                 </div>
             </div>
@@ -166,9 +167,7 @@
                 <div class="flex gap-2">
                     <input type="text" id="barcodeContent" class="flex-1 bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm" placeholder="PRODUCT-001">
                     <select id="barcodeType" class="bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm">
-                        <option value="code128">Code 128</option>
-                        <option value="code39">Code 39</option>
-                        <option value="ean13">EAN-13</option>
+                        <option value="code128">Code 128</option><option value="code39">Code 39</option><option value="ean13">EAN-13</option>
                     </select>
                     <button onclick="generateBarcode()" class="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-sm font-medium transition">Generate</button>
                 </div>
@@ -179,25 +178,17 @@
             </div>
         </div>
 
-        <!-- Camera Scanner -->
         <div class="bg-gray-800 rounded-xl border border-gray-700 p-6">
             <h3 class="text-white font-semibold mb-4 flex items-center gap-2"><i class="fas fa-camera text-green-400"></i>Camera Scanner</h3>
             <p class="text-xs text-gray-500 mb-3">Use your device camera to scan QR codes and barcodes</p>
-            <div class="camera-view mb-4" id="cameraView">
-                <video id="cameraVideo" autoplay playsinline></video>
-                <div class="camera-overlay"><div class="scan-frame"><div class="scan-line"></div></div></div>
-            </div>
+            <div class="camera-view mb-4" id="cameraView"><video id="cameraVideo" autoplay playsinline></video><div class="camera-overlay"><div class="scan-frame"><div class="scan-line"></div></div></div></div>
             <div class="flex gap-2 mb-4">
-                <button onclick="startCamera()" class="flex-1 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg text-sm font-medium transition" id="btnStartCam"><i class="fas fa-camera mr-1"></i>Start Camera</button>
+                <button onclick="startCamera()" class="flex-1 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg text-sm font-medium transition" id="btnStartCam"><i class="fas fa-camera mr-1"></i>Start</button>
                 <button onclick="stopCamera()" class="flex-1 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg text-sm font-medium transition" id="btnStopCam" disabled><i class="fas fa-stop mr-1"></i>Stop</button>
                 <button onclick="captureAndScan()" class="flex-1 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-medium transition" id="btnScan" disabled><i class="fas fa-crosshairs mr-1"></i>Scan</button>
             </div>
             <div id="scanResult" class="hidden">
-                <div class="result-box">
-                    <p class="text-xs text-gray-500 uppercase tracking-wider mb-2">Scan Result</p>
-                    <p class="text-white font-mono text-sm" id="scanData">-</p>
-                    <p class="text-gray-400 text-xs mt-1" id="scanType">-</p>
-                </div>
+                <div class="result-box"><p class="text-xs text-gray-500 uppercase tracking-wider mb-2">Result</p><p class="text-white font-mono text-sm" id="scanData">-</p><p class="text-gray-400 text-xs mt-1" id="scanType">-</p></div>
             </div>
             <div class="mt-4 pt-4 border-t border-gray-700">
                 <h4 class="text-white text-sm font-semibold mb-2">Or upload an image:</h4>
@@ -214,28 +205,21 @@
         <h3 class="text-white font-semibold">Webhook Endpoints</h3>
         <button onclick="showCreateWebhook()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-white text-sm font-medium transition"><i class="fas fa-plus mr-1"></i>Create Webhook</button>
     </div>
-
-    <!-- Create Form -->
     <div id="webhookForm" class="hidden bg-gray-800 rounded-xl border border-gray-700 p-5 mb-4 fade-in">
         <h4 class="text-white font-semibold mb-3">New Webhook</h4>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
             <input type="text" id="whName" class="bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm" placeholder="Webhook name">
             <input type="url" id="whUrl" class="bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm" placeholder="https://example.com/webhook">
-            <select id="whMethod" class="bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm">
-                <option value="POST">POST</option><option value="GET">GET</option><option value="PUT">PUT</option><option value="DELETE">DELETE</option>
-            </select>
+            <select id="whMethod" class="bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm"><option value="POST">POST</option><option value="GET">GET</option><option value="PUT">PUT</option><option value="DELETE">DELETE</option></select>
             <input type="text" id="whEvents" class="bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm" placeholder="Events (comma-separated)">
         </div>
         <textarea id="whBody" rows="3" class="mt-3 w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm font-mono" placeholder='{"event":"test","data":{}}'></textarea>
         <div class="flex gap-2 mt-3">
-            <button onclick="createWebhook()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-medium transition">Save Webhook</button>
+            <button onclick="createWebhook()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-medium transition">Save</button>
             <button onclick="hideCreateWebhook()" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm font-medium transition">Cancel</button>
         </div>
     </div>
-
-    <div id="webhookList" class="space-y-3">
-        <p class="text-gray-500 text-sm text-center py-8">No webhooks configured yet</p>
-    </div>
+    <div id="webhookList" class="space-y-3"><p class="text-gray-500 text-sm text-center py-8">No webhooks configured yet</p></div>
 </div>
 
 <!-- ============= API TESTER ============= -->
@@ -243,37 +227,19 @@
     <div class="bg-gray-800 rounded-xl border border-gray-700 p-6">
         <h3 class="text-white font-semibold mb-4 flex items-center gap-2"><i class="fas fa-flask text-purple-400"></i>API Connection Tester</h3>
         <p class="text-xs text-gray-500 mb-4">Test any REST API endpoint with full request/response details</p>
-
         <div class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-3">
             <select id="apiMethod" class="bg-gray-700 border border-gray-600 rounded-lg px-3 py-2.5 text-white text-sm font-bold">
-                <option value="GET" class="text-green-400">GET</option>
-                <option value="POST" class="text-amber-400">POST</option>
-                <option value="PUT" class="text-blue-400">PUT</option>
-                <option value="PATCH" class="text-purple-400">PATCH</option>
-                <option value="DELETE" class="text-red-400">DELETE</option>
+                <option value="GET" class="text-green-400">GET</option><option value="POST" class="text-amber-400">POST</option><option value="PUT" class="text-blue-400">PUT</option><option value="PATCH" class="text-purple-400">PATCH</option><option value="DELETE" class="text-red-400">DELETE</option>
             </select>
             <input type="url" id="apiUrl" class="md:col-span-3 bg-gray-700 border border-gray-600 rounded-lg px-4 py-2.5 text-white text-sm" placeholder="https://api.example.com/endpoint">
         </div>
-
         <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
-            <select id="apiAuth" class="bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm">
-                <option value="none">No Auth</option>
-                <option value="bearer">Bearer Token</option>
-                <option value="basic">Basic Auth</option>
-                <option value="apikey">API Key</option>
-            </select>
+            <select id="apiAuth" class="bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm"><option value="none">No Auth</option><option value="bearer">Bearer Token</option><option value="basic">Basic Auth</option><option value="apikey">API Key</option></select>
             <input type="text" id="apiAuthToken" class="md:col-span-2 bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm" placeholder="Token / Key">
         </div>
-
         <textarea id="apiBody" rows="4" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white text-sm font-mono mb-3" placeholder='{"key": "value"}'></textarea>
-
-        <div id="apiHeaders" class="mb-3">
-            <p class="text-xs text-gray-500 mb-2">Custom Headers (JSON):</p>
-            <input type="text" id="apiHeadersInput" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm font-mono" placeholder='{"Content-Type": "application/json"}'>
-        </div>
-
+        <div id="apiHeaders" class="mb-3"><p class="text-xs text-gray-500 mb-2">Custom Headers (JSON):</p><input type="text" id="apiHeadersInput" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm font-mono" placeholder='{"Content-Type": "application/json"}'></div>
         <button onclick="testApi()" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-medium transition" id="btnApiTest"><i class="fas fa-play mr-1"></i>Send Request</button>
-
         <div id="apiResult" class="hidden mt-4">
             <div class="flex items-center gap-3 mb-3">
                 <span class="px-3 py-1 rounded-lg text-sm font-bold" id="apiStatus">200</span>
@@ -285,48 +251,224 @@
     </div>
 </div>
 
-<!-- ============= CHAT ============= -->
-<div id="panelChat" class="hidden fade-in">
-    <div class="bg-gray-800 rounded-xl border border-gray-700 p-6">
-        <div class="flex items-center justify-between mb-4">
-            <div class="flex items-center gap-3">
-                <div id="chatIcon" class="w-10 h-10 bg-gray-600 rounded-lg flex items-center justify-center"><i class="fas fa-comments text-white"></i></div>
-                <div>
-                    <h3 class="text-white font-semibold" id="chatTitle">Select a Platform</h3>
-                    <p class="text-xs text-gray-500" id="chatStatus">Connect an account first</p>
+<!-- ============= AI INTEGRATION ASSISTANT ============= -->
+<div id="panelAssistant" class="hidden fade-in">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 h-[calc(100vh-220px)]">
+        <!-- Left: Platform Selection & Unified Inbox -->
+        <div class="glass-assistant flex flex-col overflow-hidden">
+            <div class="ai-assistant-header">
+                <h3 class="text-white font-semibold flex items-center gap-2"><i class="fas fa-brain text-purple-400"></i>Integration AI</h3>
+                <p class="text-xs text-gray-400 mt-1">Unified inbox + AI-powered actions</p>
+            </div>
+            <div class="p-3 border-b border-gray-700/50">
+                <div class="flex flex-wrap gap-1.5">
+                    <button onclick="selectAssistantPlatform('all')" class="integration-platform-btn active" data-platform="all"><i class="fas fa-globe mr-1"></i>All</button>
+                    <button onclick="selectAssistantPlatform('whatsapp')" class="integration-platform-btn" data-platform="whatsapp"><i class="fab fa-whatsapp mr-1"></i>WhatsApp</button>
+                    <button onclick="selectAssistantPlatform('email')" class="integration-platform-btn" data-platform="email"><i class="fas fa-envelope mr-1"></i>Email</button>
+                    <button onclick="selectAssistantPlatform('facebook')" class="integration-platform-btn" data-platform="facebook"><i class="fab fa-facebook mr-1"></i>Facebook</button>
+                    <button onclick="selectAssistantPlatform('telegram')" class="integration-platform-btn" data-platform="telegram"><i class="fab fa-telegram mr-1"></i>Telegram</button>
                 </div>
             </div>
-            <select id="chatPlatform" class="bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm" onchange="switchChatPlatform()">
-                <option value="">Select platform...</option>
-            </select>
+            <div class="flex-1 overflow-y-auto p-3 scroll-thin" id="unifiedInbox">
+                <div class="text-center text-gray-500 py-8">
+                    <i class="fas fa-inbox text-3xl mb-2 text-gray-600"></i>
+                    <p class="text-sm">Select a platform to view messages</p>
+                    <p class="text-xs text-gray-600 mt-1">or ask the AI to check for you</p>
+                </div>
+            </div>
         </div>
 
-        <div id="chatMessages" class="bg-gray-900 rounded-lg p-4 h-80 overflow-y-auto mb-4">
-            <div class="text-center text-gray-500 py-8"><i class="fas fa-inbox text-3xl mb-2"></i><p class="text-sm">Select a connected platform to start chatting</p></div>
-        </div>
+        <!-- Center: Chat Interface -->
+        <div class="glass-assistant flex flex-col overflow-hidden lg:col-span-2">
+            <div class="ai-assistant-header flex items-center justify-between">
+                <div>
+                    <h3 class="text-white font-semibold flex items-center gap-2"><i class="fas fa-robot text-cyan-400"></i>AI Assistant</h3>
+                    <p class="text-xs text-gray-400 mt-1">Read, Write, Reply, and Take Action</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <select id="aiModel" class="bg-gray-700/50 border border-gray-600 rounded-lg px-2 py-1 text-white text-xs">
+                        <option value="qwen2.5-coder:1.5b">Qwen 1.5B</option>
+                        <option value="llama3.2:1b">Llama 3.2 1B</option>
+                        <option value="qwen2.5:0.5b">Qwen 0.5B</option>
+                    </select>
+                    <select id="aiTone" class="bg-gray-700/50 border border-gray-600 rounded-lg px-2 py-1 text-white text-xs">
+                        <option value="helpful">Helpful</option>
+                        <option value="concise">Concise</option>
+                        <option value="detailed">Detailed</option>
+                    </select>
+                </div>
+            </div>
 
-        <div class="flex gap-2 mb-3">
-            <input type="text" id="chatTo" class="w-48 bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm" placeholder="To / Chat ID">
-            <input type="text" id="chatMsg" class="flex-1 bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white text-sm" placeholder="Type a message..." onkeydown="if(event.key==='Enter')sendChatMsg()">
-            <button onclick="sendChatMsg()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-medium transition"><i class="fas fa-paper-plane"></i></button>
-            <button onclick="aiChatReply()" class="px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg text-sm font-medium transition" title="AI Reply"><i class="fas fa-robot"></i></button>
-        </div>
-        <div class="flex gap-2">
-            <select id="chatModel" class="bg-gray-700 border border-gray-600 rounded-lg px-3 py-1.5 text-white text-xs">
-                <option value="llama3.2:1b">Llama 3.2 1B</option>
-                <option value="qwen2.5:0.5b">Qwen 2.5 0.5B</option>
-            </select>
-            <select id="chatTone" class="bg-gray-700 border border-gray-600 rounded-lg px-3 py-1.5 text-white text-xs">
-                <option value="professional">Professional</option>
-                <option value="friendly">Friendly</option>
-                <option value="casual">Casual</option>
-                <option value="concise">Concise</option>
-            </select>
+            <!-- Quick Actions Bar -->
+            <div class="px-4 py-2 border-b border-gray-700/50 flex flex-wrap gap-2">
+                <button onclick="sendAIAction('Check my WhatsApp messages')" class="px-3 py-1.5 bg-green-600/20 border border-green-600/30 text-green-400 rounded-lg text-xs hover:bg-green-600/30 transition">
+                    <i class="fab fa-whatsapp mr-1"></i>Check WhatsApp
+                </button>
+                <button onclick="sendAIAction('Show me recent emails')" class="px-3 py-1.5 bg-blue-600/20 border border-blue-600/30 text-blue-400 rounded-lg text-xs hover:bg-blue-600/30 transition">
+                    <i class="fas fa-envelope mr-1"></i>Check Emails
+                </button>
+                <button onclick="sendAIAction('Check my Facebook page posts')" class="px-3 py-1.5 bg-indigo-600/20 border border-indigo-600/30 text-indigo-400 rounded-lg text-xs hover:bg-indigo-600/30 transition">
+                    <i class="fab fa-facebook mr-1"></i>Check Facebook
+                </button>
+                <button onclick="sendAIAction('Summarize all unread messages across platforms')" class="px-3 py-1.5 bg-purple-600/20 border border-purple-600/30 text-purple-400 rounded-lg text-xs hover:bg-purple-600/30 transition">
+                    <i class="fas fa-layer-group mr-1"></i>Unified Summary
+                </button>
+            </div>
+
+            <!-- Chat Messages -->
+            <div class="flex-1 overflow-y-auto p-4 scroll-thin" id="aiChatMessages">
+                <div class="empty-state">
+                    <i class="fas fa-robot text-4xl text-gray-700 mb-3"></i>
+                    <p class="text-sm text-gray-400">Ask me to read or send messages</p>
+                    <p class="text-xs text-gray-600 mt-1">Example: "Read my WhatsApp messages" or "Send a reply to the last email"</p>
+                </div>
+            </div>
+
+            <!-- Action Steps Display -->
+            <div id="actionSteps" class="px-4 py-2 border-t border-gray-700/50 max-h-32 overflow-y-auto scroll-thin hidden">
+                <p class="text-xs text-gray-500 mb-2 flex items-center"><i class="fas fa-list-ol mr-1"></i>Action Steps:</p>
+                <div id="actionStepsList"></div>
+            </div>
+
+            <!-- Input Area -->
+            <div class="p-4 border-t border-gray-700/50">
+                <div class="flex gap-2">
+                    <input type="text" id="aiChatInput" class="flex-1 bg-gray-700/50 border border-gray-600 rounded-xl px-4 py-2.5 text-white text-sm" placeholder="Ask me to read, write, reply, or take action..." onkeydown="if(event.key==='Enter')sendAIMessage()">
+                    <button onclick="sendAIMessage()" class="px-4 py-2.5 bg-gradient-to-r from-purple-600 to-cyan-600 text-white rounded-xl text-sm font-medium hover:opacity-90 transition"><i class="fas fa-paper-plane"></i></button>
+                    <button onclick="sendAIMessage(true)" class="px-3 py-2.5 bg-gray-700 border border-gray-600 text-gray-400 rounded-xl text-sm hover:text-white transition" title="Take Action"><i class="fas fa-play"></i></button>
+                </div>
+                <div class="flex items-center gap-4 mt-2 text-[10px] text-gray-500">
+                    <span><i class="fas fa-info-circle mr-1"></i>AI can read & send messages</span>
+                    <span><i class="fas fa-shield-alt mr-1"></i>Your data stays local</span>
+                </div>
+            </div>
         </div>
     </div>
 </div>
 
-<!-- ============= CONNECT MODAL ============= -->
+<!-- ============= MONITORS ============= -->
+<div id="panelMonitor" class="hidden fade-in">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <!-- Left: Monitor List -->
+        <div class="lg:col-span-2">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-white font-semibold flex items-center gap-2"><i class="fas fa-satellite-dish text-cyan-400"></i>Active Monitors</h3>
+                <button onclick="openAddMonitorModal()" class="px-3 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-medium transition"><i class="fas fa-plus mr-1"></i>Add Monitor</button>
+            </div>
+            <div id="monitorsList">
+                <div class="text-center text-gray-500 py-12">
+                    <i class="fas fa-eye-slash text-4xl mb-3 text-gray-600"></i>
+                    <p class="text-sm">No monitors configured</p>
+                    <p class="text-xs text-gray-600 mt-1">Add a monitor to track websites, pages, or offers</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right: Monitor Configuration -->
+        <div class="glass-assistant p-4">
+            <h3 class="text-white font-semibold mb-3 flex items-center gap-2"><i class="fas fa-cog text-amber-400"></i>Monitor Settings</h3>
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">Notification Channel</label>
+                    <select id="notifyChannel" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm">
+                        <option value="whatsapp">WhatsApp</option>
+                        <option value="email">Email</option>
+                        <option value="telegram">Telegram</option>
+                        <option value="both">WhatsApp + Email</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">Check Interval</label>
+                    <select id="checkInterval" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm">
+                        <option value="5">Every 5 minutes</option>
+                        <option value="15">Every 15 minutes</option>
+                        <option value="30">Every 30 minutes</option>
+                        <option value="60">Every hour</option>
+                        <option value="360">Every 6 hours</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">Auto-Reply to Detected Changes</label>
+                    <label class="flex items-center gap-2 mt-1">
+                        <input type="checkbox" id="autoReply" class="w-4 h-4 rounded">
+                        <span class="text-xs text-gray-400">Enable auto-response</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="mt-6 pt-4 border-t border-gray-700/50">
+                <h4 class="text-xs text-gray-400 font-semibold mb-2 uppercase tracking-wider">Preset Monitors</h4>
+                <div class="space-y-2">
+                    <button onclick="createPresetMonitor('facebook')" class="w-full p-3 bg-blue-600/10 border border-blue-600/20 rounded-lg text-left hover:bg-blue-600/20 transition">
+                        <p class="text-sm text-blue-400"><i class="fab fa-facebook mr-2"></i>Facebook Page Monitor</p>
+                        <p class="text-[10px] text-gray-500 mt-1">Track new posts, comments, and engagement</p>
+                    </button>
+                    <button onclick="createPresetMonitor('ecommerce')" class="w-full p-3 bg-green-600/10 border border-green-600/20 rounded-lg text-left hover:bg-green-600/20 transition">
+                        <p class="text-sm text-green-400"><i class="fas fa-shopping-cart mr-2"></i>E-commerce Price Monitor</p>
+                        <p class="text-[10px] text-gray-500 mt-1">Track prices, offers, and product availability</p>
+                    </button>
+                    <button onclick="createPresetMonitor('news')" class="w-full p-3 bg-purple-600/10 border border-purple-600/20 rounded-lg text-left hover:bg-purple-600/20 transition">
+                        <p class="text-sm text-purple-400"><i class="fas fa-newspaper mr-2"></i>News/Feed Monitor</p>
+                        <p class="text-[10px] text-gray-500 mt-1">Track RSS feeds, blogs, and content updates</p>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Monitor Modal -->
+<div id="addMonitorModal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-[#1e293b] border border-gray-700 rounded-2xl w-full max-w-lg shadow-2xl">
+        <div class="flex items-center justify-between p-5 border-b border-gray-700">
+            <h3 class="text-white font-semibold"><i class="fas fa-plus-circle text-indigo-400 mr-2"></i>Add Monitor</h3>
+            <button onclick="closeAddMonitorModal()" class="text-gray-400 hover:text-white"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="p-5 space-y-4">
+            <div>
+                <label class="block text-xs text-gray-400 mb-1">Monitor Type</label>
+                <select id="monitorType" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm" onchange="onMonitorTypeChange()">
+                    <option value="website">Website / URL</option>
+                    <option value="facebook">Facebook Page</option>
+                    <option value="ecommerce">E-commerce Product</option>
+                    <option value="rss">RSS Feed</option>
+                    <option value="api">API Endpoint</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs text-gray-400 mb-1">Name</label>
+                <input type="text" id="monitorName" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm" placeholder="My Monitor">
+            </div>
+            <div id="monitorUrlField">
+                <label class="block text-xs text-gray-400 mb-1">URL to Monitor</label>
+                <input type="url" id="monitorUrl" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm" placeholder="https://...">
+            </div>
+            <div id="monitorKeywordsField">
+                <label class="block text-xs text-gray-400 mb-1">Alert Keywords (comma-separated)</label>
+                <input type="text" id="monitorKeywords" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm" placeholder="sale, discount, new, offer">
+            </div>
+            <div>
+                <label class="block text-xs text-gray-400 mb-1">Notification Method</label>
+                <select id="monitorNotify" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm">
+                    <option value="whatsapp">WhatsApp Message</option>
+                    <option value="email">Email</option>
+                    <option value="telegram">Telegram</option>
+                    <option value="webhook">Webhook</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs text-gray-400 mb-1">Recipients (phone/email/webhook URL)</label>
+                <input type="text" id="monitorRecipients" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm" placeholder="+1234567890, admin@example.com">
+            </div>
+        </div>
+        <div class="p-5 border-t border-gray-700 flex gap-3">
+            <button onclick="closeAddMonitorModal()" class="flex-1 py-2.5 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm font-medium transition">Cancel</button>
+            <button onclick="saveMonitor()" class="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-medium transition"><i class="fas fa-save mr-1"></i>Create Monitor</button>
+        </div>
+    </div>
+</div>
+
+<!-- CONNECT MODAL -->
 <div id="connectModal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
     <div class="bg-[#1e293b] border border-gray-700 rounded-2xl w-full max-w-md shadow-2xl">
         <div class="flex items-center justify-between p-5 border-b border-gray-700">
@@ -334,10 +476,7 @@
             <button onclick="closeConnectModal()" class="text-gray-400 hover:text-white"><i class="fas fa-times"></i></button>
         </div>
         <div class="p-5 space-y-4" id="connectModalBody">
-            <div id="connectQrArea" class="hidden text-center">
-                <div class="qr-box inline-block mb-3"><img id="connectQrImg" class="w-48 h-48"></div>
-                <p class="text-xs text-gray-500" id="connectQrInstructions"></p>
-            </div>
+            <div id="connectQrArea" class="hidden text-center"><div class="qr-box inline-block mb-3"><img id="connectQrImg" class="w-48 h-48"></div><p class="text-xs text-gray-500" id="connectQrInstructions"></p></div>
             <div id="connectFields"></div>
             <div id="connectStatus" class="hidden"></div>
         </div>
@@ -351,7 +490,6 @@
 <div id="toast" class="fixed bottom-6 right-6 bg-green-600 text-white px-4 py-2.5 rounded-lg shadow-lg z-50 hidden flex items-center gap-2 text-sm font-medium">
     <i class="fas fa-check-circle"></i><span id="toastMsg">Done!</span>
 </div>
-
 {% endblock %}
 
 {% block scripts %}
@@ -361,18 +499,22 @@ let connected = JSON.parse(localStorage.getItem('int_connected') || '{}');
 let catalog = [];
 let currentConnectService = null;
 let cameraStream = null;
+let currentAssistantPlatform = 'all';
+let monitors = JSON.parse(localStorage.getItem('int_monitors') || '[]');
+let aiConversationHistory = [];
 
 /* ===== Tabs ===== */
 function showTab(t) {
-    ['catalog','connected','scanner','webhooks','apitester','chat'].forEach(p => {
+    ['catalog','connected','scanner','webhooks','apitester','assistant','monitor'].forEach(p => {
         document.getElementById('panel' + p.charAt(0).toUpperCase() + p.slice(1)).classList.toggle('hidden', p !== t);
     });
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-    const map = {catalog:'tabCatalog',connected:'tabConnected',scanner:'tabScanner',webhooks:'tabWebhooks',apitester:'tabApitester',chat:'tabChat'};
+    const map = {catalog:'tabCatalog',connected:'tabConnected',scanner:'tabScanner',webhooks:'tabWebhooks',apitester:'tabApitester',assistant:'tabAssistant',monitor:'tabMonitor'};
     document.getElementById(map[t])?.classList.add('active');
     if (t === 'webhooks') loadWebhooks();
     if (t === 'connected') renderConnected();
-    if (t === 'chat') populateChatPlatforms();
+    if (t === 'monitor') renderMonitors();
+    if (t === 'assistant') initAIAssistant();
 }
 
 /* ===== Catalog ===== */
@@ -391,13 +533,8 @@ function renderCatalog(items) {
     document.getElementById('catalogGrid').innerHTML = items.map(s => `
         <div class="int-card ${connected[s.id] ? 'connected' : ''}" onclick="openConnect('${s.id}')">
             <div class="flex items-center gap-3 mb-3">
-                <div class="w-10 h-10 bg-${s.color}-600/20 rounded-xl flex items-center justify-center">
-                    <i class="${s.icon} text-${s.color}-400"></i>
-                </div>
-                <div class="min-w-0">
-                    <h4 class="text-white font-semibold text-sm truncate">${s.name}</h4>
-                    <span class="text-[10px] text-gray-500 uppercase">${s.category}</span>
-                </div>
+                <div class="w-10 h-10 bg-${s.color}-600/20 rounded-xl flex items-center justify-center"><i class="${s.icon} text-${s.color}-400"></i></div>
+                <div class="min-w-0"><h4 class="text-white font-semibold text-sm truncate">${s.name}</h4><span class="text-[10px] text-gray-500 uppercase">${s.category}</span></div>
             </div>
             <p class="text-xs text-gray-400 mb-3">${s.description}</p>
             <div class="flex items-center justify-between">
@@ -565,7 +702,7 @@ async function initWhatsAppWeb() {
         }
     } catch(e) { showToast('Error: ' + e.message, 'error'); }
     btn.disabled = false;
-    btn.innerHTML = '<i class="fas fa-qrcode mr-1"></i>Start & Get QR Code';
+    btn.innerHTML = '<i class="fas fa-qrcode mr-1"></i>Start & Get QR';
 }
 
 async function refreshWhatsAppQR() {
@@ -588,8 +725,6 @@ async function checkWhatsAppStatus() {
                 document.getElementById('waQrResult').classList.add('hidden');
                 document.getElementById('waConnectedBox').classList.remove('hidden');
                 if (waQrRefreshInterval) { clearInterval(waQrRefreshInterval); waQrRefreshInterval = null; }
-            } else if (d.status === 'disconnected' || d.status === 'auth_failure') {
-                if (waQrRefreshInterval) { clearInterval(waQrRefreshInterval); waQrRefreshInterval = null; }
             }
         }
     } catch(e) {}
@@ -601,13 +736,9 @@ function updateWAStatus(status, text) {
     if (textEl) textEl.textContent = text;
     if (dot) {
         dot.className = 'status-dot';
-        if (status === 'ready' || status === 'connected') {
-            dot.classList.add('green');
-        } else if (status === 'disconnected' || status === 'auth_failure' || status === 'init_error') {
-            dot.classList.add('red');
-        } else {
-            dot.classList.add('gray');
-        }
+        if (status === 'ready' || status === 'connected') dot.classList.add('green');
+        else if (status === 'disconnected' || status === 'auth_failure') dot.classList.add('red');
+        else dot.classList.add('gray');
     }
 }
 
@@ -618,13 +749,12 @@ async function logoutWhatsAppWeb() {
         document.getElementById('waQrResult').classList.add('hidden');
         document.getElementById('waConnectedBox').classList.add('hidden');
         updateWAStatus('disconnected', 'Disconnected');
-        if (waQrRefreshInterval) { clearInterval(waQrRefreshInterval); waQrRefreshInterval = null; }
         showToast('Logged out', 'success');
     } catch(e) { showToast('Error', 'error'); }
 }
 
 async function generateChatLinkQR() {
-    const phone = prompt('Enter WhatsApp number (with country code, e.g. +14155552671):');
+    const phone = prompt('Enter WhatsApp number (with country code):');
     if (!phone) return;
     try {
         const r = await fetch(API + '/whatsapp/chat-link-qr', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({phone, message: 'Hello!'})});
@@ -653,35 +783,6 @@ async function sendWhatsAppWebMessage() {
     btn.disabled = false;
     btn.innerHTML = '<i class="fas fa-paper-plane mr-1"></i>Send';
 }
-
-async function loadWhatsAppMessages() {
-    try {
-        const r = await fetch(API + '/whatsapp/messages');
-        const d = await r.json();
-        const list = document.getElementById('waMessagesList');
-        if (d.messages && d.messages.length > 0) {
-            list.innerHTML = d.messages.slice().reverse().slice(0, 10).map(m => `
-                <div class="p-2 bg-gray-800/50 rounded text-[10px]">
-                    <div class="flex items-center justify-between mb-0.5">
-                        <span class="text-green-400 font-mono">${esc(m.from)} ${m.from_name ? '· ' + esc(m.from_name) : ''}</span>
-                        <span class="text-gray-600">${(m.timestamp || '').slice(11, 16)}</span>
-                    </div>
-                    <p class="text-gray-300 break-words">${esc(m.text || '')}</p>
-                </div>
-            `).join('');
-        } else {
-            list.innerHTML = '<p class="text-[10px] text-gray-500 italic">No messages yet</p>';
-        }
-    } catch(e) {}
-}
-
-// Keep old function names as aliases for backward compatibility
-function generateWhatsAppQR() { return initWhatsAppWeb(); }
-function saveWhatsAppConfig() { return initWhatsAppWeb(); }
-function testWhatsAppConnection() { return checkWhatsAppStatus(); }
-function sendWhatsAppMessage() { return sendWhatsAppWebMessage(); }
-function loadWhatsAppConfig() { checkWhatsAppStatus(); }
-function copyWhatsAppLink() { showToast('Scan the QR code with WhatsApp', 'info'); }
 
 async function generateBarcode() {
     const content = document.getElementById('barcodeContent').value;
@@ -731,8 +832,7 @@ async function captureAndScan() {
                 document.getElementById('scanType').textContent = d.barcodes.map(b => b.type).join(', ');
                 document.getElementById('scanResult').classList.remove('hidden');
             } else {
-                document.getElementById('scanData').textContent = 'No barcode found in image';
-                document.getElementById('scanType').textContent = '';
+                document.getElementById('scanData').textContent = 'No barcode found';
                 document.getElementById('scanResult').classList.remove('hidden');
             }
         } catch(e) { showToast('Scan error', 'error'); }
@@ -770,11 +870,7 @@ async function loadWebhooks() {
         el.innerHTML = hooks.map(h => `
             <div class="webhook-row">
                 <span class="status-dot ${h.active ? 'green' : 'red'}"></span>
-                <div class="flex-1 min-w-0">
-                    <p class="text-white text-sm font-medium truncate">${h.name}</p>
-                    <p class="text-gray-500 text-xs">${h.method} ${h.url}</p>
-                    <p class="text-gray-600 text-[10px]">Triggered ${h.trigger_count||0} times ${h.last_triggered ? '| Last: '+h.last_triggered.split('T')[0] : ''}</p>
-                </div>
+                <div class="flex-1 min-w-0"><p class="text-white text-sm font-medium truncate">${h.name}</p><p class="text-gray-500 text-xs">${h.method} ${h.url}</p></div>
                 <button onclick="testWebhook('${h.id}')" class="px-3 py-1 bg-indigo-600/20 text-indigo-400 rounded-lg text-xs transition hover:bg-indigo-600/30">Test</button>
                 <button onclick="deleteWebhook('${h.id}')" class="px-3 py-1 bg-red-600/20 text-red-400 rounded-lg text-xs transition hover:bg-red-600/30">Delete</button>
             </div>
@@ -783,13 +879,7 @@ async function loadWebhooks() {
 }
 
 async function createWebhook() {
-    const data = {
-        name: document.getElementById('whName').value,
-        url: document.getElementById('whUrl').value,
-        method: document.getElementById('whMethod').value,
-        events: document.getElementById('whEvents').value.split(',').map(s=>s.trim()).filter(Boolean),
-        body: document.getElementById('whBody').value
-    };
+    const data = {name: document.getElementById('whName').value, url: document.getElementById('whUrl').value, method: document.getElementById('whMethod').value, events: document.getElementById('whEvents').value.split(',').map(s=>s.trim()).filter(Boolean), body: document.getElementById('whBody').value};
     try {
         await fetch(API + '/webhooks', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)});
         hideCreateWebhook();
@@ -815,14 +905,7 @@ async function deleteWebhook(id) {
 async function testApi() {
     const btn = document.getElementById('btnApiTest');
     btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Sending...';
-    const data = {
-        url: document.getElementById('apiUrl').value,
-        method: document.getElementById('apiMethod').value,
-        auth_type: document.getElementById('apiAuth').value,
-        auth_token: document.getElementById('apiAuthToken').value,
-        body: document.getElementById('apiBody').value,
-        headers: {}
-    };
+    const data = {url: document.getElementById('apiUrl').value, method: document.getElementById('apiMethod').value, auth_type: document.getElementById('apiAuth').value, auth_token: document.getElementById('apiAuthToken').value, body: document.getElementById('apiBody').value, headers: {}};
     try { data.headers = JSON.parse(document.getElementById('apiHeadersInput').value || '{}'); } catch(e) {}
     try {
         const r = await fetch(API + '/api-test', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)});
@@ -849,51 +932,268 @@ async function testApi() {
     btn.disabled = false; btn.innerHTML = '<i class="fas fa-play mr-1"></i>Send Request';
 }
 
-/* ===== Chat ===== */
-function populateChatPlatforms() {
-    const sel = document.getElementById('chatPlatform');
-    sel.innerHTML = '<option value="">Select platform...</option>' + Object.entries(connected).map(([id, acc]) => `<option value="${id}">${acc.name || id}</option>`).join('');
+/* ===== AI ASSISTANT ===== */
+async function initAIAssistant() {
+    if (aiConversationHistory.length === 0) {
+        aiConversationHistory = [{role: 'system', content: `You are an Integration AI Assistant. You can:
+1. READ messages from connected platforms (WhatsApp, Email, Facebook, Telegram)
+2. WRITE/SEND new messages
+3. REPLY to existing messages
+4. Take STEP-BY-STEP actions with user confirmation
+
+When a user asks to check messages, use the appropriate API endpoint to fetch them.
+When a user asks to send a message, collect the necessary details and use the send endpoint.
+Always confirm details with the user before taking action.
+Be helpful, clear, and guide users through multi-step processes.`}];
+    }
+    loadUnifiedInbox();
 }
 
-function switchChatPlatform() {
-    const id = document.getElementById('chatPlatform').value;
-    if (!id) return;
-    const svc = catalog.find(s => s.id === id) || {};
-    document.getElementById('chatIcon').className = `w-10 h-10 bg-${svc.color||'gray'}-600/20 rounded-lg flex items-center justify-center`;
-    document.getElementById('chatIcon').innerHTML = `<i class="${svc.icon||'fas fa-plug'} text-${svc.color||'gray'}-400"></i>`;
-    document.getElementById('chatTitle').textContent = connected[id]?.name || id;
-    document.getElementById('chatStatus').textContent = 'Connected';
-    document.getElementById('chatMessages').innerHTML = '<div class="text-center text-gray-500 py-8"><i class="fas fa-inbox text-3xl mb-2"></p><p class="text-sm">Messages will appear here</p></div>';
+function selectAssistantPlatform(platform) {
+    currentAssistantPlatform = platform;
+    document.querySelectorAll('.integration-platform-btn').forEach(b => b.classList.remove('active'));
+    document.querySelector(`[data-platform="${platform}"]`)?.classList.add('active');
+    loadUnifiedInbox();
 }
 
-function sendChatMsg() {
-    const msg = document.getElementById('chatMsg').value;
-    if (!msg) return;
-    const el = document.getElementById('chatMessages');
-    el.innerHTML += `<div class="flex justify-end mb-2"><div class="bg-indigo-600 text-white rounded-lg px-3 py-2 text-sm max-w-[70%]">${esc(msg)}</div></div>`;
-    document.getElementById('chatMsg').value = '';
+async function loadUnifiedInbox() {
+    const el = document.getElementById('unifiedInbox');
+    const platform = currentAssistantPlatform;
+
+    if (platform === 'whatsapp' || platform === 'all') {
+        try {
+            const r = await fetch(API + '/whatsapp/messages');
+            const d = await r.json();
+            if (d.messages && d.messages.length > 0) {
+                el.innerHTML = d.messages.slice().reverse().slice(0, 20).map(m => `
+                    <div class="unified-inbox-item ${m.read ? '' : 'unread'}" onclick="selectMessage('whatsapp', '${m.id || m.from}')">
+                        <div class="flex items-center justify-between mb-1">
+                            <span class="text-green-400 font-mono text-xs"><i class="fab fa-whatsapp platform-icon"></i>${esc(m.from || 'Unknown')}</span>
+                            <span class="text-gray-600 text-[10px]">${(m.timestamp || '').slice(11, 16)}</span>
+                        </div>
+                        <p class="text-white text-sm truncate">${esc(m.text || '(no text)')}</p>
+                    </div>
+                `).join('');
+                return;
+            }
+        } catch(e) {}
+    }
+
+    el.innerHTML = `<div class="text-center text-gray-500 py-8">
+        <i class="fas fa-inbox text-3xl mb-2 text-gray-600"></i>
+        <p class="text-sm">No messages found</p>
+        <p class="text-xs text-gray-600 mt-1">Connect a platform to see messages</p>
+    </div>`;
+}
+
+function selectMessage(platform, id) {
+    document.getElementById('aiChatInput').value = `Show me the full message from ${platform} and help me reply to it`;
+    sendAIMessage();
+}
+
+function sendAIAction(action) {
+    document.getElementById('aiChatInput').value = action;
+    sendAIMessage();
+}
+
+async function sendAIMessage(takeAction = false) {
+    const input = document.getElementById('aiChatInput');
+    const text = input.value.trim();
+    if (!text) return;
+    input.value = '';
+
+    const el = document.getElementById('aiChatMessages');
+    if (el.querySelector('.empty-state')) el.innerHTML = '';
+
+    el.innerHTML += `<div class="flex justify-end mb-3"><div class="msg-bubble user">${esc(text)}</div></div>`;
+    el.innerHTML += `<div class="flex justify-start mb-3" id="typingBubble"><div class="msg-bubble assistant"><div class="typing-indicator"><span></span><span></span><span></span></div></div></div>`;
     el.scrollTop = el.scrollHeight;
-    setTimeout(() => {
-        el.innerHTML += `<div class="flex mb-2"><div class="bg-gray-700 text-gray-300 rounded-lg px-3 py-2 text-sm max-w-[70%]"><i class="fas fa-robot mr-1 text-green-400"></i>Message queued for delivery</div></div>`;
-        el.scrollTop = el.scrollHeight;
-    }, 500);
-}
 
-async function aiChatReply() {
-    const model = document.getElementById('chatModel').value;
-    const tone = document.getElementById('chatTone').value;
-    const el = document.getElementById('chatMessages');
-    const msgs = el.querySelectorAll('.bg-gray-700');
-    const lastMsg = msgs.length ? msgs[msgs.length-1].textContent : '';
-    if (!lastMsg) { showToast('No messages to reply to', 'error'); return; }
-    el.innerHTML += '<div class="flex mb-2"><div class="bg-green-600/20 border border-green-600 text-green-400 rounded-lg px-3 py-2 text-sm"><i class="fas fa-spinner fa-spin mr-1"></i>Generating...</div></div>';
-    el.scrollTop = el.scrollHeight;
+    const model = document.getElementById('aiModel').value;
+    const tone = document.getElementById('aiTone').value;
+
+    aiConversationHistory.push({role: 'user', content: text});
+
     try {
-        const r = await fetch('http://localhost:8000/v1/chat/completions', {method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer sk-local-f61f4d314363e693de5b7fd9792d4bbb91f6a064b5f09be1eb247100476f17ea'}, body:JSON.stringify({model, messages:[{role:'system',content:`Reply in ${tone} tone. Be concise.`},{role:'user',content:lastMsg}],max_tokens:300})});
+        const systemPrompt = `You are an Integration AI Assistant. Connected platforms: WhatsApp, Email, Facebook, Telegram.
+${takeAction ? 'The user wants you to TAKE ACTION. Provide step-by-step instructions.' : 'Answer the user\'s question about reading/writing/replying to messages.'}
+Tone: ${tone}. Be concise and helpful.`;
+
+        const r = await fetch('http://localhost:8000/v1/chat/completions', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                model,
+                messages: [{role: 'system', content: systemPrompt}, ...aiConversationHistory.slice(-10)],
+                max_tokens: 800,
+                temperature: 0.7
+            })
+        });
+
         const d = await r.json();
-        const reply = d.choices?.[0]?.message?.content || 'No response';
-        document.getElementById('chatMsg').value = reply;
-    } catch(e) { showToast('AI error', 'error'); }
+        const response = d.choices?.[0]?.message?.content || 'I couldn\'t generate a response. Please try again.';
+
+        document.getElementById('typingBubble')?.remove();
+        aiConversationHistory.push({role: 'assistant', content: response});
+
+        let displayResponse = response;
+        if (typeof marked !== 'undefined') {
+            try {
+                displayResponse = marked.parse(response, {breaks: true, gfm: true});
+                if (typeof DOMPurify !== 'undefined') displayResponse = DOMPurify.sanitize(displayResponse);
+            } catch(e) { displayResponse = esc(response); }
+        } else {
+            displayResponse = esc(response);
+        }
+
+        el.innerHTML += `<div class="flex justify-start mb-3"><div class="msg-bubble assistant">${displayResponse}</div></div>`;
+        el.scrollTop = el.scrollHeight;
+
+        // If AI suggests actions, show them
+        if (response.includes('Step 1') || response.includes('step') || takeAction) {
+            showActionSteps(response);
+        }
+
+    } catch(e) {
+        document.getElementById('typingBubble')?.remove();
+        el.innerHTML += `<div class="flex justify-start mb-3"><div class="msg-bubble assistant" style="background:rgba(239,68,68,.2);border-color:#ef4444;">Error: ${esc(e.message)}</div></div>`;
+    }
+}
+
+function showActionSteps(response) {
+    const container = document.getElementById('actionSteps');
+    const list = document.getElementById('actionStepsList');
+    container.classList.remove('hidden');
+
+    const steps = response.split(/\n\d+\.|\nStep \d+/i).filter(s => s.trim());
+    list.innerHTML = steps.slice(0, 5).map((s, i) => `
+        <div class="action-step ${i === 0 ? 'executing' : ''}">
+            <span class="step-num">${i + 1}</span>${esc(s.trim().substring(0, 150))}
+        </div>
+    `).join('');
+}
+
+/* ===== MONITORS ===== */
+function renderMonitors() {
+    const el = document.getElementById('monitorsList');
+    if (monitors.length === 0) {
+        el.innerHTML = `<div class="text-center text-gray-500 py-12">
+            <i class="fas fa-eye-slash text-4xl mb-3 text-gray-600"></i>
+            <p class="text-sm">No monitors configured</p>
+            <p class="text-xs text-gray-600 mt-1">Add a monitor to track websites, pages, or offers</p>
+        </div>`;
+        return;
+    }
+    el.innerHTML = monitors.map(m => `
+        <div class="monitor-card ${m.active ? 'active' : ''}">
+            <div class="flex items-center justify-between mb-2">
+                <div class="flex items-center gap-3">
+                    <div class="monitor-status ${m.active ? 'running' : 'stopped'}"></div>
+                    <div>
+                        <h4 class="text-white font-medium text-sm">${esc(m.name)}</h4>
+                        <p class="text-xs text-gray-500">${esc(m.type)} • ${esc(m.url || '').substring(0, 40)}</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button onclick="toggleMonitor('${m.id}')" class="px-3 py-1 bg-${m.active ? 'green' : 'gray'}-600/20 text-${m.active ? 'green' : 'gray'}-400 rounded-lg text-xs hover:bg-${m.active ? 'green' : 'gray'}-600/30 transition">
+                        <i class="fas fa-${m.active ? 'pause' : 'play'} mr-1"></i>${m.active ? 'Pause' : 'Start'}
+                    </button>
+                    <button onclick="deleteMonitor('${m.id}')" class="px-3 py-1 bg-red-600/20 text-red-400 rounded-lg text-xs hover:bg-red-600/30 transition"><i class="fas fa-trash"></i></button>
+                </div>
+            </div>
+            <div class="flex items-center gap-4 text-[10px] text-gray-500">
+                <span><i class="fas fa-clock mr-1"></i>Every ${m.interval || 15}min</span>
+                <span><i class="fas fa-bell mr-1"></i>${esc(m.notify || 'whatsapp')}</span>
+                <span><i class="fas fa-key mr-1"></i>${m.keywords ? esc(m.keywords.split(',')[0]) : 'all changes'}</span>
+            </div>
+        </div>
+    `).join('');
+}
+
+function openAddMonitorModal() { document.getElementById('addMonitorModal').classList.remove('hidden'); }
+function closeAddMonitorModal() { document.getElementById('addMonitorModal').classList.add('hidden'); }
+
+function onMonitorTypeChange() {
+    const type = document.getElementById('monitorType').value;
+    const urlField = document.getElementById('monitorUrlField');
+    const keywordsField = document.getElementById('monitorKeywordsField');
+
+    if (type === 'facebook') {
+        document.getElementById('monitorUrl').placeholder = 'https://facebook.com/your-page';
+        keywordsField.classList.remove('hidden');
+    } else if (type === 'ecommerce') {
+        document.getElementById('monitorUrl').placeholder = 'https://shop.example.com/product/123';
+        keywordsField.classList.remove('hidden');
+    } else if (type === 'rss') {
+        document.getElementById('monitorUrl').placeholder = 'https://blog.example.com/feed.xml';
+        keywordsField.classList.add('hidden');
+    } else {
+        document.getElementById('monitorUrl').placeholder = 'https://...';
+        keywordsField.classList.remove('hidden');
+    }
+}
+
+function saveMonitor() {
+    const monitor = {
+        id: 'm_' + Date.now(),
+        type: document.getElementById('monitorType').value,
+        name: document.getElementById('monitorName').value,
+        url: document.getElementById('monitorUrl').value,
+        keywords: document.getElementById('monitorKeywords').value,
+        notify: document.getElementById('monitorNotify').value,
+        recipients: document.getElementById('monitorRecipients').value,
+        interval: document.getElementById('checkInterval').value,
+        active: true,
+        created: new Date().toISOString()
+    };
+
+    if (!monitor.name || !monitor.url) {
+        showToast('Name and URL are required', 'error');
+        return;
+    }
+
+    monitors.push(monitor);
+    localStorage.setItem('int_monitors', JSON.stringify(monitors));
+    closeAddMonitorModal();
+    renderMonitors();
+    showToast('Monitor created!');
+}
+
+function toggleMonitor(id) {
+    const m = monitors.find(m => m.id === id);
+    if (m) {
+        m.active = !m.active;
+        localStorage.setItem('int_monitors', JSON.stringify(monitors));
+        renderMonitors();
+    }
+}
+
+function deleteMonitor(id) {
+    if (!confirm('Delete this monitor?')) return;
+    monitors = monitors.filter(m => m.id !== id);
+    localStorage.setItem('int_monitors', JSON.stringify(monitors));
+    renderMonitors();
+    showToast('Monitor deleted');
+}
+
+function createPresetMonitor(type) {
+    if (type === 'facebook') {
+        document.getElementById('monitorType').value = 'facebook';
+        document.getElementById('monitorName').value = 'Facebook Page Monitor';
+        document.getElementById('monitorKeywords').value = 'new post,comment,like,share';
+        document.getElementById('monitorNotify').value = 'whatsapp';
+    } else if (type === 'ecommerce') {
+        document.getElementById('monitorType').value = 'ecommerce';
+        document.getElementById('monitorName').value = 'E-commerce Price Monitor';
+        document.getElementById('monitorKeywords').value = 'sale,discount,offer,price drop,new arrival';
+        document.getElementById('monitorNotify').value = 'whatsapp';
+    } else if (type === 'news') {
+        document.getElementById('monitorType').value = 'rss';
+        document.getElementById('monitorName').value = 'News Feed Monitor';
+        document.getElementById('monitorKeywords').value = 'breaking,urgent,important';
+        document.getElementById('monitorNotify').value = 'whatsapp';
+    }
+    openAddMonitorModal();
 }
 
 /* ===== Utils ===== */
@@ -908,9 +1208,9 @@ function showToast(msg, type) {
 
 /* Init */
 loadCatalog();
-loadWhatsAppMessages();
 waStatusRefreshInterval = setInterval(checkWhatsAppStatus, 10000);
 checkWhatsAppStatus();
 document.getElementById('connectModal').addEventListener('click', function(e) { if (e.target === this) closeConnectModal(); });
+document.getElementById('addMonitorModal').addEventListener('click', function(e) { if (e.target === this) closeAddMonitorModal(); });
 </script>
 {% endblock %}

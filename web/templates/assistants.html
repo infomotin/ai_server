@@ -429,6 +429,7 @@ textarea.input-field { resize: vertical; min-height: 80px; }
                     <button onclick="setTab('chat')" id="tabChat" class="tab-btn active"><i class="fas fa-comments mr-1"></i>Chat</button>
                     <button onclick="setTab('integrations')" id="tabIntegrations" class="tab-btn"><i class="fas fa-plug mr-1"></i>Integrations</button>
                     <button onclick="setTab('tasks')" id="tabTasks" class="tab-btn"><i class="fas fa-bolt mr-1"></i>Tasks</button>
+                    <button onclick="setTab('monitors')" id="tabMonitors" class="tab-btn"><i class="fas fa-eye mr-1"></i>Monitors</button>
                     <button onclick="setTab('schedule')" id="tabSchedule" class="tab-btn"><i class="fas fa-calendar mr-1"></i>Schedule</button>
                     <button onclick="setTab('analytics')" id="tabAnalytics" class="tab-btn"><i class="fas fa-chart-line mr-1"></i>Analytics</button>
                 </div>
@@ -548,6 +549,94 @@ textarea.input-field { resize: vertical; min-height: 80px; }
                             <div class="task-actions">
                                 <button class="btn btn-secondary text-xs" onclick="sendQuickAction('facebook')"><i class="fas fa-play mr-1"></i>Run Now</button>
                                 <button class="btn btn-ghost text-xs" onclick="toggleSchedule('facebook')"><i class="fas fa-toggle-off mr-1"></i>Disabled</button>
+                            </div>
+                        </div>
+                        <div class="scheduled-task">
+                            <div class="task-header">
+                                <span class="task-name"><i class="fas fa-shopping-cart mr-2"></i>E-commerce Watch</span>
+                                <span class="task-schedule">Every 6 hours</span>
+                            </div>
+                            <p class="text-xs text-gray-400 mb-2">Monitor products for price drops & offers</p>
+                            <div class="task-actions">
+                                <button class="btn btn-secondary text-xs" onclick="sendQuickAction('ecommerce')"><i class="fas fa-play mr-1"></i>Run Now</button>
+                                <button class="btn btn-ghost text-xs" onclick="toggleSchedule('ecommerce')"><i class="fas fa-toggle-off mr-1"></i>Disabled</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Monitors tab (Mr. Robot style) -->
+                <div id="panelMonitors" class="flex-1 hidden overflow-y-auto p-4 scroll-thin">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-white font-semibold"><i class="fas fa-robot text-green-400 mr-2"></i>Agent Monitors</h3>
+                        <button onclick="openAddMonitorModal()" class="btn btn-primary text-xs"><i class="fas fa-plus mr-1"></i>Add Monitor</button>
+                    </div>
+                    <p class="text-xs text-gray-500 mb-4">Configure autonomous monitoring agents. Each monitor runs independently and notifies you of changes.</p>
+
+                    <!-- Quick Monitor Presets -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
+                        <div class="task-exec-card" onclick="createQuickMonitor('facebook')">
+                            <h4><i class="fab fa-facebook mr-2 text-blue-400"></i>Facebook Monitor</h4>
+                            <p class="text-xs text-gray-400 mt-1">Track page posts, comments, new followers. Notify via WhatsApp.</p>
+                            <div class="mt-2 flex items-center gap-2">
+                                <span class="badge badge-tag text-[9px]">Posts</span>
+                                <span class="badge badge-tag text-[9px]">Comments</span>
+                                <span class="badge badge-tag text-[9px]">WhatsApp</span>
+                            </div>
+                        </div>
+                        <div class="task-exec-card" onclick="createQuickMonitor('ecommerce')">
+                            <h4><i class="fas fa-shopping-cart mr-2 text-green-400"></i>E-commerce Monitor</h4>
+                            <p class="text-xs text-gray-400 mt-1">Track prices, sales, new products. Get notified of offers.</p>
+                            <div class="mt-2 flex items-center gap-2">
+                                <span class="badge badge-tag text-[9px]">Price Drop</span>
+                                <span class="badge badge-tag text-[9px]">Sale</span>
+                                <span class="badge badge-tag text-[9px]">In Stock</span>
+                            </div>
+                        </div>
+                        <div class="task-exec-card" onclick="createQuickMonitor('website')">
+                            <h4><i class="fas fa-globe mr-2 text-cyan-400"></i>Website Monitor</h4>
+                            <p class="text-xs text-gray-400 mt-1">Track any website for changes. Content, prices, availability.</p>
+                            <div class="mt-2 flex items-center gap-2">
+                                <span class="badge badge-tag text-[9px]">Content</span>
+                                <span class="badge badge-tag text-[9px]">Keywords</span>
+                                <span class="badge badge-tag text-[9px]">Uptime</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Active Monitors -->
+                    <h4 class="text-white text-sm font-semibold mb-3 flex items-center gap-2"><i class="fas fa-list-check text-purple-400"></i>Active Monitors</h4>
+                    <div id="assistantMonitorsList" class="space-y-3 mb-4">
+                        <div class="text-center text-gray-500 py-6">
+                            <i class="fas fa-eye-slash text-2xl mb-2 text-gray-600"></i>
+                            <p class="text-xs">No monitors configured for this assistant</p>
+                        </div>
+                    </div>
+
+                    <!-- Multi-Task Configuration -->
+                    <h4 class="text-white text-sm font-semibold mb-3 flex items-center gap-2"><i class="fas fa-layer-group text-amber-400"></i>Multi-Task Automation</h4>
+                    <div class="glass p-4 rounded-xl mb-4">
+                        <div class="flex items-center justify-between mb-3">
+                            <div>
+                                <p class="text-white text-sm font-medium">Chain Tasks Together</p>
+                                <p class="text-xs text-gray-500">Execute multiple actions in sequence when triggered</p>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="enableChain" class="sr-only peer">
+                                <div class="w-11 h-6 bg-gray-600 rounded-full peer peer-checked:bg-green-500 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full"></div>
+                            </label>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                            <div class="p-2 bg-white/5 rounded-lg text-xs text-gray-400">
+                                <i class="fas fa-check-circle text-green-400 mr-1"></i>1. Check Facebook page
+                            </div>
+                            <div class="p-2 bg-white/5 rounded-lg text-xs text-gray-400">
+                                <i class="fas fa-check-circle text-green-400 mr-1"></i>2. Extract engagement stats
+                            </div>
+                            <div class="p-2 bg-white/5 rounded-lg text-xs text-gray-400">
+                                <i class="fas fa-clock text-amber-400 mr-1"></i>3. Generate summary report
+                            </div>
+                            <div class="p-2 bg-white/5 rounded-lg text-xs text-gray-400">
+                                <i class="fas fa-paper-plane text-green-400 mr-1"></i>4. Send to WhatsApp
                             </div>
                         </div>
                     </div>
@@ -676,6 +765,30 @@ textarea.input-field { resize: vertical; min-height: 80px; }
     </div>
 </div>
 
+<!-- Add Monitor Modal (Mr. Robot style) -->
+<div id="addMonitorModal" class="modal-overlay hidden">
+    <div class="modal-content glass-strong w-full max-w-md p-5">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-white font-semibold"><i class="fas fa-robot text-green-400 mr-2"></i>Add Monitor</h3>
+            <button onclick="closeAddMonitorModal()" class="btn btn-ghost text-gray-500 hover:text-white"><i class="fas fa-times"></i></button>
+        </div>
+        <form id="addMonitorForm" class="space-y-3">
+            <div><label class="block text-sm font-medium text-gray-300 mb-1">Monitor Type</label><select name="monitor_type" class="input-field"><option value="facebook">Facebook Page</option><option value="ecommerce">E-commerce / Product</option><option value="website">Website / URL</option><option value="rss">RSS Feed</option></select></div>
+            <div><label class="block text-sm font-medium text-gray-300 mb-1">Name</label><input type="text" name="name" class="input-field" placeholder="My Monitor"></div>
+            <div><label class="block text-sm font-medium text-gray-300 mb-1">URL to Monitor</label><input type="url" name="url" class="input-field" placeholder="https://..."></div>
+            <div><label class="block text-sm font-medium text-gray-300 mb-1">Alert Keywords (comma-separated)</label><input type="text" name="keywords" class="input-field" placeholder="sale, new, offer, discount"></div>
+            <div class="grid grid-cols-2 gap-3">
+                <div><label class="block text-sm font-medium text-gray-300 mb-1">Check Every</label><select name="interval" class="input-field"><option value="5">5 min</option><option value="15">15 min</option><option value="30">30 min</option><option value="60">1 hour</option><option value="360">6 hours</option></select></div>
+                <div><label class="block text-sm font-medium text-gray-300 mb-1">Notify Via</label><select name="notify" class="input-field"><option value="whatsapp">WhatsApp</option><option value="email">Email</option><option value="telegram">Telegram</option></select></div>
+            </div>
+            <div class="flex justify-end gap-2 pt-3 border-t border-gray-700/50">
+                <button type="button" onclick="closeAddMonitorModal()" class="btn btn-secondary">Cancel</button>
+                <button type="submit" class="btn btn-primary"><i class="fas fa-plus"></i>Add Monitor</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <div id="toastContainer"></div>
 {% endblock %}
 
@@ -693,6 +806,8 @@ const COMMANDS = [
     { id: 'news', name: 'Read News', desc: 'Get latest headlines', icon: 'fa-newspaper', prompt: 'Get the latest news headlines for today' },
     { id: 'research', name: 'Research Paper', desc: 'Analyze a paper', icon: 'fa-book', prompt: 'I want to analyze a research paper. Please help me summarize and highlight key findings.' },
     { id: 'facebook', name: 'Facebook Update', desc: 'Social media summary', icon: 'fab fa-facebook', prompt: 'Check my Facebook page and summarize recent activity' },
+    { id: 'ecommerce', name: 'E-commerce Monitor', desc: 'Check product prices & offers', icon: 'fas fa-shopping-cart', prompt: 'Check my monitored e-commerce products for price drops or new offers' },
+    { id: 'website', name: 'Website Monitor', desc: 'Check website changes', icon: 'fas fa-globe', prompt: 'Check my monitored websites for any content changes or updates' },
 ];
 
 function openCommandPalette() {
@@ -765,7 +880,9 @@ function sendQuickAction(action) {
         schedule: 'I want to schedule a recurring task. Ask me what task, when, and how often.',
         news: 'Get the latest news headlines from today. Summarize the top 5 stories.',
         research: 'I want to analyze a research paper. Please read and summarize the key findings.',
-        facebook: 'Check my Facebook page and summarize recent activity, engagement, and post ideas.'
+        facebook: 'Check my Facebook page and summarize recent activity, engagement, and post ideas.',
+        ecommerce: 'Check my monitored e-commerce products. Look for price drops, new sales, or special offers.',
+        website: 'Check my monitored websites for any content changes, updates, or new announcements.'
     };
     
     const prompt = prompts[action];
@@ -808,6 +925,33 @@ document.getElementById('scheduleForm')?.addEventListener('submit', async e => {
     const fd = new FormData(e.target);
     showToast('Schedule created successfully!', 'success');
     closeScheduleModal();
+});
+
+function closeAddMonitorModal() {
+    document.getElementById('addMonitorModal')?.classList.add('hidden');
+}
+
+document.getElementById('addMonitorForm')?.addEventListener('submit', async e => {
+    e.preventDefault();
+    if (!currentAssistantId) { showToast('Open an assistant first', 'error'); return; }
+    const fd = new FormData(e.target);
+    const monitor = {
+        id: 'm_' + Date.now(),
+        type: fd.get('monitor_type'),
+        name: fd.get('name'),
+        url: fd.get('url'),
+        keywords: fd.get('keywords'),
+        interval: fd.get('interval'),
+        notify: fd.get('notify'),
+        active: true,
+        created: new Date().toISOString()
+    };
+    if (!assistantMonitors[currentAssistantId]) assistantMonitors[currentAssistantId] = [];
+    assistantMonitors[currentAssistantId].push(monitor);
+    localStorage.setItem('asm_monitors', JSON.stringify(assistantMonitors));
+    closeAddMonitorModal();
+    initMonitorsTab();
+    showToast('Monitor created!');
 });
 </script>
 {% endblock %}
