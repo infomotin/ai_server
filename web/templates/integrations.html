@@ -173,6 +173,44 @@
                 </div>
             </div>
 
+            <!-- Telegram Bot Connection -->
+            <div class="mt-6 pt-4 border-t border-gray-700">
+                <h4 class="text-white text-sm font-semibold mb-3"><i class="fab fa-telegram text-sky-400 mr-1"></i>Telegram Bot Connection</h4>
+                <div class="bg-sky-900/20 border border-sky-600/30 rounded-lg p-3 mb-3">
+                    <p class="text-xs text-sky-300 leading-relaxed"><i class="fas fa-info-circle mr-1"></i>Create a bot via <a href="https://t.me/BotFather" target="_blank" class="underline">@BotFather</a> on Telegram, then paste the token below.</p>
+                </div>
+                <div class="space-y-2">
+                    <input type="text" id="tgBotToken" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-xs font-mono" placeholder="123456789:ABCdefGHIjklMNOpqrsTUVwxyz" value="">
+                    <div class="flex gap-2">
+                        <button onclick="connectTelegramBot()" id="tgConnectBtn" class="flex-1 px-3 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-lg text-xs font-medium transition"><i class="fas fa-plug mr-1"></i>Connect Bot</button>
+                        <button onclick="testTelegramBot()" id="tgTestBtn" class="px-3 py-2 bg-gray-700 border border-gray-600 text-gray-400 rounded-lg text-xs hover:text-white transition"><i class="fas fa-vial mr-1"></i>Test</button>
+                    </div>
+                    <div id="tgStatusBox" class="p-2 rounded-lg text-xs bg-gray-800/50 border border-gray-700">
+                        <div class="flex items-center gap-2">
+                            <span id="tgStatusDot" class="status-dot gray"></span>
+                            <span id="tgStatusText" class="text-gray-400">Not connected</span>
+                        </div>
+                    </div>
+                    <div id="tgBotInfo" class="hidden p-3 bg-sky-600/10 border border-sky-600/30 rounded-lg">
+                        <div class="flex items-center gap-2 mb-2">
+                            <i class="fab fa-telegram text-sky-400"></i>
+                            <span class="text-sky-300 font-semibold text-sm" id="tgBotName">@bot_name</span>
+                        </div>
+                        <p class="text-[10px] text-gray-400" id="tgBotId">Bot ID: -</p>
+                    </div>
+                </div>
+                <!-- Telegram Send Message -->
+                <div id="tgSendSection" class="hidden mt-4 pt-3 border-t border-gray-700">
+                    <p class="text-xs text-gray-400 mb-2 font-semibold"><i class="fas fa-paper-plane mr-1"></i>Send to Telegram</p>
+                    <div class="space-y-2">
+                        <input type="text" id="tgChatId" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-xs" placeholder="Chat ID (e.g., 123456789 or @channelname)">
+                        <textarea id="tgMessageText" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-xs" rows="2" placeholder="Message to send..."></textarea>
+                        <button onclick="sendTelegramMessage()" id="tgSendBtn" class="w-full px-3 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-lg text-xs font-medium transition"><i class="fas fa-paper-plane mr-1"></i>Send</button>
+                        <div id="tgSendResult" class="text-xs mt-1 hidden"></div>
+                    </div>
+                </div>
+            </div>
+
             <div class="mt-6 pt-4 border-t border-gray-700">
                 <h4 class="text-white text-sm font-semibold mb-3"><i class="fas fa-barcode text-amber-400 mr-1"></i>Barcode Generator</h4>
                 <div class="flex gap-2">
@@ -840,6 +878,117 @@ async function sendWhatsAppWebMessage(testOnly) {
     btn.disabled = false;
     btn.innerHTML = '<i class="fas fa-paper-plane mr-1"></i>Send to All';
     if (sent > 0) showToast('Sent to ' + sent + ' number(s)!', 'success');
+}
+
+/* ===== TELEGRAM BOT ===== */
+let tgConnected = false;
+let tgBotData = null;
+
+async function connectTelegramBot() {
+    var token = document.getElementById('tgBotToken').value.trim();
+    if (!token) { showToast('Enter a bot token from @BotFather', 'error'); return; }
+    var btn = document.getElementById('tgConnectBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Connecting...';
+    try {
+        var r = await fetch('/api/integrations/telegram/test', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({bot_token: token})});
+        var d = await r.json();
+        if (d.success) {
+            tgConnected = true;
+            tgBotData = d;
+            localStorage.setItem('tg_bot_token', token);
+            localStorage.setItem('tg_bot_info', JSON.stringify(d));
+            document.getElementById('tgStatusDot').className = 'status-dot green';
+            document.getElementById('tgStatusText').textContent = 'Connected: @' + (d.username || 'unknown');
+            document.getElementById('tgBotInfo').classList.remove('hidden');
+            document.getElementById('tgBotName').textContent = '@' + (d.username || 'unknown');
+            document.getElementById('tgBotId').textContent = 'Bot ID: ' + (d.id || '-');
+            document.getElementById('tgSendSection').classList.remove('hidden');
+            showToast('Telegram bot connected!', 'success');
+        } else {
+            document.getElementById('tgStatusDot').className = 'status-dot red';
+            document.getElementById('tgStatusText').textContent = 'Failed: ' + (d.message || 'Invalid token');
+            showToast('Connection failed: ' + (d.message || 'Check token'), 'error');
+        }
+    } catch(e) {
+        document.getElementById('tgStatusDot').className = 'status-dot red';
+        document.getElementById('tgStatusText').textContent = 'Error: ' + e.message;
+        showToast('Error: ' + e.message, 'error');
+    }
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-plug mr-1"></i>Connect Bot';
+}
+
+async function testTelegramBot() {
+    var token = document.getElementById('tgBotToken').value.trim() || localStorage.getItem('tg_bot_token');
+    if (!token) { showToast('Enter a bot token first', 'error'); return; }
+    var btn = document.getElementById('tgTestBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>';
+    try {
+        var r = await fetch('/api/integrations/telegram/test', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({bot_token: token})});
+        var d = await r.json();
+        if (d.success) {
+            document.getElementById('tgStatusDot').className = 'status-dot green';
+            document.getElementById('tgStatusText').textContent = 'Online: @' + (d.username || 'unknown');
+            showToast('Bot is online: @' + d.username, 'success');
+        } else {
+            document.getElementById('tgStatusDot').className = 'status-dot red';
+            document.getElementById('tgStatusText').textContent = 'Offline: ' + (d.message || 'Failed');
+            showToast('Test failed: ' + (d.message || 'Check token'), 'error');
+        }
+    } catch(e) { showToast('Error: ' + e.message, 'error'); }
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-vial mr-1"></i>Test';
+}
+
+async function sendTelegramMessage() {
+    var token = document.getElementById('tgBotToken').value.trim() || localStorage.getItem('tg_bot_token');
+    var chatId = document.getElementById('tgChatId').value.trim();
+    var text = document.getElementById('tgMessageText').value.trim();
+    var resultDiv = document.getElementById('tgSendResult');
+    if (!token) { showToast('Connect bot first', 'error'); return; }
+    if (!chatId || !text) { showToast('Chat ID and message required', 'error'); return; }
+    var btn = document.getElementById('tgSendBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Sending...';
+    resultDiv.classList.remove('hidden');
+    resultDiv.innerHTML = '<span class="text-blue-400">Sending...</span>';
+    try {
+        var r = await fetch('/api/integrations/telegram/send-direct', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({bot_token: token, chat_id: chatId, text: text})});
+        var d = await r.json();
+        if (d.success) {
+            resultDiv.innerHTML = '<span class="text-green-400"><i class="fas fa-check-circle mr-1"></i>Sent to ' + chatId + '</span>';
+            showToast('Message sent!', 'success');
+            document.getElementById('tgMessageText').value = '';
+        } else {
+            resultDiv.innerHTML = '<span class="text-red-400"><i class="fas fa-times-circle mr-1"></i>' + (d.message || 'Failed') + '</span>';
+            showToast('Send failed: ' + (d.message || 'Unknown'), 'error');
+        }
+    } catch(e) {
+        resultDiv.innerHTML = '<span class="text-red-400"><i class="fas fa-times-circle mr-1"></i>' + e.message + '</span>';
+    }
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-paper-plane mr-1"></i>Send';
+}
+
+function loadTelegramConfig() {
+    var token = localStorage.getItem('tg_bot_token');
+    var info = localStorage.getItem('tg_bot_info');
+    if (token) document.getElementById('tgBotToken').value = token;
+    if (info) {
+        try {
+            var d = JSON.parse(info);
+            tgBotData = d;
+            tgConnected = true;
+            document.getElementById('tgStatusDot').className = 'status-dot green';
+            document.getElementById('tgStatusText').textContent = 'Connected: @' + (d.username || 'unknown');
+            document.getElementById('tgBotInfo').classList.remove('hidden');
+            document.getElementById('tgBotName').textContent = '@' + (d.username || 'unknown');
+            document.getElementById('tgBotId').textContent = 'Bot ID: ' + (d.id || '-');
+            document.getElementById('tgSendSection').classList.remove('hidden');
+        } catch(e) {}
+    }
 }
 
 async function generateBarcode() {
@@ -1705,6 +1854,7 @@ function showToast(msg, type) {
 loadCatalog();
 waStatusRefreshInterval = setInterval(checkWhatsAppStatus, 10000);
 checkWhatsAppStatus();
+loadTelegramConfig();
 document.getElementById('connectModal').addEventListener('click', function(e) { if (e.target === this) closeConnectModal(); });
 document.getElementById('addMonitorModal').addEventListener('click', function(e) { if (e.target === this) closeAddMonitorModal(); });
 </script>

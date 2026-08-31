@@ -1,12 +1,15 @@
 import os
 import json
 import requests
+import httpx
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, Response, make_response
 from datetime import datetime
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "openlocalai-prod-secret-2024")
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+DATA_DIR = "/www/AI_server/data"
+os.makedirs(DATA_DIR, exist_ok=True)
 app.config['SESSION_COOKIE_SECURE'] = False
 
 API_BASE_URL = os.environ.get("API_BASE_URL", "http://localhost:8000")
@@ -3333,6 +3336,72 @@ def api_telegram_send():
         return {"success": False, "message": "Connection error"}
 
 
+@app.route("/api/integrations/telegram/test", methods=["POST"])
+def api_telegram_test():
+    data = request.get_json(silent=True) or {}
+    token = data.get("bot_token", "")
+    if not token:
+        return jsonify({"success": False, "message": "Bot token required"})
+    try:
+        resp = httpx.get(f"https://api.telegram.org/bot{token}/getMe", timeout=10)
+        result = resp.json()
+        if result.get("ok"):
+            bot = result["result"]
+            return jsonify({"success": True, "username": bot.get("username", ""), "id": bot.get("id", ""), "first_name": bot.get("first_name", "")})
+        return jsonify({"success": False, "message": result.get("description", "Invalid token")})
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)[:200]})
+
+
+@app.route("/api/integrations/telegram/send-direct", methods=["POST"])
+def api_telegram_send_direct():
+    data = request.get_json(silent=True) or {}
+    token = data.get("bot_token", "")
+    chat_id = data.get("chat_id", "")
+    text = data.get("text", "")
+    if not token or not chat_id or not text:
+        return jsonify({"success": False, "message": "Token, chat_id, and text required"})
+    try:
+        resp = httpx.post(f"https://api.telegram.org/bot{token}/sendMessage", json={"chat_id": chat_id, "text": text}, timeout=10)
+        result = resp.json()
+        if result.get("ok"):
+            return jsonify({"success": True, "message_id": result["result"].get("message_id")})
+        return jsonify({"success": False, "message": result.get("description", "Failed to send")})
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)[:200]})
+
+
+@app.route("/api/integrations/telegram/updates-direct", methods=["POST"])
+def api_telegram_updates_direct():
+    data = request.get_json(silent=True) or {}
+    token = data.get("bot_token", "")
+    limit = data.get("limit", 20)
+    if not token:
+        return jsonify({"success": False, "messages": []})
+    try:
+        resp = httpx.get(f"https://api.telegram.org/bot{token}/getUpdates", params={"limit": limit}, timeout=10)
+        result = resp.json()
+        if not result.get("ok"):
+            return jsonify({"success": False, "messages": [], "error": result.get("description", "")})
+        messages = []
+        for update in result.get("result", []):
+            msg = update.get("message")
+            if msg:
+                messages.append({
+                    "id": str(update["update_id"]),
+                    "from": msg.get("from", {}).get("username") or msg.get("from", {}).get("first_name", "unknown"),
+                    "from_id": msg.get("from", {}).get("id"),
+                    "chat_id": msg.get("chat", {}).get("id"),
+                    "text": msg.get("text", ""),
+                    "date": datetime.fromtimestamp(msg.get("date", 0)).isoformat() if msg.get("date") else "",
+                    "message_id": msg.get("message_id"),
+                    "platform": "telegram"
+                })
+        return jsonify({"success": True, "messages": messages})
+    except Exception as e:
+        return jsonify({"success": False, "messages": [], "error": str(e)[:200]})
+
+
 @app.route("/api/integrations/discord/guilds", methods=["POST"])
 def api_discord_guilds():
     if "access_token" not in session:
@@ -4182,7 +4251,41 @@ def api_facebook_messages_proxy():
 
 @app.route("/api/integrations/telegram/messages", methods=["GET"])
 def api_telegram_messages_proxy():
-    return jsonify({"success": True, "messages": [], "info": "Configure Telegram Bot in connected integrations"})
+    token = request.args.get("token") or ""
+    if not token:
+        token = ""
+        token_file = os.path.join(DATA_DIR, "telegram_token.txt")
+        if os.path.exists(token_file):
+            with open(token_file, "r") as f:
+                token = f.read().strip()
+    if not token:
+        return jsonify({"success": True, "messages": [], "info": "No Telegram bot token configured"})
+    try:
+        resp = httpx.get(f"https://api.telegram.org/bot{token}/getUpdates", params={"limit": 50}, timeout=15)
+        result = resp.json()
+        if not result.get("ok"):
+            return jsonify({"success": True, "messages": [], "error": result.get("description", "")})
+        messages = []
+        for update in result.get("result", []):
+            msg = update.get("message")
+            if msg:
+                messages.append({
+                    "id": str(update["update_id"]),
+                    "from": msg.get("from", {}).get("username") or msg.get("from", {}).get("first_name", "unknown"),
+                    "from_name": msg.get("from", {}).get("first_name", "") + " " + msg.get("from", {}).get("last_name", ""),
+                    "from_id": msg.get("from", {}).get("id"),
+                    "chat_id": msg.get("chat", {}).get("id"),
+                    "text": msg.get("text", ""),
+                    "date": datetime.fromtimestamp(msg.get("date", 0)).isoformat() if msg.get("date") else "",
+                    "timestamp": datetime.fromtimestamp(msg.get("date", 0)).isoformat() if msg.get("date") else "",
+                    "message_id": msg.get("message_id"),
+                    "platform": "telegram",
+                    "direction": "inbound",
+                    "type": "text"
+                })
+        return jsonify({"success": True, "messages": messages})
+    except Exception as e:
+        return jsonify({"success": True, "messages": [], "error": str(e)[:200]})
 
 
 # ============= Video/Audio Call Endpoints =============
