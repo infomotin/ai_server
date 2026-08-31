@@ -566,6 +566,7 @@ let catalog = [];
 let currentConnectService = null;
 let cameraStream = null;
 let currentAssistantPlatform = 'all';
+let currentTab = 'catalog';
 let monitors = [];
 fetch('/api/monitors').then(function(r){return r.json()}).then(function(d){monitors=d||[]; if(currentTab==='monitor') renderMonitors();}).catch(function(){monitors=[];});
 let aiConversationHistory = [];
