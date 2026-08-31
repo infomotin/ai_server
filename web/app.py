@@ -4290,3 +4290,62 @@ function toggleMute(){muted=!muted;if(localStream)localStream.getAudioTracks().f
 function toggleSpeaker(){speakerOn=!speakerOn;document.querySelector('.btn-speaker').innerHTML=speakerOn?'<i class="fas fa-volume-up"></i>':'<i class="fas fa-volume-mute"></i>';}
 function endCall(){if(localStream)localStream.getTracks().forEach(function(t){t.stop()});statusEl.textContent='Call ended';document.querySelector('.caller-avatar').classList.remove('pulse');document.querySelector('.caller-avatar').innerHTML='<i class="fas fa-phone-slash"></i>';document.getElementById('controls').innerHTML='<a href="/integrations" class="ctrl-btn btn-mute" style="width:auto;border-radius:12px;padding:0 24px;text-decoration:none;color:white">Back</a>';}
 </script></body></html>"""
+
+
+# ============= Monitor / Website Crawl Proxy =============
+@app.route("/api/monitor/check", methods=["POST"])
+def api_monitor_check():
+    data = request.get_json(silent=True) or {}
+    try:
+        resp = requests.post(f"{API_BASE_URL}/api/monitor/check", json=data, headers=get_api_headers(), timeout=60)
+        return resp.json(), resp.status_code
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)[:300]}), 500
+
+
+@app.route("/api/monitor/history/<monitor_id>", methods=["GET"])
+def api_monitor_history(monitor_id):
+    try:
+        resp = requests.get(f"{API_BASE_URL}/api/monitor/history/{monitor_id}", headers=get_api_headers(), timeout=10)
+        return resp.json(), resp.status_code
+    except Exception as e:
+        return jsonify({"error": str(e)[:300]}), 500
+
+
+@app.route("/api/monitor/notify", methods=["POST"])
+def api_monitor_notify():
+    data = request.get_json(silent=True) or {}
+    try:
+        resp = requests.post(f"{API_BASE_URL}/api/monitor/notify", json=data, headers=get_api_headers(), timeout=15)
+        return resp.json(), resp.status_code
+    except Exception as e:
+        return jsonify({"error": str(e)[:300]}), 500
+
+
+@app.route("/api/crawl", methods=["POST"])
+def api_crawl():
+    data = request.get_json(silent=True) or {}
+    url = data.get("url", "")
+    if not url:
+        return jsonify({"success": False, "message": "URL required"}), 400
+    try:
+        import httpx
+        from bs4 import BeautifulSoup
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
+        with httpx.Client(timeout=30.0, follow_redirects=True) as client:
+            resp = client.get(url, headers=headers)
+            soup = BeautifulSoup(resp.text, 'html.parser')
+            title = soup.title.string if soup.title else ""
+            text = soup.get_text(separator=' ', strip=True)[:5000]
+            links = [{"href": a.get('href',''), "text": a.get_text(strip=True)[:100]} for a in soup.find_all('a', href=True)[:20]]
+            images = [{"src": img.get('src',''), "alt": img.get('alt','')} for img in soup.find_all('img')[:10]]
+            prices = [{"price": el.get_text(strip=True)[:50]} for el in soup.find_all(string=lambda t: t and ('$' in t or '\u09f3' in t or '\u20b9' in t or '\u20ac' in t or '\u00a3' in t))[:10]]
+            return jsonify({
+                "success": True, "url": url, "status": resp.status_code,
+                "title": title, "text_preview": text[:2000], "text_length": len(text),
+                "links_count": len(soup.find_all('a', href=True)), "links": links,
+                "images_count": len(soup.find_all('img')), "images": images,
+                "prices_found": prices, "content_hash": str(hash(text))
+            })
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)[:300]}), 500
