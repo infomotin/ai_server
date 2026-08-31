@@ -8,8 +8,30 @@ from datetime import datetime
 from typing import Optional, List, Dict, Any
 import json
 import re
+import asyncio
 
 import httpx
+
+# SDK Imports
+try:
+    import telegram
+    from telegram import Bot as TelegramBot
+    TELEGRAM_SDK_AVAILABLE = True
+except ImportError:
+    TELEGRAM_SDK_AVAILABLE = False
+
+try:
+    import discord
+    from discord import Client as DiscordClient
+    DISCORD_SDK_AVAILABLE = True
+except ImportError:
+    DISCORD_SDK_AVAILABLE = False
+
+try:
+    import facebook
+    FACEBOOK_SDK_AVAILABLE = True
+except ImportError:
+    FACEBOOK_SDK_AVAILABLE = False
 
 
 class EmailIntegration:
@@ -111,9 +133,19 @@ class TelegramIntegration:
     def __init__(self, config: Dict[str, Any]):
         self.bot_token = config.get("bot_token", "")
         self.base_url = f"{self.API_BASE}{self.bot_token}"
+        if TELEGRAM_SDK_AVAILABLE and self.bot_token:
+            self.bot = TelegramBot(token=self.bot_token)
+        else:
+            self.bot = None
 
     def test_connection(self) -> Dict[str, Any]:
         try:
+            if self.bot:
+                import asyncio
+                loop = asyncio.new_event_loop()
+                me = loop.run_until_complete(self.bot.get_me())
+                loop.close()
+                return {"success": True, "message": f"Bot: @{me.username}", "username": me.username, "id": me.id}
             resp = httpx.get(f"{self.base_url}/getMe", timeout=10)
             data = resp.json()
             if data.get("ok"):
@@ -124,11 +156,29 @@ class TelegramIntegration:
 
     def get_updates(self, limit: int = 20) -> List[Dict[str, Any]]:
         try:
+            if self.bot:
+                import asyncio
+                loop = asyncio.new_event_loop()
+                updates = loop.run_until_complete(self.bot.get_updates(limit=limit))
+                loop.close()
+                messages = []
+                for update in updates:
+                    msg = update.message
+                    if msg:
+                        messages.append({
+                            "id": str(update.update_id),
+                            "from": msg.from_user.username or msg.from_user.first_name or "unknown",
+                            "from_id": msg.from_user.id,
+                            "chat_id": msg.chat.id,
+                            "text": msg.text or "",
+                            "date": msg.date.isoformat() if msg.date else "",
+                            "message_id": msg.message_id
+                        })
+                return messages
             resp = httpx.get(f"{self.base_url}/getUpdates", params={"limit": limit}, timeout=10)
             data = resp.json()
             if not data.get("ok"):
                 return []
-
             messages = []
             for update in data.get("result", []):
                 msg = update.get("message", {})
@@ -149,9 +199,43 @@ class TelegramIntegration:
 
     def send_message(self, chat_id: int, text: str) -> Dict[str, Any]:
         try:
+            if self.bot:
+                import asyncio
+                loop = asyncio.new_event_loop()
+                result = loop.run_until_complete(self.bot.send_message(chat_id=chat_id, text=text))
+                loop.close()
+                return {"success": True, "message": "Sent via SDK"}
             resp = httpx.post(f"{self.base_url}/sendMessage", json={"chat_id": chat_id, "text": text}, timeout=10)
             data = resp.json()
             return {"success": data.get("ok", False), "message": "Sent" if data.get("ok") else data.get("description", "Failed")}
+        except Exception as e:
+            return {"success": False, "message": str(e)[:200]}
+
+    def send_photo(self, chat_id: int, photo: str, caption: str = "") -> Dict[str, Any]:
+        try:
+            if self.bot:
+                import asyncio
+                loop = asyncio.new_event_loop()
+                result = loop.run_until_complete(self.bot.send_photo(chat_id=chat_id, photo=photo, caption=caption))
+                loop.close()
+                return {"success": True, "message": "Photo sent via SDK"}
+            resp = httpx.post(f"{self.base_url}/sendPhoto", json={"chat_id": chat_id, "photo": photo, "caption": caption}, timeout=10)
+            data = resp.json()
+            return {"success": data.get("ok", False), "message": "Sent" if data.get("ok") else "Failed"}
+        except Exception as e:
+            return {"success": False, "message": str(e)[:200]}
+
+    def send_document(self, chat_id: int, document: str, caption: str = "") -> Dict[str, Any]:
+        try:
+            if self.bot:
+                import asyncio
+                loop = asyncio.new_event_loop()
+                result = loop.run_until_complete(self.bot.send_document(chat_id=chat_id, document=document, caption=caption))
+                loop.close()
+                return {"success": True, "message": "Document sent via SDK"}
+            resp = httpx.post(f"{self.base_url}/sendDocument", json={"chat_id": chat_id, "document": document, "caption": caption}, timeout=10)
+            data = resp.json()
+            return {"success": data.get("ok", False), "message": "Sent" if data.get("ok") else "Failed"}
         except Exception as e:
             return {"success": False, "message": str(e)[:200]}
 
@@ -168,7 +252,7 @@ class DiscordIntegration:
             resp = httpx.get(f"{self.API_BASE}/users/@me", headers=self.headers, timeout=10)
             data = resp.json()
             if "id" in data:
-                return {"success": True, "message": f"Bot: {data.get('username', 'unknown')}"}
+                return {"success": True, "message": f"Bot: {data.get('username', 'unknown')}", "username": data.get('username'), "id": data.get('id')}
             return {"success": False, "message": data.get("message", "Unknown error")}
         except Exception as e:
             return {"success": False, "message": str(e)[:200]}
@@ -208,6 +292,41 @@ class DiscordIntegration:
             return {"success": resp.status_code == 201, "message": "Sent" if resp.status_code == 201 else "Failed"}
         except Exception as e:
             return {"success": False, "message": str(e)[:200]}
+
+    def send_embed(self, channel_id: str, title: str, description: str, color: int = 0x5865F2) -> Dict[str, Any]:
+        try:
+            embed = {"title": title, "description": description, "color": color}
+            resp = httpx.post(f"{self.API_BASE}/channels/{channel_id}/messages", headers=self.headers, json={"embeds": [embed]}, timeout=10)
+            return {"success": resp.status_code == 201, "message": "Embed sent" if resp.status_code == 201 else "Failed"}
+        except Exception as e:
+            return {"success": False, "message": str(e)[:200]}
+
+    def send_file(self, channel_id: str, file_path: str, content: str = "") -> Dict[str, Any]:
+        try:
+            import os
+            if not os.path.exists(file_path):
+                return {"success": False, "message": "File not found"}
+            with open(file_path, 'rb') as f:
+                files = {'file': (os.path.basename(file_path), f)}
+                data = {'content': content} if content else {}
+                resp = httpx.post(f"{self.API_BASE}/channels/{channel_id}/messages", headers={"Authorization": f"Bot {self.bot_token}"}, data=data, files=files, timeout=30)
+            return {"success": resp.status_code == 201, "message": "File sent" if resp.status_code == 201 else "Failed"}
+        except Exception as e:
+            return {"success": False, "message": str(e)[:200]}
+
+    def get_webhooks(self, channel_id: str) -> List[Dict[str, Any]]:
+        try:
+            resp = httpx.get(f"{self.API_BASE}/channels/{channel_id}/webhooks", headers=self.headers, timeout=10)
+            return resp.json() if resp.status_code == 200 else []
+        except:
+            return []
+
+    def create_webhook(self, channel_id: str, name: str) -> Dict[str, Any]:
+        try:
+            resp = httpx.post(f"{self.API_BASE}/channels/{channel_id}/webhooks", headers=self.headers, json={"name": name}, timeout=10)
+            return resp.json() if resp.status_code in (200, 201) else {}
+        except:
+            return {}
 
 
 class WhatsAppIntegration:
@@ -277,9 +396,17 @@ class FacebookIntegration:
         self.page_id = config.get("page_id", "")
         self.access_token = config.get("access_token", "")
         self.headers = {"Authorization": f"Bearer {self.access_token}"}
+        if FACEBOOK_SDK_AVAILABLE and self.access_token:
+            self.graph = facebook.GraphAPI(access_token=self.access_token, version="3.1.0")
+        else:
+            self.graph = None
 
     def test_connection(self) -> Dict[str, Any]:
         try:
+            if self.graph:
+                me = self.graph.get_object("me")
+                if "id" in me:
+                    return {"success": True, "message": f"Page: {me.get('name', 'unknown')}", "id": me.get('id'), "name": me.get('name')}
             resp = httpx.get(f"{self.API_BASE}/me", headers=self.headers, timeout=10)
             data = resp.json()
             if "id" in data:
@@ -290,6 +417,14 @@ class FacebookIntegration:
 
     def get_posts(self, limit: int = 10) -> List[Dict[str, Any]]:
         try:
+            if self.graph:
+                posts = self.graph.get_connections(self.page_id, "posts", limit=limit)
+                return [{
+                    "id": p["id"],
+                    "message": p.get("message", ""),
+                    "created_time": p.get("created_time", ""),
+                    "from": p.get("from", {}).get("name", "unknown")
+                } for p in posts.get("data", [])]
             resp = httpx.get(f"{self.API_BASE}/{self.page_id}/posts", headers=self.headers, params={"limit": limit}, timeout=10)
             data = resp.json()
             return [{
@@ -303,6 +438,14 @@ class FacebookIntegration:
 
     def get_comments(self, post_id: str) -> List[Dict[str, Any]]:
         try:
+            if self.graph:
+                comments = self.graph.get_connections(post_id, "comments")
+                return [{
+                    "id": c["id"],
+                    "message": c.get("message", ""),
+                    "from": c.get("from", {}).get("name", "unknown"),
+                    "created_time": c.get("created_time", "")
+                } for c in comments.get("data", [])]
             resp = httpx.get(f"{self.API_BASE}/{post_id}/comments", headers=self.headers, timeout=10)
             data = resp.json()
             return [{
@@ -316,9 +459,53 @@ class FacebookIntegration:
 
     def post_comment(self, post_id: str, message: str) -> Dict[str, Any]:
         try:
+            if self.graph:
+                result = self.graph.put_object(post_id, "comments", message=message)
+                return {"success": "id" in result, "message": "Commented via SDK"}
             resp = httpx.post(f"{self.API_BASE}/{post_id}/comments", headers=self.headers, json={"message": message}, timeout=10)
             data = resp.json()
             return {"success": "id" in data, "message": "Commented" if "id" in data else "Failed"}
+        except Exception as e:
+            return {"success": False, "message": str(e)[:200]}
+
+    def get_page_info(self) -> Dict[str, Any]:
+        try:
+            if self.graph:
+                info = self.graph.get_object(self.page_id, fields="id,name,fan_count,followers_count,category,about")
+                return {"success": True, "data": info}
+            resp = httpx.get(f"{self.API_BASE}/{self.page_id}", headers=self.headers, params={"fields": "id,name,fan_count,followers_count,category,about"}, timeout=10)
+            return {"success": True, "data": resp.json()}
+        except Exception as e:
+            return {"success": False, "message": str(e)[:200]}
+
+    def get_insights(self, metric: str = "page_engagement") -> Dict[str, Any]:
+        try:
+            if self.graph:
+                insights = self.graph.get_connections(self.page_id, "insights", metric=metric, period="day")
+                return {"success": True, "data": insights.get("data", [])}
+            resp = httpx.get(f"{self.API_BASE}/{self.page_id}/insights", headers=self.headers, params={"metric": metric, "period": "day"}, timeout=10)
+            return {"success": True, "data": resp.json().get("data", [])}
+        except Exception as e:
+            return {"success": False, "message": str(e)[:200]}
+
+    def publish_post(self, message: str) -> Dict[str, Any]:
+        try:
+            if self.graph:
+                result = self.graph.put_object(self.page_id, "feed", message=message)
+                return {"success": "id" in result, "message": "Post published via SDK", "post_id": result.get("id")}
+            resp = httpx.post(f"{self.API_BASE}/{self.page_id}/feed", headers=self.headers, json={"message": message}, timeout=10)
+            data = resp.json()
+            return {"success": "id" in data, "message": "Post published" if "id" in data else "Failed"}
+        except Exception as e:
+            return {"success": False, "message": str(e)[:200]}
+
+    def upload_photo(self, image_path: str, message: str = "") -> Dict[str, Any]:
+        try:
+            if self.graph:
+                with open(image_path, 'rb') as f:
+                    result = self.graph.put_photo(image=f, message=message, album_path=f"{self.page_id}/photos")
+                return {"success": True, "message": "Photo uploaded via SDK"}
+            return {"success": False, "message": "SDK not available"}
         except Exception as e:
             return {"success": False, "message": str(e)[:200]}
 
@@ -354,6 +541,146 @@ class MessengerIntegration:
             return {"success": False, "message": str(e)[:200]}
 
 
+class TwitterIntegration:
+    def __init__(self, config: Dict[str, Any]):
+        self.api_key = config.get("api_key", "")
+        self.api_secret = config.get("api_secret", "")
+        self.access_token = config.get("access_token", "")
+        self.access_token_secret = config.get("access_token_secret", "")
+        self.bearer_token = config.get("bearer_token", "")
+        if all([self.api_key, self.api_secret, self.access_token, self.access_token_secret]):
+            try:
+                import tweepy
+                auth = tweepy.OAuth1UserHandler(self.api_key, self.api_secret, self.access_token, self.access_token_secret)
+                self.client = tweepy.API(auth)
+            except:
+                self.client = None
+        else:
+            self.client = None
+
+    def test_connection(self) -> Dict[str, Any]:
+        try:
+            if self.client:
+                me = self.client.verify_credentials()
+                return {"success": True, "message": f"@{me.screen_name}", "username": me.screen_name, "name": me.name}
+            return {"success": False, "message": "Twitter SDK not configured. Provide API keys."}
+        except Exception as e:
+            return {"success": False, "message": str(e)[:200]}
+
+    def get_timeline(self, limit: int = 10) -> List[Dict[str, Any]]:
+        try:
+            if self.client:
+                tweets = self.client.home_timeline(count=limit)
+                return [{"id": str(t.id), "text": t.text, "from": t.user.screen_name, "created_at": t.created_at.isoformat()} for t in tweets]
+            return []
+        except:
+            return []
+
+    def get_mentions(self, limit: int = 10) -> List[Dict[str, Any]]:
+        try:
+            if self.client:
+                mentions = self.client.mentions_timeline(count=limit)
+                return [{"id": str(m.id), "text": m.text, "from": m.user.screen_name, "created_at": m.created_at.isoformat()} for m in mentions]
+            return []
+        except:
+            return []
+
+    def send_tweet(self, text: str) -> Dict[str, Any]:
+        try:
+            if self.client:
+                tweet = self.client.update_status(text)
+                return {"success": True, "message": "Tweet posted", "tweet_id": str(tweet.id)}
+            return {"success": False, "message": "Twitter SDK not configured"}
+        except Exception as e:
+            return {"success": False, "message": str(e)[:200]}
+
+    def reply_tweet(self, tweet_id: str, text: str) -> Dict[str, Any]:
+        try:
+            if self.client:
+                tweet = self.client.update_status(text, in_reply_to_status_id=tweet_id)
+                return {"success": True, "message": "Reply posted", "tweet_id": str(tweet.id)}
+            return {"success": False, "message": "Twitter SDK not configured"}
+        except Exception as e:
+            return {"success": False, "message": str(e)[:200]}
+
+    def retweet(self, tweet_id: str) -> Dict[str, Any]:
+        try:
+            if self.client:
+                self.client.retweet(tweet_id)
+                return {"success": True, "message": "Retweeted"}
+            return {"success": False, "message": "Twitter SDK not configured"}
+        except Exception as e:
+            return {"success": False, "message": str(e)[:200]}
+
+    def search_tweets(self, query: str, limit: int = 10) -> List[Dict[str, Any]]:
+        try:
+            if self.client:
+                tweets = tweepy.Cursor(self.client.search_tweets, q=query, lang="en").items(limit)
+                return [{"id": str(t.id), "text": t.text, "from": t.user.screen_name, "created_at": t.created_at.isoformat()} for t in tweets]
+            return []
+        except:
+            return []
+
+
+class SlackIntegration:
+    API_BASE = "https://slack.com/api"
+
+    def __init__(self, config: Dict[str, Any]):
+        self.bot_token = config.get("bot_token", "")
+        self.app_token = config.get("app_token", "")
+        self.headers = {"Authorization": f"Bearer {self.bot_token}", "Content-Type": "application/json"}
+
+    def test_connection(self) -> Dict[str, Any]:
+        try:
+            resp = httpx.post(f"{self.API_BASE}/auth.test", headers=self.headers, timeout=10)
+            data = resp.json()
+            if data.get("ok"):
+                return {"success": True, "message": f"Workspace: {data.get('team', 'unknown')}", "team": data.get("team"), "user": data.get("user")}
+            return {"success": False, "message": data.get("error", "Unknown error")}
+        except Exception as e:
+            return {"success": False, "message": str(e)[:200]}
+
+    def get_channels(self) -> List[Dict[str, Any]]:
+        try:
+            resp = httpx.get(f"{self.API_BASE}/conversations.list", headers=self.headers, params={"types": "public_channel,private_channel"}, timeout=10)
+            data = resp.json()
+            if data.get("ok"):
+                return [{"id": c["id"], "name": c["name"], "is_member": c.get("is_member", False)} for c in data.get("channels", [])]
+            return []
+        except:
+            return []
+
+    def get_messages(self, channel_id: str, limit: int = 20) -> List[Dict[str, Any]]:
+        try:
+            resp = httpx.get(f"{self.API_BASE}/conversations.history", headers=self.headers, params={"channel": channel_id, "limit": limit}, timeout=10)
+            data = resp.json()
+            if data.get("ok"):
+                return [{"id": m["ts"], "text": m.get("text", ""), "from": m.get("user", "unknown"), "date": datetime.fromtimestamp(float(m["ts"])).isoformat()} for m in data.get("messages", [])]
+            return []
+        except:
+            return []
+
+    def send_message(self, channel_id: str, text: str) -> Dict[str, Any]:
+        try:
+            resp = httpx.post(f"{self.API_BASE}/chat.postMessage", headers=self.headers, json={"channel": channel_id, "text": text}, timeout=10)
+            data = resp.json()
+            return {"success": data.get("ok", False), "message": "Sent" if data.get("ok") else data.get("error", "Failed")}
+        except Exception as e:
+            return {"success": False, "message": str(e)[:200]}
+
+    def upload_file(self, channel_id: str, file_path: str, title: str = "") -> Dict[str, Any]:
+        try:
+            import os
+            if not os.path.exists(file_path):
+                return {"success": False, "message": "File not found"}
+            with open(file_path, 'rb') as f:
+                resp = httpx.post(f"{self.API_BASE}/files.upload", headers={"Authorization": f"Bearer {self.bot_token}"}, data={"channels": channel_id, "title": title}, files={"file": (os.path.basename(file_path), f)}, timeout=30)
+            data = resp.json()
+            return {"success": data.get("ok", False), "message": "File uploaded" if data.get("ok") else "Failed"}
+        except Exception as e:
+            return {"success": False, "message": str(e)[:200]}
+
+
 INTEGRATIONS = {
     "email": EmailIntegration,
     "telegram": TelegramIntegration,
@@ -361,6 +688,8 @@ INTEGRATIONS = {
     "whatsapp": WhatsAppIntegration,
     "facebook": FacebookIntegration,
     "messenger": MessengerIntegration,
+    "twitter": TwitterIntegration,
+    "slack": SlackIntegration,
 }
 
 
