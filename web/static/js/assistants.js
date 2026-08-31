@@ -372,6 +372,7 @@ function populateDetail(data) {
     if (el('currentTokens')) el('currentTokens').textContent = a.max_tokens ?? 1000;
     renderConversations(data.conversations || []);
     renderIntegrations(data.integrations || []);
+    loadConnectedIntegrations();
     renderTasks(data.tasks || []);
     renderLogs(data.recent_logs || []);
     renderAnalytics(data);
@@ -390,6 +391,7 @@ function setTab(tab) {
         if (panelEl) panelEl.classList.toggle('hidden', t !== tab);
     });
     if (tab === 'monitors') initMonitorsTab();
+    if (tab === 'integrations') loadConnectedIntegrations();
     if (tab === 'analytics' && currentAssistant) {
         setTimeout(() => renderAnalytics(currentAssistant), 100);
     }
@@ -677,7 +679,7 @@ document.getElementById('integrationForm').addEventListener('submit', async e =>
 function renderIntegrations(integrations) {
     const list = document.getElementById('integrationsList');
     if (!integrations || !integrations.length) {
-        list.innerHTML = '<p class="text-sm text-gray-500">No integrations configured</p>';
+        list.innerHTML = '<p class="text-sm text-gray-500">No custom integrations configured</p>';
         return;
     }
     list.innerHTML = integrations.map(i => {
@@ -711,6 +713,92 @@ async function toggleIntegration(id, active) {
     try {
         await api('PUT', `integrations/${id}`, { is_active: active, status: active ? 'connected' : 'disconnected' });
     } catch (e) { showToast(e.message, 'error'); }
+}
+
+// Load connected integrations from the integrations page (localStorage)
+const INTEGRATION_CATALOG = {
+    whatsapp_web: { name: 'WhatsApp Web', icon: 'fab fa-whatsapp', color: 'green', category: 'messaging' },
+    telegram_bot: { name: 'Telegram Bot', icon: 'fab fa-telegram', color: 'sky', category: 'messaging' },
+    slack: { name: 'Slack', icon: 'fab fa-slack', color: 'purple', category: 'messaging' },
+    discord_bot: { name: 'Discord Bot', icon: 'fab fa-discord', color: 'indigo', category: 'messaging' },
+    email_imap: { name: 'Email (IMAP/SMTP)', icon: 'fas fa-envelope', color: 'blue', category: 'messaging' },
+    github: { name: 'GitHub', icon: 'fab fa-github', color: 'gray', category: 'dev' },
+    gitlab: { name: 'GitLab', icon: 'fab fa-gitlab', color: 'orange', category: 'dev' },
+    google_calendar: { name: 'Google Calendar', icon: 'fas fa-calendar', color: 'blue', category: 'productivity' },
+    google_sheets: { name: 'Google Sheets', icon: 'fas fa-table', color: 'green', category: 'productivity' },
+    notion: { name: 'Notion', icon: 'fas fa-book', color: 'gray', category: 'productivity' },
+    stripe: { name: 'Stripe', icon: 'fas fa-credit-card', color: 'purple', category: 'payments' },
+    facebook_page: { name: 'Facebook Page', icon: 'fab fa-facebook', color: 'indigo', category: 'social' },
+    twitter: { name: 'Twitter / X', icon: 'fab fa-twitter', color: 'sky', category: 'social' },
+    linkedin: { name: 'LinkedIn', icon: 'fab fa-linkedin', color: 'blue', category: 'social' },
+    youtube: { name: 'YouTube', icon: 'fab fa-youtube', color: 'red', category: 'media' },
+    shopify: { name: 'Shopify', icon: 'fab fa-shopify', color: 'green', category: 'ecommerce' },
+    woocommerce: { name: 'WooCommerce', icon: 'fas fa-shopping-cart', color: 'purple', category: 'ecommerce' },
+    slack_webhook: { name: 'Slack Webhook', icon: 'fab fa-slack', color: 'purple', category: 'automation' },
+    zapier: { name: 'Zapier', icon: 'fas fa-bolt', color: 'orange', category: 'automation' },
+    n8n: { name: 'n8n', icon: 'fas fa-project-diagram', color: 'red', category: 'automation' },
+};
+
+let assistantLinkedIntegrations = JSON.parse(localStorage.getItem('asm_linked_integrations') || '{}');
+
+function loadConnectedIntegrations() {
+    const container = document.getElementById('connectedIntegrations');
+    if (!container) return;
+    
+    // Get connected integrations from the integrations page
+    const connected = JSON.parse(localStorage.getItem('int_connected') || '{}');
+    const entries = Object.entries(connected);
+    
+    if (!entries.length) {
+        container.innerHTML = `
+            <div class="text-center py-6">
+                <i class="fas fa-plug text-3xl text-gray-600 mb-2"></i>
+                <p class="text-sm text-gray-400">No integrations connected yet</p>
+                <a href="/integrations" target="_blank" class="text-xs text-cyan-400 hover:text-cyan-300 mt-2 inline-block">Go to Integrations page to connect</a>
+            </div>`;
+        return;
+    }
+
+    container.innerHTML = entries.map(([id, acc]) => {
+        const svc = INTEGRATION_CATALOG[id] || { name: id, icon: 'fas fa-plug', color: 'gray' };
+        const isLinked = assistantLinkedIntegrations[currentAssistantId]?.includes(id);
+        return `
+        <div class="p-3 glass flex items-center justify-between gap-3" style="border-left: 3px solid ${isLinked ? '#10b981' : '#334155'}">
+            <div class="flex items-center gap-3 flex-1 min-w-0">
+                <div class="w-10 h-10 rounded-lg bg-${svc.color}-600/20 flex items-center justify-center">
+                    <i class="${svc.icon} text-${svc.color}-400"></i>
+                </div>
+                <div class="min-w-0">
+                    <p class="text-sm text-white font-medium truncate">${escapeHtml(acc.name || svc.name)}</p>
+                    <p class="text-[10px] text-gray-500">${escapeHtml(svc.category || '')} • Connected</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <label class="relative inline-flex items-center cursor-pointer" title="${isLinked ? 'Disable for this assistant' : 'Enable for this assistant'}">
+                    <input type="checkbox" ${isLinked ? 'checked' : ''} onchange="toggleLinkedIntegration('${id}', this.checked)" class="sr-only peer">
+                    <div class="w-9 h-5 bg-gray-600 rounded-full peer peer-checked:bg-green-500 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full"></div>
+                </label>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function toggleLinkedIntegration(integrationId, enabled) {
+    if (!currentAssistantId) return;
+    if (!assistantLinkedIntegrations[currentAssistantId]) {
+        assistantLinkedIntegrations[currentAssistantId] = [];
+    }
+    if (enabled) {
+        if (!assistantLinkedIntegrations[currentAssistantId].includes(integrationId)) {
+            assistantLinkedIntegrations[currentAssistantId].push(integrationId);
+        }
+        showToast(`Integration enabled for this assistant`);
+    } else {
+        assistantLinkedIntegrations[currentAssistantId] = assistantLinkedIntegrations[currentAssistantId].filter(id => id !== integrationId);
+        showToast(`Integration disabled for this assistant`);
+    }
+    localStorage.setItem('asm_linked_integrations', JSON.stringify(assistantLinkedIntegrations));
+    loadConnectedIntegrations();
 }
 
 async function deleteIntegration(id) {

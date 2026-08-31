@@ -465,11 +465,18 @@ textarea.input-field { resize: vertical; min-height: 80px; }
                 <!-- integrations tab -->
                 <div id="panelIntegrations" class="flex-1 hidden overflow-y-auto p-4 scroll-thin">
                     <div class="flex items-center justify-between mb-4">
-                        <h3 class="text-white font-semibold"><i class="fas fa-plug text-cyan-400 mr-2"></i>Integrations</h3>
-                        <button onclick="openAddIntegrationModal()" class="btn btn-primary text-xs"><i class="fas fa-plus mr-1"></i>Add</button>
+                        <h3 class="text-white font-semibold"><i class="fas fa-plug text-cyan-400 mr-2"></i>Connected Integrations</h3>
+                        <a href="/integrations" class="btn btn-secondary text-xs" target="_blank"><i class="fas fa-external-link-alt mr-1"></i>Manage</a>
                     </div>
-                    <div id="integrationsList" class="space-y-2">
-                        <p class="text-sm text-gray-500">No integrations configured</p>
+                    <p class="text-xs text-gray-500 mb-3">These are your connected integrations from the Integrations page. Toggle to enable for this assistant.</p>
+                    <div id="connectedIntegrations" class="space-y-2 mb-4">
+                        <p class="text-sm text-gray-500">Loading connected integrations...</p>
+                    </div>
+                    <div class="border-t border-gray-700/50 pt-4 mt-4">
+                        <h4 class="text-white text-sm font-semibold mb-3"><i class="fas fa-plus-circle text-purple-400 mr-2"></i>Add Custom Integration</h4>
+                        <div id="integrationsList" class="space-y-2">
+                            <p class="text-sm text-gray-500">No custom integrations configured</p>
+                        </div>
                     </div>
                 </div>
                 <!-- Tasks tab -->
