@@ -350,25 +350,26 @@ function closeDetailModal() {
 
 function populateDetail(data) {
     const a = data.assistant;
-    document.getElementById('detailName').textContent = a.name;
-    document.getElementById('detailSubtitle').textContent = `${a.model_id} • ${a.personality}`;
-    document.getElementById('detailAvatar').textContent = avatarFor(a.name);
-    document.getElementById('infoAvatar').textContent = avatarFor(a.name);
-    document.getElementById('infoName').textContent = a.name;
-    document.getElementById('infoDescription').textContent = a.description || '—';
-    document.getElementById('infoModel').textContent = a.model_id;
-    document.getElementById('infoPersonality').textContent = a.personality;
-    document.getElementById('infoTemp').textContent = a.temperature ?? 0.7;
-    document.getElementById('infoTokens').textContent = a.max_tokens ?? 1000;
-    document.getElementById('infoCreated').textContent = formatDate(a.created_at);
-    document.getElementById('infoStatus').innerHTML = a.is_active ? '<span class="text-green-400"><i class="fas fa-circle text-[6px] mr-1"></i>Active</span>' : '<span class="text-gray-400">Inactive</span>';
+    const el = (id) => document.getElementById(id);
+    if (el('detailName')) el('detailName').textContent = a.name;
+    if (el('detailSubtitle')) el('detailSubtitle').textContent = `${a.model_id} • ${a.personality}`;
+    if (el('detailAvatar')) el('detailAvatar').textContent = avatarFor(a.name);
+    if (el('infoAvatar')) el('infoAvatar').textContent = avatarFor(a.name);
+    if (el('infoName')) el('infoName').textContent = a.name;
+    if (el('infoDescription')) el('infoDescription').textContent = a.description || '—';
+    if (el('infoModel')) el('infoModel').textContent = a.model_id;
+    if (el('infoPersonality')) el('infoPersonality').textContent = a.personality;
+    if (el('infoTemp')) el('infoTemp').textContent = a.temperature ?? 0.7;
+    if (el('infoTokens')) el('infoTokens').textContent = a.max_tokens ?? 1000;
+    if (el('infoCreated')) el('infoCreated').textContent = formatDate(a.created_at);
+    if (el('infoStatus')) el('infoStatus').innerHTML = a.is_active ? '<span class="text-green-400"><i class="fas fa-circle text-[6px] mr-1"></i>Active</span>' : '<span class="text-gray-400">Inactive</span>';
     const tagsHtml = (a.tags || '').split(',').map(t => t.trim()).filter(Boolean)
         .map(t => `<span class="badge badge-tag">${escapeHtml(t)}</span>`).join('') || '<span class="text-xs text-gray-500">No tags</span>';
-    document.getElementById('infoTags').innerHTML = tagsHtml;
-    document.getElementById('infoPrompt').textContent = a.system_prompt || 'No system prompt';
-    document.getElementById('currentModel').textContent = a.model_id;
-    document.getElementById('currentTemp').textContent = a.temperature ?? 0.7;
-    document.getElementById('currentTokens').textContent = a.max_tokens ?? 1000;
+    if (el('infoTags')) el('infoTags').innerHTML = tagsHtml;
+    if (el('infoPrompt')) el('infoPrompt').textContent = a.system_prompt || 'No system prompt';
+    if (el('currentModel')) el('currentModel').textContent = a.model_id;
+    if (el('currentTemp')) el('currentTemp').textContent = a.temperature ?? 0.7;
+    if (el('currentTokens')) el('currentTokens').textContent = a.max_tokens ?? 1000;
     renderConversations(data.conversations || []);
     renderIntegrations(data.integrations || []);
     renderTasks(data.tasks || []);
@@ -389,6 +390,9 @@ function setTab(tab) {
         if (panelEl) panelEl.classList.toggle('hidden', t !== tab);
     });
     if (tab === 'monitors') initMonitorsTab();
+    if (tab === 'analytics' && currentAssistant) {
+        setTimeout(() => renderAnalytics(currentAssistant), 100);
+    }
 }
 
 function renderConversations(conversations) {
@@ -505,17 +509,18 @@ document.getElementById('chatInput').addEventListener('input', function() {
 function openSettingsPanel() {
     if (!currentAssistant) return;
     const a = currentAssistant.assistant;
-    document.getElementById('setName').value = a.name || '';
-    document.getElementById('setDescription').value = a.description || '';
-    document.getElementById('setModel').innerHTML = availableModels.map(m => `<option value="${escapeHtml(m)}" ${m === a.model_id ? 'selected' : ''}>${escapeHtml(m)}</option>`).join('');
-    document.getElementById('setPersonality').value = a.personality || 'professional';
-    document.getElementById('setTemp').value = a.temperature ?? 0.7;
-    document.getElementById('setTempVal').textContent = a.temperature ?? 0.7;
-    document.getElementById('setTokens').value = a.max_tokens ?? 1000;
-    document.getElementById('setTokensVal').textContent = a.max_tokens ?? 1000;
-    document.getElementById('setPrompt').value = a.system_prompt || '';
-    document.getElementById('setTags').value = a.tags || '';
-    document.getElementById('settingsModal').classList.remove('hidden');
+    const el = (id) => document.getElementById(id);
+    if (el('setName')) el('setName').value = a.name || '';
+    if (el('setDescription')) el('setDescription').value = a.description || '';
+    if (el('setModel')) el('setModel').innerHTML = availableModels.map(m => `<option value="${escapeHtml(m)}" ${m === a.model_id ? 'selected' : ''}>${escapeHtml(m)}</option>`).join('');
+    if (el('setPersonality')) el('setPersonality').value = a.personality || 'professional';
+    if (el('setTemp')) el('setTemp').value = a.temperature ?? 0.7;
+    if (el('setTempVal')) el('setTempVal').textContent = a.temperature ?? 0.7;
+    if (el('setTokens')) el('setTokens').value = a.max_tokens ?? 1000;
+    if (el('setTokensVal')) el('setTokensVal').textContent = a.max_tokens ?? 1000;
+    if (el('setPrompt')) el('setPrompt').value = a.system_prompt || '';
+    if (el('setTags')) el('setTags').value = a.tags || '';
+    if (el('settingsModal')) el('settingsModal').classList.remove('hidden');
 }
 function closeSettingsPanel() { document.getElementById('settingsModal').classList.add('hidden'); }
 
@@ -864,6 +869,7 @@ function renderAnalytics(data) {
 
 function renderLogs(logs) {
     const list = document.getElementById('logsList');
+    if (!list) return;
     if (!logs || !logs.length) {
         list.innerHTML = '<p class="text-sm text-gray-500">No activity yet</p>';
         return;

@@ -649,7 +649,9 @@ textarea.input-field { resize: vertical; min-height: 80px; }
                         <div class="stat-card"><p class="text-xs text-gray-400">Tokens</p><p class="text-xl font-bold text-white" id="anaTokens">0</p></div>
                         <div class="stat-card"><p class="text-xs text-gray-400">Tasks Run</p><p class="text-xl font-bold text-white" id="anaTasksRun">0</p></div>
                     </div>
-                    <div class="glass p-4" style="height:280px;"><canvas id="activityChart"></canvas></div>
+                    <div class="glass p-4 mb-4" style="height:280px;"><canvas id="activityChart"></canvas></div>
+                    <h4 class="text-white text-sm font-semibold mb-3"><i class="fas fa-history text-purple-400 mr-2"></i>Recent Activity</h4>
+                    <div id="logsList" class="space-y-2"><p class="text-sm text-gray-500">No activity yet</p></div>
                 </div>
             </div>
             <!-- Right: Info -->
@@ -665,6 +667,12 @@ textarea.input-field { resize: vertical; min-height: 80px; }
                         <div class="flex justify-between p-2 bg-white/5 rounded-lg"><span class="text-gray-400">Model</span><span id="infoModel" class="text-cyan-400">—</span></div>
                         <div class="flex justify-between p-2 bg-white/5 rounded-lg"><span class="text-gray-400">Personality</span><span id="infoPersonality" class="text-purple-400">—</span></div>
                         <div class="flex justify-between p-2 bg-white/5 rounded-lg"><span class="text-gray-400">Temperature</span><span id="infoTemp" class="text-amber-400">—</span></div>
+                        <div class="flex justify-between p-2 bg-white/5 rounded-lg"><span class="text-gray-400">Max Tokens</span><span id="infoTokens" class="text-cyan-400">1000</span></div>
+                        <div class="flex justify-between p-2 bg-white/5 rounded-lg"><span class="text-gray-400">Created</span><span id="infoCreated" class="text-gray-300">—</span></div>
+                    </div>
+                    <div class="mt-3">
+                        <h4 class="text-xs text-gray-400 font-semibold mb-2 uppercase tracking-wider">System Prompt</h4>
+                        <p id="infoPrompt" class="text-xs text-gray-500 bg-white/5 rounded-lg p-2 break-words" style="max-height:80px;overflow-y:auto;">No system prompt</p>
                     </div>
                     <div>
                         <h4 class="text-xs text-gray-400 font-semibold mb-2 uppercase tracking-wider">Tags</h4>
