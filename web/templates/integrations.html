@@ -155,9 +155,10 @@
                 <div class="border-t border-gray-700 pt-3 mt-3">
                     <p class="text-xs text-gray-400 mb-2 font-semibold"><i class="fas fa-paper-plane mr-1"></i>Send Message</p>
                     <div class="space-y-2">
-                        <input type="text" id="waRecipient" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-xs" placeholder="Recipient phone (e.g. 14155552671)">
+                        <input type="text" id="waRecipient" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-xs" placeholder="Phone with country code (e.g., 14155552671, 8801712345678)">
                         <textarea id="waText" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-xs" rows="2" placeholder="Message text"></textarea>
                         <button onclick="sendWhatsAppWebMessage()" id="waSendBtn" class="w-full px-3 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg text-xs font-medium transition"><i class="fas fa-paper-plane mr-1"></i>Send</button>
+                        <div id="waSendResult" class="text-xs mt-1 hidden"></div>
                     </div>
                 </div>
             </div>
@@ -776,16 +777,29 @@ async function generateChatLinkQR() {
 async function sendWhatsAppWebMessage() {
     const to = document.getElementById('waRecipient').value.trim().replace(/[^\d]/g, '');
     const text = document.getElementById('waText').value.trim();
+    const resultDiv = document.getElementById('waSendResult');
     if (!to || !text) { showToast('Recipient and message required', 'error'); return; }
+    if (to.length < 10) { showToast('Phone number must include country code (e.g., 14155552671)', 'error'); return; }
     const btn = document.getElementById('waSendBtn');
     btn.disabled = true;
     btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Sending...';
+    resultDiv.classList.remove('hidden');
+    resultDiv.innerHTML = '<span class="text-blue-400">Sending to +' + to + '...</span>';
     try {
         const r = await fetch(API + '/whatsapp/send-wa', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({session_id: waSessionId, to, text})});
         const d = await r.json();
-        if (d.success) { showToast('Message sent!', 'success'); document.getElementById('waText').value = ''; }
-        else { showToast(d.message || d.error || 'Failed', 'error'); }
-    } catch(e) { showToast('Error: ' + e.message, 'error'); }
+        if (d.success) {
+            resultDiv.innerHTML = '<span class="text-green-400"><i class="fas fa-check-circle mr-1"></i>Sent to +' + to + '</span>';
+            showToast('Message sent!', 'success');
+            document.getElementById('waText').value = '';
+        } else {
+            resultDiv.innerHTML = '<span class="text-red-400"><i class="fas fa-exclamation-circle mr-1"></i>' + (d.message || d.error || 'Failed') + '</span>';
+            showToast(d.message || d.error || 'Failed', 'error');
+        }
+    } catch(e) {
+        resultDiv.innerHTML = '<span class="text-red-400"><i class="fas fa-exclamation-circle mr-1"></i>' + e.message + '</span>';
+        showToast('Error: ' + e.message, 'error');
+    }
     btn.disabled = false;
     btn.innerHTML = '<i class="fas fa-paper-plane mr-1"></i>Send';
 }
