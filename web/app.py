@@ -4375,3 +4375,96 @@ def api_crawl():
             })
     except Exception as e:
         return jsonify({"success": False, "message": str(e)[:300]}), 500
+
+
+# ============= Monitor Scheduler CRUD =============
+@app.route("/api/monitors", methods=["GET"])
+def api_get_monitors():
+    from src.services.monitor_scheduler import get_monitors
+    return jsonify(get_monitors())
+
+
+@app.route("/api/monitors", methods=["POST"])
+def api_add_monitor():
+    import uuid
+    from src.services.monitor_scheduler import add_monitor
+    data = request.get_json(silent=True) or {}
+    monitor = {
+        "id": f"mon-{uuid.uuid4().hex[:8]}",
+        "name": data.get("name", "Untitled Monitor"),
+        "type": data.get("type", "website"),
+        "url": data.get("url", ""),
+        "phone": data.get("phone", ""),
+        "group_id": data.get("group_id", ""),
+        "keywords": data.get("keywords", ""),
+        "interval": data.get("interval", 5),
+        "notify": data.get("notify", "whatsapp"),
+        "active": data.get("active", True),
+        "created": datetime.now().isoformat() if 'datetime' in dir() else __import__('datetime').datetime.now().isoformat(),
+        "last_check": None,
+        "last_change": None,
+        "last_status": "pending",
+    }
+    add_monitor(monitor)
+    return jsonify(monitor), 201
+
+
+@app.route("/api/monitors/<monitor_id>", methods=["PUT"])
+def api_update_monitor(monitor_id):
+    from src.services.monitor_scheduler import update_monitor
+    data = request.get_json(silent=True) or {}
+    result = update_monitor(monitor_id, data)
+    if result:
+        return jsonify(result)
+    return jsonify({"error": "Monitor not found"}), 404
+
+
+@app.route("/api/monitors/<monitor_id>", methods=["DELETE"])
+def api_delete_monitor(monitor_id):
+    from src.services.monitor_scheduler import delete_monitor
+    delete_monitor(monitor_id)
+    return jsonify({"success": True})
+
+
+@app.route("/api/monitors/<monitor_id>/test", methods=["POST"])
+def api_test_monitor_now(monitor_id):
+    from src.services.monitor_scheduler import run_monitor_check, get_monitors, crawl_website, send_whatsapp_message, format_monitor_result
+    monitors = get_monitors()
+    m = next((x for x in monitors if x.get("id") == monitor_id), None)
+    if not m:
+        return jsonify({"error": "Monitor not found"}), 404
+    crawl_data = crawl_website(m.get("url", ""))
+    if not crawl_data.get("success"):
+        return jsonify({"success": False, "message": crawl_data.get("error", "Crawl failed")})
+    if m.get("phone"):
+        msg = format_monitor_result(m, crawl_data)
+        send_result = send_whatsapp_message(m["phone"], msg)
+        return jsonify({"success": True, "crawl": crawl_data, "whatsapp_sent": send_result.get("success", False)})
+    return jsonify({"success": True, "crawl": crawl_data, "whatsapp_sent": False, "message": "No phone number configured"})
+
+
+@app.route("/api/monitors/scheduler/status", methods=["GET"])
+def api_scheduler_status():
+    from src.services.monitor_scheduler import get_scheduler_status
+    return jsonify(get_scheduler_status())
+
+
+@app.route("/api/monitors/scheduler/start", methods=["POST"])
+def api_start_scheduler():
+    from src.services.monitor_scheduler import start_scheduler
+    start_scheduler()
+    return jsonify({"success": True, "message": "Scheduler started"})
+
+
+@app.route("/api/monitors/scheduler/stop", methods=["POST"])
+def api_stop_scheduler():
+    from src.services.monitor_scheduler import stop_scheduler
+    return jsonify({"success": True, "message": "Scheduler stopped"})
+
+
+# Start monitor scheduler on import
+try:
+    from src.services.monitor_scheduler import start_scheduler
+    start_scheduler()
+except Exception as _sched_err:
+    print(f"[MonitorScheduler] Could not start: {_sched_err}")

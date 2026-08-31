@@ -1,0 +1,18 @@
+[
+  {
+    "id": "mon-6e43e7c6",
+    "name": "Prothom Alo News",
+    "type": "news",
+    "url": "https://www.prothomalo.com/",
+    "phone": "8801712345678",
+    "group_id": "",
+    "keywords": "breaking,urgent",
+    "interval": 5,
+    "notify": "whatsapp",
+    "active": true,
+    "created": "2026-08-31T10:50:45.981393",
+    "last_check": null,
+    "last_change": null,
+    "last_status": "pending"
+  }
+]

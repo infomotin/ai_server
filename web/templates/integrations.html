@@ -495,34 +495,43 @@
                     <option value="website">Website / URL</option>
                     <option value="facebook">Facebook Page</option>
                     <option value="ecommerce">E-commerce Product</option>
+                    <option value="news">News / Blog</option>
                     <option value="rss">RSS Feed</option>
-                    <option value="api">API Endpoint</option>
                 </select>
             </div>
             <div>
-                <label class="block text-xs text-gray-400 mb-1">Name</label>
-                <input type="text" id="monitorName" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm" placeholder="My Monitor">
+                <label class="block text-xs text-gray-400 mb-1">Monitor Name</label>
+                <input type="text" id="monitorName" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm" placeholder="e.g., Prothom Alo News">
             </div>
             <div id="monitorUrlField">
                 <label class="block text-xs text-gray-400 mb-1">URL to Monitor</label>
                 <input type="url" id="monitorUrl" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm" placeholder="https://...">
             </div>
-            <div id="monitorKeywordsField">
-                <label class="block text-xs text-gray-400 mb-1">Alert Keywords (comma-separated)</label>
-                <input type="text" id="monitorKeywords" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm" placeholder="sale, discount, new, offer">
+            <div>
+                <label class="block text-xs text-gray-400 mb-1">WhatsApp Number (with country code)</label>
+                <input type="text" id="monitorPhone" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm" placeholder="8801712345678">
+                <p class="text-[10px] text-gray-600 mt-1">Send alerts to this number. For groups, enter group name below.</p>
             </div>
             <div>
-                <label class="block text-xs text-gray-400 mb-1">Notification Method</label>
-                <select id="monitorNotify" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm">
-                    <option value="whatsapp">WhatsApp Message</option>
-                    <option value="email">Email</option>
-                    <option value="telegram">Telegram</option>
-                    <option value="webhook">Webhook</option>
+                <label class="block text-xs text-gray-400 mb-1">Or WhatsApp Group Name</label>
+                <input type="text" id="monitorGroup" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm" placeholder="Family Group">
+                <p class="text-[10px] text-gray-600 mt-1">Leave blank to send to the number above</p>
+            </div>
+            <div>
+                <label class="block text-xs text-gray-400 mb-1">Check Interval</label>
+                <select id="monitorInterval" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm">
+                    <option value="1">Every 1 minute</option>
+                    <option value="5" selected>Every 5 minutes</option>
+                    <option value="15">Every 15 minutes</option>
+                    <option value="30">Every 30 minutes</option>
+                    <option value="60">Every 1 hour</option>
+                    <option value="360">Every 6 hours</option>
+                    <option value="1440">Once a day</option>
                 </select>
             </div>
-            <div>
-                <label class="block text-xs text-gray-400 mb-1">Recipients (phone/email/webhook URL)</label>
-                <input type="text" id="monitorRecipients" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm" placeholder="+1234567890, admin@example.com">
+            <div id="monitorKeywordsField">
+                <label class="block text-xs text-gray-400 mb-1">Alert Keywords (comma-separated)</label>
+                <input type="text" id="monitorKeywords" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm" placeholder="sale, discount, breaking, new, offer">
             </div>
         </div>
         <div class="p-5 border-t border-gray-700 flex gap-3">
@@ -564,7 +573,8 @@ let catalog = [];
 let currentConnectService = null;
 let cameraStream = null;
 let currentAssistantPlatform = 'all';
-let monitors = JSON.parse(localStorage.getItem('int_monitors') || '[]');
+let monitors = [];
+fetch('/api/monitors').then(function(r){return r.json()}).then(function(d){monitors=d||[]; if(currentTab==='monitor') renderMonitors();}).catch(function(){monitors=[];});
 let aiConversationHistory = [];
 
 /* ===== Tabs ===== */
@@ -1459,80 +1469,89 @@ async function startAudioCall() {
 /* ===== MONITORS ===== */
 function renderMonitors() {
     const el = document.getElementById('monitorsList');
-    if (monitors.length === 0) {
-        el.innerHTML = `<div class="text-center text-gray-500 py-12">
-            <i class="fas fa-eye-slash text-4xl mb-3 text-gray-600"></i>
-            <p class="text-sm">No monitors configured</p>
-            <p class="text-xs text-gray-600 mt-1">Add a monitor to track websites, pages, or offers</p>
-        </div>`;
+    if (!monitors || monitors.length === 0) {
+        el.innerHTML = '<div class="text-center text-gray-500 py-12"><i class="fas fa-eye-slash text-4xl mb-3 text-gray-600"></i><p class="text-sm">No monitors configured</p><p class="text-xs text-gray-600 mt-1">Add a monitor to auto-crawl websites and send WhatsApp alerts</p></div>';
         return;
     }
-    el.innerHTML = monitors.map(m => `
-        <div class="monitor-card ${m.active ? 'active' : ''}">
-            <div class="flex items-center justify-between mb-2">
-                <div class="flex items-center gap-3">
-                    <div class="monitor-status ${m.active ? 'running' : 'stopped'}"></div>
-                    <div>
-                        <h4 class="text-white font-medium text-sm">${esc(m.name)}</h4>
-                        <p class="text-xs text-gray-500">${esc(m.type)} \u2022 ${esc(m.url || '').substring(0, 40)}</p>
-                    </div>
-                </div>
-                <div class="flex items-center gap-2">
-                    <button onclick="testMonitor('${m.id}')" class="px-3 py-1 bg-cyan-600/20 text-cyan-400 rounded-lg text-xs hover:bg-cyan-600/30 transition" title="Test now">
-                        <i class="fas fa-vial mr-1"></i>Test
-                    </button>
-                    <button onclick="toggleMonitor('${m.id}')" class="px-3 py-1 bg-${m.active ? 'green' : 'gray'}-600/20 text-${m.active ? 'green' : 'gray'}-400 rounded-lg text-xs hover:bg-${m.active ? 'green' : 'gray'}-600/30 transition">
-                        <i class="fas fa-${m.active ? 'pause' : 'play'} mr-1"></i>${m.active ? 'Pause' : 'Start'}
-                    </button>
-                    <button onclick="deleteMonitor('${m.id}')" class="px-3 py-1 bg-red-600/20 text-red-400 rounded-lg text-xs hover:bg-red-600/30 transition"><i class="fas fa-trash"></i></button>
-                </div>
-            </div>
-            <div class="flex items-center gap-4 text-[10px] text-gray-500">
-                <span><i class="fas fa-clock mr-1"></i>Every ${m.interval || 15}min</span>
-                <span><i class="fas fa-bell mr-1"></i>${esc(m.notify || 'whatsapp')}</span>
-                <span><i class="fas fa-key mr-1"></i>${m.keywords ? esc(m.keywords.split(',')[0]) : 'all changes'}</span>
-            </div>
-            <div id="monitorResult_${m.id}" class="hidden mt-2 text-xs"></div>
-        </div>
-    `).join('');
+    el.innerHTML = monitors.map(function(m) {
+        var statusColor = m.active ? 'green' : 'gray';
+        var statusText = m.active ? 'Active' : 'Paused';
+        var lastCheck = m.last_check ? new Date(m.last_check).toLocaleString() : 'Never';
+        var phoneInfo = m.phone ? '<i class="fab fa-whatsapp mr-1 text-green-400"></i>' + esc(m.phone) : '';
+        var groupInfo = m.group_id ? '<i class="fas fa-users mr-1 text-blue-400"></i>' + esc(m.group_id) : '';
+        var statusInfo = m.last_status === 'change_detected' ? '<span class="text-yellow-400"><i class="fas fa-bell mr-1"></i>Change detected</span>' : '';
+        return '<div class="monitor-card ' + (m.active ? 'active' : '') + '">' +
+            '<div class="flex items-center justify-between mb-2">' +
+                '<div class="flex items-center gap-3">' +
+                    '<div class="monitor-status ' + (m.active ? 'running' : 'stopped') + '"></div>' +
+                    '<div>' +
+                        '<h4 class="text-white font-medium text-sm">' + esc(m.name) + '</h4>' +
+                        '<p class="text-xs text-gray-500">' + esc(m.type) + ' &bull; ' + esc((m.url || '').substring(0, 45)) + '</p>' +
+                    '</div>' +
+                '</div>' +
+                '<div class="flex items-center gap-2">' +
+                    '<button onclick="testMonitor(\'' + m.id + '\')" class="px-3 py-1 bg-cyan-600/20 text-cyan-400 rounded-lg text-xs hover:bg-cyan-600/30 transition" title="Test now"><i class="fas fa-vial mr-1"></i>Test</button>' +
+                    '<button onclick="toggleMonitor(\'' + m.id + '\')" class="px-3 py-1 bg-' + statusColor + '-600/20 text-' + statusColor + '-400 rounded-lg text-xs hover:bg-' + statusColor + '-600/30 transition"><i class="fas fa-' + (m.active ? 'pause' : 'play') + ' mr-1"></i>' + statusText + '</button>' +
+                    '<button onclick="deleteMonitor(\'' + m.id + '\')" class="px-3 py-1 bg-red-600/20 text-red-400 rounded-lg text-xs hover:bg-red-600/30 transition"><i class="fas fa-trash"></i></button>' +
+                '</div>' +
+            '</div>' +
+            '<div class="flex items-center gap-4 text-[10px] text-gray-500 flex-wrap">' +
+                '<span><i class="fas fa-clock mr-1"></i>Every ' + (m.interval || 5) + 'min</span>' +
+                (phoneInfo ? '<span>' + phoneInfo + '</span>' : '') +
+                (groupInfo ? '<span>' + groupInfo + '</span>' : '') +
+                '<span><i class="fas fa-key mr-1"></i>' + (m.keywords ? esc(m.keywords.split(',')[0]) : 'all changes') + '</span>' +
+                '<span><i class="fas fa-history mr-1"></i>' + lastCheck + '</span>' +
+                statusInfo +
+            '</div>' +
+            '<div id="monitorResult_' + m.id + '" class="hidden mt-2 text-xs"></div>' +
+        '</div>';
+    }).join('');
 }
 
 async function testMonitor(monitorId) {
-    const m = monitors.find(x => x.id === monitorId);
+    const m = monitors.find(function(x){return x.id === monitorId});
     if (!m) return;
     const resultEl = document.getElementById('monitorResult_' + monitorId);
-    if (resultEl) { resultEl.classList.remove('hidden'); resultEl.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Crawling...'; }
+    if (resultEl) { resultEl.classList.remove('hidden'); resultEl.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Crawling & sending to WhatsApp...'; }
     try {
-        const r = await fetch('/api/crawl', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({url: m.url})});
+        const r = await fetch('/api/monitors/' + monitorId + '/test', {method:'POST', headers:{'Content-Type':'application/json'}});
         const d = await r.json();
-        if (d.success) {
-            let html = '<div class="p-3 bg-green-600/10 border border-green-600/30 rounded-lg">';
+        var cd = d.crawl || {};
+        if (d.success || cd.success) {
+            var html = '<div class="p-3 bg-green-600/10 border border-green-600/30 rounded-lg">';
             html += '<p class="text-green-400 font-semibold mb-2"><i class="fas fa-check-circle mr-1"></i>Crawl Successful</p>';
-            html += '<p class="text-white mb-1"><b>Title:</b> ' + esc(d.title || 'N/A') + '</p>';
-            if (d.meta_description) html += '<p class="text-gray-400 text-[11px] mb-1">' + esc(d.meta_description) + '</p>';
+            html += '<p class="text-white mb-1"><b>Title:</b> ' + esc(cd.title || 'N/A') + '</p>';
+            if (cd.meta_description) html += '<p class="text-gray-400 text-[11px] mb-1">' + esc(cd.meta_description) + '</p>';
             html += '<div class="flex gap-3 text-[11px] text-gray-400 mb-2">';
-            html += '<span><i class="fas fa-link mr-1"></i>' + (d.links_count||0) + ' links</span>';
-            html += '<span><i class="fas fa-image mr-1"></i>' + (d.images_count||0) + ' images</span>';
-            html += '<span><i class="fas fa-file-alt mr-1"></i>' + (d.text_length||0) + ' chars</span>';
+            html += '<span><i class="fas fa-link mr-1"></i>' + (cd.links_count||0) + ' links</span>';
+            html += '<span><i class="fas fa-image mr-1"></i>' + (cd.images_count||0) + ' images</span>';
+            html += '<span><i class="fas fa-file-alt mr-1"></i>' + (cd.text_length||0) + ' chars</span>';
             html += '</div>';
-            if (d.prices_found && d.prices_found.length) {
-                html += '<p class="text-yellow-400 text-xs mb-1"><i class="fas fa-tag mr-1"></i>Prices: ' + d.prices_found.join(', ') + '</p>';
+            if (cd.prices && cd.prices.length) {
+                html += '<p class="text-yellow-400 text-xs mb-1"><i class="fas fa-tag mr-1"></i>Prices: ' + cd.prices.join(', ') + '</p>';
             }
-            if (d.headings && d.headings.length) {
+            if (cd.headings && cd.headings.length) {
                 html += '<div class="mb-1"><p class="text-gray-500 text-[10px] uppercase tracking-wider mb-1">Headings:</p>';
-                d.headings.slice(0,5).forEach(function(h){ html += '<p class="text-gray-300 text-[11px] ml-2">- ' + esc(h) + '</p>'; });
+                cd.headings.slice(0,5).forEach(function(h){ html += '<p class="text-gray-300 text-[11px] ml-2">- ' + esc(h) + '</p>'; });
                 html += '</div>';
             }
-            if (d.structured_items && d.structured_items.length) {
-                html += '<div class="mb-1"><p class="text-gray-500 text-[10px] uppercase tracking-wider mb-1">Content Items:</p>';
-                d.structured_items.slice(0,3).forEach(function(s){ html += '<p class="text-gray-400 text-[11px] ml-2 truncate">- ' + esc(s.substring(0,120)) + '</p>'; });
+            if (cd.items && cd.items.length) {
+                html += '<div class="mb-1"><p class="text-gray-500 text-[10px] uppercase tracking-wider mb-1">Content:</p>';
+                cd.items.slice(0,3).forEach(function(s){ html += '<p class="text-gray-400 text-[11px] ml-2 truncate">- ' + esc(s.substring(0,120)) + '</p>'; });
                 html += '</div>';
             }
-            html += '<p class="text-gray-600 mt-1 text-[10px]">Hash: ' + d.content_hash + '</p>';
+            html += '<p class="text-gray-600 mt-1 text-[10px]">Hash: ' + (cd.content_hash||'') + '</p>';
+            if (d.whatsapp_sent) {
+                html += '<p class="text-green-300 text-xs mt-1"><i class="fab fa-whatsapp mr-1"></i>WhatsApp alert sent to ' + esc(m.phone || m.group_id) + '</p>';
+            } else if (m.phone || m.group_id) {
+                html += '<p class="text-yellow-400 text-xs mt-1"><i class="fas fa-exclamation-triangle mr-1"></i>WhatsApp send failed - check number</p>';
+            } else {
+                html += '<p class="text-gray-500 text-xs mt-1"><i class="fas fa-info-circle mr-1"></i>No phone number configured</p>';
+            }
             html += '</div>';
             if (resultEl) resultEl.innerHTML = html;
         } else {
-            if (resultEl) resultEl.innerHTML = '<div class="p-2 bg-red-600/10 border border-red-600/30 rounded-lg text-red-400 text-xs">' + esc(d.message || 'Failed to crawl') + '</div>';
+            if (resultEl) resultEl.innerHTML = '<div class="p-2 bg-red-600/10 border border-red-600/30 rounded-lg text-red-400 text-xs">' + esc(d.message || cd.error || 'Failed') + '</div>';
         }
     } catch(e) {
         if (resultEl) resultEl.innerHTML = '<div class="p-2 bg-red-600/10 border border-red-600/30 rounded-lg text-red-400 text-xs">' + esc(e.message) + '</div>';
@@ -1564,63 +1583,74 @@ function onMonitorTypeChange() {
 
 function saveMonitor() {
     const monitor = {
-        id: 'm_' + Date.now(),
         type: document.getElementById('monitorType').value,
         name: document.getElementById('monitorName').value,
         url: document.getElementById('monitorUrl').value,
+        phone: document.getElementById('monitorPhone').value,
+        group_id: document.getElementById('monitorGroup').value,
         keywords: document.getElementById('monitorKeywords').value,
-        notify: document.getElementById('monitorNotify').value,
-        recipients: document.getElementById('monitorRecipients').value,
-        interval: document.getElementById('checkInterval').value,
+        interval: parseInt(document.getElementById('monitorInterval').value),
+        notify: 'whatsapp',
         active: true,
-        created: new Date().toISOString()
     };
 
     if (!monitor.name || !monitor.url) {
         showToast('Name and URL are required', 'error');
         return;
     }
+    if (!monitor.phone && !monitor.group_id) {
+        showToast('Enter a WhatsApp number or group name', 'error');
+        return;
+    }
 
-    monitors.push(monitor);
-    localStorage.setItem('int_monitors', JSON.stringify(monitors));
-    closeAddMonitorModal();
-    renderMonitors();
-    showToast('Monitor created!');
+    fetch('/api/monitors', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(monitor)})
+    .then(r => r.json())
+    .then(d => {
+        monitors.push(d);
+        closeAddMonitorModal();
+        renderMonitors();
+        showToast('Monitor created! Auto-checking every ' + monitor.interval + ' min');
+    })
+    .catch(e => showToast('Error: ' + e.message, 'error'));
 }
 
 function toggleMonitor(id) {
     const m = monitors.find(m => m.id === id);
     if (m) {
         m.active = !m.active;
-        localStorage.setItem('int_monitors', JSON.stringify(monitors));
-        renderMonitors();
+        fetch('/api/monitors/' + id, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({active: m.active})})
+        .then(() => renderMonitors())
+        .catch(() => renderMonitors());
     }
 }
 
 function deleteMonitor(id) {
     if (!confirm('Delete this monitor?')) return;
-    monitors = monitors.filter(m => m.id !== id);
-    localStorage.setItem('int_monitors', JSON.stringify(monitors));
-    renderMonitors();
-    showToast('Monitor deleted');
+    fetch('/api/monitors/' + id, {method:'DELETE'})
+    .then(() => {
+        monitors = monitors.filter(m => m.id !== id);
+        renderMonitors();
+        showToast('Monitor deleted');
+    })
+    .catch(() => showToast('Delete failed', 'error'));
 }
 
 function createPresetMonitor(type) {
     if (type === 'facebook') {
         document.getElementById('monitorType').value = 'facebook';
         document.getElementById('monitorName').value = 'Facebook Page Monitor';
+        document.getElementById('monitorUrl').value = 'https://facebook.com/your-page';
         document.getElementById('monitorKeywords').value = 'new post,comment,like,share';
-        document.getElementById('monitorNotify').value = 'whatsapp';
     } else if (type === 'ecommerce') {
         document.getElementById('monitorType').value = 'ecommerce';
         document.getElementById('monitorName').value = 'E-commerce Price Monitor';
+        document.getElementById('monitorUrl').value = 'https://shop.example.com/product/123';
         document.getElementById('monitorKeywords').value = 'sale,discount,offer,price drop,new arrival';
-        document.getElementById('monitorNotify').value = 'whatsapp';
     } else if (type === 'news') {
-        document.getElementById('monitorType').value = 'rss';
+        document.getElementById('monitorType').value = 'news';
         document.getElementById('monitorName').value = 'News Feed Monitor';
+        document.getElementById('monitorUrl').value = 'https://www.prothomalo.com/';
         document.getElementById('monitorKeywords').value = 'breaking,urgent,important';
-        document.getElementById('monitorNotify').value = 'whatsapp';
     }
     openAddMonitorModal();
 }
