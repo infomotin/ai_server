@@ -1,7 +1,7 @@
 import os
 import json
 import requests
-from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, Response
+from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, Response, make_response
 from datetime import datetime
 
 app = Flask(__name__)
@@ -3133,8 +3133,6 @@ def api_mcp_proxy(path):
 
 @app.route("/api/assistants")
 def api_assistants():
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         resp = requests.get(f"{API_BASE_URL}/assistants", headers=get_api_headers(), timeout=10)
         return resp.json() if resp.status_code == 200 else []
@@ -3144,8 +3142,6 @@ def api_assistants():
 
 @app.route("/api/assistants/<assistant_id>")
 def api_assistant(assistant_id):
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         resp = requests.get(f"{API_BASE_URL}/assistants/{assistant_id}", headers=get_api_headers(), timeout=10)
         return resp.json() if resp.status_code == 200 else {"detail": "Not found"}
@@ -3155,8 +3151,6 @@ def api_assistant(assistant_id):
 
 @app.route("/api/assistants/stats")
 def api_assistants_stats():
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         resp = requests.get(f"{API_BASE_URL}/assistants/stats", headers=get_api_headers(), timeout=10)
         return resp.json() if resp.status_code == 200 else {}
@@ -3166,8 +3160,6 @@ def api_assistants_stats():
 
 @app.route("/api/assistants/<assistant_id>/chat", methods=["POST"])
 def api_assistants_chat(assistant_id):
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         data = request.get_json()
         resp = requests.post(
@@ -3184,8 +3176,6 @@ def api_assistants_chat(assistant_id):
 @app.route("/api/assistants/proxy", methods=["GET", "POST", "PUT", "DELETE"])
 @app.route("/api/assistants/proxy/", methods=["GET", "POST", "PUT", "DELETE"])
 def api_assistants_proxy_root():
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     return _assistants_proxy_forward("")
 
 
