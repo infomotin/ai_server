@@ -3528,8 +3528,6 @@ def api_messenger_send():
 
 @app.route("/api/integrations/qr/generate", methods=["POST"])
 def api_qr_generate():
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     data = request.get_json(silent=True) or {}
     content = data.get("content", "https://openlocalai.dev")
     size = data.get("size", 300)
@@ -3553,8 +3551,6 @@ def api_qr_generate():
 
 @app.route("/api/integrations/barcode/scan", methods=["POST"])
 def api_barcode_scan():
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     if "image" not in request.files:
         return jsonify({"success": False, "error": "No image provided"}), 400
     file = request.files["image"]
@@ -3581,8 +3577,6 @@ def api_barcode_scan():
 
 @app.route("/api/integrations/barcode/generate", methods=["POST"])
 def api_barcode_generate():
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     data = request.get_json(silent=True) or {}
     content = data.get("content", "TEST-12345")
     barcode_type = data.get("type", "code128")
@@ -3623,16 +3617,12 @@ def _save_webhooks(hooks):
 
 @app.route("/api/integrations/webhooks", methods=["GET"])
 def api_webhooks_list():
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     hooks = _load_webhooks()
     user_id = session.get("user", {}).get("id", "default")
     return jsonify([h for h in hooks if h.get("user_id") == user_id])
 
 @app.route("/api/integrations/webhooks", methods=["POST"])
 def api_webhooks_create():
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     data = request.get_json(silent=True) or {}
     hooks = _load_webhooks()
     import uuid
@@ -3656,8 +3646,6 @@ def api_webhooks_create():
 
 @app.route("/api/integrations/webhooks/<hook_id>", methods=["DELETE"])
 def api_webhooks_delete(hook_id):
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     hooks = _load_webhooks()
     hooks = [h for h in hooks if h["id"] != hook_id]
     _save_webhooks(hooks)
@@ -3665,8 +3653,6 @@ def api_webhooks_delete(hook_id):
 
 @app.route("/api/integrations/webhooks/<hook_id>/test", methods=["POST"])
 def api_webhooks_test(hook_id):
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     hooks = _load_webhooks()
     hook = next((h for h in hooks if h["id"] == hook_id), None)
     if not hook:
@@ -3691,8 +3677,6 @@ def api_webhooks_test(hook_id):
 
 @app.route("/api/integrations/api-test", methods=["POST"])
 def api_connection_test():
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     data = request.get_json(silent=True) or {}
     url = data.get("url", "")
     method = data.get("method", "GET")
@@ -3737,8 +3721,6 @@ def api_connection_test():
 
 @app.route("/api/integrations/catalog", methods=["GET"])
 def api_integration_catalog():
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     return jsonify({
         "services": [
             {"id": "whatsapp_web", "name": "WhatsApp Web", "icon": "fab fa-whatsapp", "color": "green", "category": "messaging", "auth_type": "qr", "description": "Scan QR code to connect WhatsApp Web"},
@@ -3779,8 +3761,6 @@ def _wa_bridge_request(method, path, timeout=30, **kwargs):
 
 @app.route("/api/integrations/whatsapp/qr", methods=["POST"])
 def api_whatsapp_qr():
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     data = request.get_json(silent=True) or {}
     phone = data.get("phone", "")
     message = data.get("message", "Hello! I'm interested in your business.")
@@ -3829,8 +3809,6 @@ def api_whatsapp_qr():
 
 @app.route("/api/integrations/whatsapp/status", methods=["GET"])
 def api_whatsapp_status():
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     session_id = request.args.get("session_id", f"wa_{session.get('user', {}).get('id', 'default')}")
     bridge = _wa_bridge_request("GET", f"/sessions/{session_id}/status", timeout=5)
     if bridge is None:
@@ -3843,8 +3821,6 @@ def api_whatsapp_status():
 
 @app.route("/api/integrations/whatsapp/logout", methods=["POST"])
 def api_whatsapp_logout():
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     data = request.get_json(silent=True) or {}
     session_id = data.get("session_id", f"wa_{session.get('user', {}).get('id', 'default')}")
     bridge = _wa_bridge_request("POST", f"/sessions/{session_id}/logout", timeout=15)
@@ -3858,8 +3834,6 @@ def api_whatsapp_logout():
 
 @app.route("/api/integrations/whatsapp/send-wa", methods=["POST"])
 def api_whatsapp_send_wa():
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     data = request.get_json(silent=True) or {}
     session_id = data.get("session_id", f"wa_{session.get('user', {}).get('id', 'default')}")
     to = data.get("to", "")
@@ -3878,8 +3852,6 @@ def api_whatsapp_send_wa():
 @app.route("/api/integrations/whatsapp/chat-link-qr", methods=["POST"])
 def api_whatsapp_chat_link_qr():
     """Generate a wa.me click-to-chat QR code (works with WhatsApp Business app)"""
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     data = request.get_json(silent=True) or {}
     phone = data.get("phone", "")
     message = data.get("message", "Hello! I'm interested in your business.")
@@ -4005,8 +3977,6 @@ def save_whatsapp_message(from_num, text, msg_type, direction, phone_id):
 
 @app.route("/api/integrations/whatsapp/messages", methods=["GET"])
 def api_whatsapp_messages():
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     import json as json_mod
     import os
     storage_path = "/www/AI_server/data/whatsapp_messages.json"
