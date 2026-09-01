@@ -72,11 +72,11 @@
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div class="p-3 bg-gray-800/50 rounded-lg">
                     <p class="text-xs text-gray-500 mb-1">Username</p>
-                    <p class="text-sm text-white font-medium">{{ user.username }}</p>
+                    <p class="text-sm text-white font-medium">{{ user.username if user else 'Guest' }}</p>
                 </div>
                 <div class="p-3 bg-gray-800/50 rounded-lg">
                     <p class="text-xs text-gray-500 mb-1">Email</p>
-                    <p class="text-sm text-white font-medium">{{ user.email }}</p>
+                    <p class="text-sm text-white font-medium">{{ user.email if user else 'N/A' }}</p>
                 </div>
                 <div class="p-3 bg-gray-800/50 rounded-lg">
                     <p class="text-xs text-gray-500 mb-1">Default Model</p>
@@ -84,7 +84,7 @@
                 </div>
                 <div class="p-3 bg-gray-800/50 rounded-lg">
                     <p class="text-xs text-gray-500 mb-1">Member Since</p>
-                    <p class="text-sm text-white font-medium">{{ user.created_at[:10] }}</p>
+                    <p class="text-sm text-white font-medium">{{ user.created_at[:10] if user and user.created_at else 'N/A' }}</p>
                 </div>
             </div>
         </div>

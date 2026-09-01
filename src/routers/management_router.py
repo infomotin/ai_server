@@ -405,7 +405,7 @@ async def benchmark_model(
 
     started = time.time()
     try:
-        text, usage = await ollama_client.generate(
+        result = await ollama_client.generate(
             model=model_id,
             prompt=prompt,
             stream=False,
@@ -414,8 +414,13 @@ async def benchmark_model(
         raise HTTPException(status_code=500, detail=str(e))
     elapsed = time.time() - started
 
-    completion_tokens = (usage or {}).get("completion_tokens") or 0
-    prompt_tokens = (usage or {}).get("prompt_tokens") or 0
+    text = result.get("response", "") if isinstance(result, dict) else ""
+    usage = {
+        "completion_tokens": result.get("eval_count", 0) if isinstance(result, dict) else 0,
+        "prompt_tokens": result.get("prompt_eval_count", 0) if isinstance(result, dict) else 0,
+    }
+    completion_tokens = usage.get("completion_tokens") or 0
+    prompt_tokens = usage.get("prompt_tokens") or 0
     tps = (completion_tokens / elapsed) if elapsed > 0 and completion_tokens else 0.0
 
     return {
@@ -450,7 +455,10 @@ async def prompt_playground(
             stream=False,
         )
         text = result.get("message", {}).get("content", "")
-        usage = result.get("usage", {})
+        usage = {
+            "completion_tokens": result.get("eval_count", 0),
+            "prompt_tokens": result.get("prompt_eval_count", 0),
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     elapsed = time.time() - started

@@ -1,581 +1,381 @@
 {% extends "base.html" %}
-{% block title %}OpenLocalAI - Model Firewall{% endblock %}
-{% block header_title %}Model Firewall{% endblock %}
+{% block title %}AI Firewall{% endblock %}
+{% block header_title %}AI Firewall{% endblock %}
 
 {% block content %}
-<!-- Stats Row -->
-<div class="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-6">
-    <div class="stat-card">
-        <div class="flex items-center justify-between mb-2">
-            <span class="text-gray-400 text-sm">Firewall Profiles</span>
-            <div class="w-9 h-9 bg-purple-600/20 rounded-lg flex items-center justify-center"><i class="fas fa-shield-halved text-purple-400"></i></div>
-        </div>
-        <p class="text-2xl font-bold text-white">{{ stats.total_profiles }}</p>
-        <p class="text-xs text-gray-500 mt-1">Total profiles</p>
+<style>
+:root { --accent: #8b5cf6; --accent-2: #06b6d4; --success: #10b981; --danger: #ef4444; --warning: #f59e0b; }
+.glass { background: rgba(30, 41, 59, 0.55); backdrop-filter: blur(14px); border: 1px solid rgba(148, 163, 184, 0.15); border-radius: 14px; }
+.gradient-text { background: linear-gradient(135deg, #c4b5fd, #67e8f9, #fde68a); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.btn { padding: 8px 14px; border-radius: 9px; font-size: 13px; font-weight: 500; cursor: pointer; transition: all .2s; border: none; display: inline-flex; align-items: center; gap: 6px; }
+.btn-primary { background: linear-gradient(135deg, #8b5cf6, #6366f1); color: white; box-shadow: 0 4px 14px rgba(139,92,246,0.35); }
+.btn-primary:hover { transform: translateY(-1px); }
+.btn-secondary { background: rgba(51, 65, 85, 0.6); color: #e2e8f0; border: 1px solid rgba(148,163,184,0.25); }
+.btn-success { background: linear-gradient(135deg, #10b981, #059669); color: white; }
+.btn-danger { background: linear-gradient(135deg, #ef4444, #dc2626); color: white; }
+.btn-warning { background: linear-gradient(135deg, #f59e0b, #d97706); color: white; }
+.btn-sm { padding: 5px 10px; font-size: 11px; }
+.input-field { width: 100%; padding: 10px 14px; background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(148,163,184,0.25); border-radius: 9px; color: #e2e8f0; font-size: 13px; outline: none; transition: all .2s; }
+.input-field:focus { border-color: #8b5cf6; box-shadow: 0 0 0 3px rgba(139,92,246,0.15); }
+.badge { padding: 3px 9px; border-radius: 999px; font-size: 10px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; }
+.badge-green { background: rgba(16, 185, 129, 0.18); color: #6ee7b7; border: 1px solid rgba(16, 185, 129, 0.3); }
+.badge-red { background: rgba(239, 68, 68, 0.18); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.3); }
+.badge-amber { background: rgba(245, 158, 11, 0.18); color: #fcd34d; border: 1px solid rgba(245, 158, 11, 0.3); }
+.badge-blue { background: rgba(6, 182, 212, 0.18); color: #67e8f9; border: 1px solid rgba(6, 182, 212, 0.3); }
+.badge-purple { background: rgba(139, 92, 246, 0.18); color: #c4b5fd; border: 1px solid rgba(139, 92, 246, 0.3); }
+.badge-gray { background: rgba(100, 116, 139, 0.18); color: #94a3b8; border: 1px solid rgba(100, 116, 139, 0.3); }
+.mode-card { padding: 14px; border-radius: 12px; border: 2px solid rgba(148,163,184,0.15); cursor: pointer; transition: all .2s; }
+.mode-card:hover { border-color: rgba(139,92,246,0.4); }
+.mode-card.selected { border-color: #8b5cf6; background: rgba(139,92,246,0.1); }
+.rule-row { padding: 10px 14px; border-radius: 10px; background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(148,163,184,0.1); display: flex; align-items: center; gap: 10px; transition: all .2s; }
+.rule-row:hover { border-color: rgba(139,92,246,0.3); }
+.log-entry { padding: 8px 12px; border-radius: 8px; font-size: 12px; font-family: monospace; }
+.log-allow { background: rgba(16,185,129,0.1); border-left: 3px solid #10b981; }
+.log-deny { background: rgba(239,68,68,0.1); border-left: 3px solid #ef4444; }
+.log-log { background: rgba(245,158,11,0.1); border-left: 3px solid #f59e0b; }
+.pulse-dot { width: 8px; height: 8px; border-radius: 50%; background: #10b981; box-shadow: 0 0 0 0 rgba(16,185,129,0.6); animation: pulse 2s infinite; }
+@keyframes pulse { 0% { box-shadow: 0 0 0 0 currentColor; } 70% { box-shadow: 0 0 0 8px transparent; } 100% { box-shadow: 0 0 0 0 transparent; } }
+</style>
+
+<!-- Header -->
+<div class="flex items-center justify-between mb-6">
+    <div>
+        <h2 class="text-2xl font-bold gradient-text">AI Firewall</h2>
+        <p class="text-sm text-gray-400 mt-1">Protect your AI models with intelligent filtering</p>
     </div>
-    <div class="stat-card">
-        <div class="flex items-center justify-between mb-2">
-            <span class="text-gray-400 text-sm">Active</span>
-            <div class="w-9 h-9 bg-green-600/20 rounded-lg flex items-center justify-center"><i class="fas fa-check-circle text-green-400"></i></div>
+    <div class="flex items-center gap-3">
+        {% if active_profile_id %}
+        <div class="flex items-center gap-2 px-3 py-2 glass">
+            <span class="pulse-dot"></span>
+            <span class="text-xs text-green-400 font-medium">Active Protection</span>
         </div>
-        <p class="text-2xl font-bold text-white">{{ stats.active_profiles }}</p>
-        <p class="text-xs text-gray-500 mt-1">Active profile</p>
-    </div>
-    <div class="stat-card">
-        <div class="flex items-center justify-between mb-2">
-            <span class="text-gray-400 text-sm">Blocked</span>
-            <div class="w-9 h-9 bg-red-600/20 rounded-lg flex items-center justify-center"><i class="fas fa-ban text-red-400"></i></div>
+        {% else %}
+        <div class="flex items-center gap-2 px-3 py-2 glass">
+            <span class="w-2 h-2 rounded-full bg-gray-500"></span>
+            <span class="text-xs text-gray-400">No Active Firewall</span>
         </div>
-        <p class="text-2xl font-bold text-white">{{ stats.blocked_requests }}</p>
-        <p class="text-xs text-gray-500 mt-1">{{ stats.block_rate }} block rate</p>
-    </div>
-    <div class="stat-card">
-        <div class="flex items-center justify-between mb-2">
-            <span class="text-gray-400 text-sm">Reviews</span>
-            <div class="w-9 h-9 bg-amber-600/20 rounded-lg flex items-center justify-center"><i class="fas fa-user-check text-amber-400"></i></div>
-        </div>
-        <p class="text-2xl font-bold text-white">{{ stats.pending_reviews }}</p>
-        <p class="text-xs text-gray-500 mt-1">Pending reviews</p>
+        {% endif %}
+        <button onclick="location.reload()" class="btn btn-secondary btn-sm"><i class="fas fa-sync-alt"></i></button>
     </div>
 </div>
 
-<!-- Main Layout -->
+<!-- Stats -->
+<div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
+    <div class="glass p-4 text-center">
+        <p class="text-2xl font-bold text-white">{{ stats.total_profiles }}</p>
+        <p class="text-xs text-gray-400 mt-1">Profiles</p>
+    </div>
+    <div class="glass p-4 text-center">
+        <p class="text-2xl font-bold {{ 'text-green-400' if stats.active_profiles else 'text-gray-500' }}">{{ stats.active_profiles }}</p>
+        <p class="text-xs text-gray-400 mt-1">Active</p>
+    </div>
+    <div class="glass p-4 text-center">
+        <p class="text-2xl font-bold text-red-400">{{ stats.blocked_requests }}</p>
+        <p class="text-xs text-gray-400 mt-1">Blocked</p>
+    </div>
+    <div class="glass p-4 text-center">
+        <p class="text-2xl font-bold text-cyan-400">{{ stats.total_requests }}</p>
+        <p class="text-xs text-gray-400 mt-1">Total Requests</p>
+    </div>
+    <div class="glass p-4 text-center">
+        <p class="text-2xl font-bold text-amber-400">{{ stats.block_rate }}</p>
+        <p class="text-xs text-gray-400 mt-1">Block Rate</p>
+    </div>
+</div>
+
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-    <!-- Left Column: Create Profile -->
-    <div class="lg:col-span-1 space-y-6">
-        <div class="card">
-            <div class="flex items-center gap-3 mb-5">
-                <div class="w-10 h-10 bg-red-600/20 rounded-xl flex items-center justify-center">
-                    <i class="fas fa-fire text-red-400"></i>
+    <!-- Left: Create + Active Profile -->
+    <div class="space-y-6">
+        <!-- Create Firewall -->
+        <div class="glass p-5">
+            <h3 class="text-white font-semibold mb-4 flex items-center gap-2">
+                <i class="fas fa-plus-circle text-purple-400"></i> Create Firewall
+            </h3>
+            <form method="POST" action="/firewall/create" class="space-y-3">
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">Name</label>
+                    <input type="text" name="name" class="input-field" placeholder="e.g. Production API" required>
                 </div>
                 <div>
-                    <h3 class="text-white font-semibold">Create Firewall</h3>
-                    <p class="text-xs text-gray-500">Set up protection for an AI model</p>
+                    <label class="block text-xs text-gray-400 mb-1">Description</label>
+                    <input type="text" name="description" class="input-field" placeholder="What does this protect?">
                 </div>
-            </div>
-
-            <form method="POST" action="/firewall/create" class="space-y-4">
                 <div>
-                    <label class="block text-sm font-medium text-gray-300 mb-1.5">Profile Name <span class="text-red-400">*</span></label>
-                    <input type="text" name="name" required class="input-field" placeholder="e.g. Production Model Firewall">
+                    <label class="block text-xs text-gray-400 mb-1">AI Model (for AI-powered filtering)</label>
+                    <select name="model_id" class="input-field">
+                        <option value="">None (regex only)</option>
+                        {% for m in ollama_models %}
+                        <option value="{{ m }}">{{ m }}</option>
+                        {% endfor %}
+                    </select>
                 </div>
-
                 <div>
-                    <label class="block text-sm font-medium text-gray-300 mb-1.5">Description</label>
-                    <input type="text" name="description" class="input-field" placeholder="What this firewall protects">
-                </div>
-
-                <div>
-                    <label class="block text-sm font-medium text-gray-300 mb-1.5">Protection Mode <span class="text-red-400">*</span></label>
-                    <div class="space-y-2" id="modeGrid">
-                        {% set modes = [
-                            ("lockdown", "fas fa-shield-halved", "red", "Lockdown", "Maximum security - blocks everything except allowed"),
-                            ("over_protection", "fas fa-shield", "amber", "Over Protection", "High security - blocks risky, reviews sensitive"),
-                            ("standard", "fas fa-check-shield", "blue", "Standard", "Balanced - basic protections"),
-                            ("open", "fas fa-lock-open", "green", "Open", "Minimal - only blocks harmful content"),
-                            ("custom", "fas fa-cog", "purple", "Custom", "Build your own rules from scratch")
-                        ] %}
-                        {% for mode_id, icon, color, name, desc in modes %}
-                        <button type="button" onclick="selectMode('{{ mode_id }}')" 
-                            class="mode-btn w-full p-3 rounded-lg border border-gray-700 text-left transition hover:border-{{ color }}-500/50 flex items-center gap-3"
-                            data-mode="{{ mode_id }}">
-                            <div class="w-8 h-8 bg-{{ color }}-600/20 rounded-lg flex items-center justify-center flex-shrink-0">
-                                <i class="{{ icon }} text-{{ color }}-400 text-sm"></i>
+                    <label class="block text-xs text-gray-400 mb-2">Protection Mode</label>
+                    <div class="grid grid-cols-2 gap-2">
+                        {% for mode_id, mode in modes.items() %}
+                        <label class="mode-card" onclick="this.querySelector('input').checked=true">
+                            <input type="radio" name="protection_mode" value="{{ mode_id }}" class="hidden" {{ 'checked' if mode_id == 'standard' else '' }}>
+                            <div class="flex items-center gap-2">
+                                <i class="{{ mode.icon }} text-{{ mode.color }}-400"></i>
+                                <span class="text-sm text-white font-medium">{{ mode.name }}</span>
                             </div>
-                            <div>
-                                <p class="text-sm text-white font-medium">{{ name }}</p>
-                                <p class="text-[10px] text-gray-500">{{ desc }}</p>
-                            </div>
-                        </button>
+                            <p class="text-[10px] text-gray-500 mt-1">{{ mode.desc }}</p>
+                        </label>
                         {% endfor %}
                     </div>
-                    <input type="hidden" name="protection_mode" id="selectedMode" value="standard">
                 </div>
-
-                <button type="submit" class="btn btn-primary w-full py-3">
-                    <i class="fas fa-shield-halved mr-2"></i>Create Firewall Profile
-                </button>
+                <button type="submit" class="btn btn-primary w-full"><i class="fas fa-shield-halved mr-1"></i> Create</button>
             </form>
         </div>
 
-        <!-- Mode Info Card -->
-        <div class="card" id="modeInfoCard">
-            <div class="flex items-center gap-3 mb-4">
-                <div class="w-10 h-10 bg-blue-600/20 rounded-xl flex items-center justify-center">
-                    <i class="fas fa-info-circle text-blue-400"></i>
-                </div>
-                <h3 class="text-white font-semibold">Mode Details</h3>
+        <!-- Active Profile Info -->
+        {% if active_profile_id %}
+        {% for p in profiles if p.id == active_profile_id %}
+        <div class="glass p-5 border-green-500/30">
+            <h3 class="text-white font-semibold mb-3 flex items-center gap-2">
+                <span class="pulse-dot"></span> Active: {{ p.name }}
+            </h3>
+            <p class="text-xs text-gray-400 mb-3">{{ p.description or 'No description' }}</p>
+            <div class="grid grid-cols-2 gap-2 text-xs mb-3">
+                <div class="p-2 bg-black/20 rounded"><p class="text-gray-500">Mode</p><p class="text-white">{{ modes.get(p.mode, {}).get('name', p.mode) }}</p></div>
+                <div class="p-2 bg-black/20 rounded"><p class="text-gray-500">Rules</p><p class="text-white">{{ p.rules|length }}</p></div>
+                <div class="p-2 bg-black/20 rounded"><p class="text-gray-500">Requests</p><p class="text-white">{{ p.request_count }}</p></div>
+                <div class="p-2 bg-black/20 rounded"><p class="text-gray-500">Blocked</p><p class="text-red-400">{{ p.blocked_count }}</p></div>
             </div>
-            <div id="modeInfoContent" class="space-y-3 text-sm">
-                <p class="text-gray-400">Select a protection mode to see details</p>
+            {% if p.model_id %}
+            <div class="p-2 bg-purple-500/10 rounded border border-purple-500/20 text-xs">
+                <i class="fas fa-robot text-purple-400 mr-1"></i> AI Model: <span class="text-purple-300">{{ p.model_id }}</span>
             </div>
+            {% endif %}
         </div>
+        {% endfor %}
+        {% endif %}
     </div>
 
-    <!-- Right Column: Profiles & Rules -->
+    <!-- Center: Profiles List -->
     <div class="lg:col-span-2 space-y-6">
-        <div class="flex items-center justify-between">
-            <h3 class="text-white font-semibold flex items-center gap-2">
-                <i class="fas fa-list text-gray-400"></i> Your Firewall Profiles
+        <div class="glass p-5">
+            <h3 class="text-white font-semibold mb-4 flex items-center gap-2">
+                <i class="fas fa-layer-group text-cyan-400"></i> Firewall Profiles
+                <span class="badge badge-purple ml-auto">{{ profiles|length }}</span>
             </h3>
-            {% if profiles %}
-            <input type="text" id="profileSearch" class="input-field py-1.5 px-3 text-sm w-48" placeholder="Search profiles..." onkeyup="filterProfiles()">
+            {% if not profiles %}
+            <div class="text-center py-12">
+                <i class="fas fa-shield-halved text-4xl text-gray-600 mb-3"></i>
+                <p class="text-gray-400">No firewall profiles yet</p>
+                <p class="text-xs text-gray-500 mt-1">Create one to start protecting your AI models</p>
+            </div>
+            {% else %}
+            <div class="space-y-3">
+                {% for p in profiles %}
+                <div class="rule-row {{ 'border-green-500/30 bg-green-500/5' if p.id == active_profile_id else '' }}">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-{{ modes.get(p.mode, {}).get('color', 'gray') }}-600/30 to-{{ modes.get(p.mode, {}).get('color', 'gray') }}-800/30 flex items-center justify-center border border-{{ modes.get(p.mode, {}).get('color', 'gray') }}-500/20">
+                        <i class="{{ modes.get(p.mode, {}).get('icon', 'fas fa-shield') }} text-{{ modes.get(p.mode, {}).get('color', 'gray') }}-300"></i>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-2">
+                            <h4 class="text-white font-medium text-sm truncate">{{ p.name }}</h4>
+                            {% if p.id == active_profile_id %}
+                            <span class="badge badge-green">Active</span>
+                            {% endif %}
+                            <span class="badge badge-gray">{{ p.rules|length }} rules</span>
+                            {% if p.model_id %}
+                            <span class="badge badge-purple"><i class="fas fa-robot"></i> AI</span>
+                            {% endif %}
+                        </div>
+                        <p class="text-xs text-gray-500 truncate">{{ p.description or modes.get(p.mode, {}).get('name', '') }}</p>
+                    </div>
+                    <div class="flex items-center gap-1">
+                        {% if p.id != active_profile_id %}
+                        <form method="POST" action="/firewall/{{ p.id }}/activate" style="display:inline">
+                            <button type="submit" class="btn btn-success btn-sm" title="Activate"><i class="fas fa-play"></i></button>
+                        </form>
+                        {% endif %}
+                        <button onclick="openProfile('{{ p.id }}')" class="btn btn-secondary btn-sm" title="View/Edit"><i class="fas fa-eye"></i></button>
+                        <button onclick="openTestFirewall('{{ p.id }}')" class="btn btn-secondary btn-sm" title="Test"><i class="fas fa-flask"></i></button>
+                        <form method="POST" action="/firewall/{{ p.id }}/delete" style="display:inline" onsubmit="return confirm('Delete this profile?')">
+                            <button type="submit" class="btn btn-danger btn-sm" title="Delete"><i class="fas fa-trash"></i></button>
+                        </form>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
             {% endif %}
         </div>
 
-        {% if profiles %}
-        <div class="space-y-4" id="profilesList">
-            {% for p in profiles %}
-            <div class="card group hover:border-purple-500/30 transition-all profile-card" data-name="{{ p.name|lower }}">
-                <div class="flex items-start justify-between mb-3">
-                    <div class="flex items-center gap-3 min-w-0">
-                        <div class="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0
-                            {% if p.protection_mode == 'lockdown' %}bg-red-600/20
-                            {% elif p.protection_mode == 'over_protection' %}bg-amber-600/20
-                            {% elif p.protection_mode == 'standard' %}bg-blue-600/20
-                            {% elif p.protection_mode == 'open' %}bg-green-600/20
-                            {% else %}bg-purple-600/20{% endif %}">
-                            {% if p.protection_mode == 'lockdown' %}
-                            <i class="fas fa-shield-halved text-red-400"></i>
-                            {% elif p.protection_mode == 'over_protection' %}
-                            <i class="fas fa-shield text-amber-400"></i>
-                            {% elif p.protection_mode == 'standard' %}
-                            <i class="fas fa-check-shield text-blue-400"></i>
-                            {% elif p.protection_mode == 'open' %}
-                            <i class="fas fa-lock-open text-green-400"></i>
-                            {% else %}
-                            <i class="fas fa-cog text-purple-400"></i>
-                            {% endif %}
-                        </div>
-                        <div class="min-w-0">
-                            <div class="flex items-center gap-2">
-                                <h4 class="text-white font-semibold truncate">{{ p.name }}</h4>
-                                {% if p.is_active %}
-                                <span class="badge badge-green text-[10px]">Active</span>
-                                {% else %}
-                                <span class="badge bg-gray-700 text-gray-400 text-[10px]">Inactive</span>
-                                {% endif %}
-                            </div>
-                            <p class="text-xs text-gray-500 truncate">{{ p.description or p.protection_mode|title }}</p>
-                        </div>
-                    </div>
-                    <div class="flex items-center gap-1 flex-shrink-0 ml-2">
-                        <button onclick="showProfileDetail('{{ p.id }}')" class="p-2 text-gray-500 hover:text-blue-400 hover:bg-blue-600/10 rounded-lg transition" title="View & Edit">
-                            <i class="fas fa-eye text-sm"></i>
-                        </button>
-                        {% if not p.is_active %}
-                        <form method="POST" action="/firewall/{{ p.id }}/activate" class="inline">
-                            <button type="submit" class="p-2 text-gray-500 hover:text-green-400 hover:bg-green-600/10 rounded-lg transition" title="Activate">
-                                <i class="fas fa-play text-sm"></i>
-                            </button>
-                        </form>
+        <!-- Recent Activity -->
+        <div class="glass p-5">
+            <h3 class="text-white font-semibold mb-4 flex items-center gap-2">
+                <i class="fas fa-clock text-amber-400"></i> Recent Activity
+                <span class="badge badge-amber ml-auto">{{ logs|length }}</span>
+            </h3>
+            {% if not logs %}
+            <p class="text-gray-500 text-sm text-center py-6">No activity yet. Test a firewall to see results.</p>
+            {% else %}
+            <div class="space-y-2 max-h-80 overflow-y-auto">
+                {% for log in logs|reverse %}
+                <div class="log-entry log-{{ log.action }}">
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="badge badge-{{ 'red' if log.action == 'deny' else ('amber' if log.action == 'log' else 'green') }}">{{ log.action|upper }}</span>
+                        <span class="text-gray-500 text-[10px]">{{ log.timestamp[:19] }}</span>
+                        {% if log.rule %}
+                        <span class="text-gray-400 text-[10px]">Rule: {{ log.rule }}</span>
                         {% endif %}
-                        <form method="POST" action="/firewall/{{ p.id }}/delete" class="inline" onsubmit="return confirm('Delete firewall profile \'{{ p.name }}\'? This cannot be undone.')">
-                            <button type="submit" class="p-2 text-gray-500 hover:text-red-400 hover:bg-red-600/10 rounded-lg transition" title="Delete">
-                                <i class="fas fa-trash text-sm"></i>
-                            </button>
-                        </form>
                     </div>
+                    <p class="text-gray-300 truncate">{{ log.text }}</p>
                 </div>
-                <div class="flex items-center gap-4 text-xs text-gray-500">
-                    <span><i class="fas fa-shield-halved mr-1"></i>{{ p.protection_mode|title }}</span>
-                    {% if p.model_id %}<span><i class="fas fa-cube mr-1"></i>{{ p.model_id }}</span>{% endif %}
-                    <span><i class="fas fa-clock mr-1"></i>{{ p.created_at[:10] }}</span>
-                </div>
+                {% endfor %}
             </div>
-            {% endfor %}
+            {% endif %}
         </div>
-        {% else %}
-        <div class="card text-center py-12">
-            <div class="w-16 h-16 bg-red-600/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <i class="fas fa-shield-halved text-red-400 text-2xl"></i>
-            </div>
-            <h3 class="text-white font-semibold mb-2">No Firewall Profiles</h3>
-            <p class="text-gray-500 text-sm mb-4">Create your first firewall to protect AI models</p>
-        </div>
-        {% endif %}
     </div>
 </div>
 
 <!-- Profile Detail Modal -->
 <div id="profileModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
-    <div class="bg-gray-900 rounded-2xl border border-gray-700 w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
-        <div class="flex items-center justify-between p-5 border-b border-gray-700">
-            <div class="flex items-center gap-3">
-                <div class="w-10 h-10 bg-purple-600/20 rounded-xl flex items-center justify-center">
-                    <i class="fas fa-shield-halved text-purple-400"></i>
-                </div>
-                <div>
-                    <h3 class="text-white font-semibold text-lg" id="modalProfileName">Profile</h3>
-                    <p class="text-xs text-gray-500" id="modalProfileMode">Mode</p>
-                </div>
-            </div>
-            <button onclick="closeProfileModal()" class="p-2 text-gray-500 hover:text-white hover:bg-gray-700 rounded-lg transition">
-                <i class="fas fa-times text-lg"></i>
-            </button>
+    <div class="glass w-full max-w-2xl max-h-[85vh] overflow-y-auto p-6" onclick="event.stopPropagation()">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-bold text-white" id="modalProfileName">Profile</h3>
+            <button onclick="closeModal('profileModal')" class="text-gray-400 hover:text-white"><i class="fas fa-times text-xl"></i></button>
         </div>
-        <div class="overflow-y-auto p-5 flex-1" id="modalContent">
-            <div class="text-center py-8"><i class="fas fa-spinner fa-spin text-2xl text-gray-500"></i></div>
-        </div>
+        <div id="modalProfileContent"><p class="text-gray-400">Loading...</p></div>
     </div>
 </div>
 
 <!-- Add Rule Modal -->
-<div id="addRuleModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
-    <div class="bg-gray-900 rounded-2xl border border-gray-700 w-full max-w-lg">
-        <div class="flex items-center justify-between p-5 border-b border-gray-700">
-            <div class="flex items-center gap-3">
-                <div class="w-10 h-10 bg-amber-600/20 rounded-xl flex items-center justify-center">
-                    <i class="fas fa-plus text-amber-400"></i>
-                </div>
-                <h3 class="text-white font-semibold">Add Firewall Rule</h3>
-            </div>
-            <button onclick="closeAddRuleModal()" class="p-2 text-gray-500 hover:text-white hover:bg-gray-700 rounded-lg transition">
-                <i class="fas fa-times"></i>
-            </button>
+<div id="ruleModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="glass w-full max-w-md p-6" onclick="event.stopPropagation()">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-bold text-white">Add Rule</h3>
+            <button onclick="closeModal('ruleModal')" class="text-gray-400 hover:text-white"><i class="fas fa-times text-xl"></i></button>
         </div>
-        <form method="POST" action="/firewall/rule/add" class="p-5 space-y-4">
-            <input type="hidden" name="profile_id" id="addRuleProfileId">
-            <div>
-                <label class="block text-sm font-medium text-gray-300 mb-1.5">Rule Name <span class="text-red-400">*</span></label>
-                <input type="text" name="name" required class="input-field" placeholder="e.g. Block PII">
-            </div>
+        <form method="POST" action="/firewall/rule/add" class="space-y-3">
+            <input type="hidden" name="profile_id" id="ruleProfileId">
+            <div><label class="block text-xs text-gray-400 mb-1">Rule Name</label><input type="text" name="name" class="input-field" required placeholder="e.g. Block PII"></div>
             <div class="grid grid-cols-2 gap-3">
-                <div>
-                    <label class="block text-sm font-medium text-gray-300 mb-1.5">Category</label>
-                    <select name="category" class="input-field">
-                        <option value="content">Content Filter</option>
-                        <option value="topic">Topic Restriction</option>
-                        <option value="action">Action Control</option>
-                        <option value="user">User Restriction</option>
-                        <option value="token">Token Limit</option>
-                        <option value="time">Time-based</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-300 mb-1.5">Action</label>
-                    <select name="action" class="input-field">
-                        <option value="allow">Allow</option>
-                        <option value="deny">Deny</option>
-                        <option value="human_review">Human Review</option>
-                        <option value="log">Log Only</option>
-                    </select>
-                </div>
+                <div><label class="block text-xs text-gray-400 mb-1">Category</label>
+                    <select name="category" class="input-field"><option value="content">Content</option><option value="topic">Topic</option><option value="action">Action</option><option value="user">User</option><option value="token">Token</option></select></div>
+                <div><label class="block text-xs text-gray-400 mb-1">Action</label>
+                    <select name="action" class="input-field"><option value="deny">Deny</option><option value="allow">Allow</option><option value="log">Log</option></select></div>
             </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-300 mb-1.5">Pattern (Regex) <span class="text-red-400">*</span></label>
-                <input type="text" name="pattern" required class="input-field font-mono text-sm" placeholder="e.g. (password|secret|api.?key)">
-                <p class="text-[10px] text-gray-600 mt-1">Regular expression pattern to match</p>
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-300 mb-1.5">Response Message</label>
-                <textarea name="response_message" rows="2" class="input-field text-sm" placeholder="What the model says when this rule triggers"></textarea>
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-300 mb-1.5">Priority (0-1000)</label>
-                <input type="number" name="priority" value="0" min="0" max="1000" class="input-field">
-                <p class="text-[10px] text-gray-600 mt-1">Higher priority rules are checked first</p>
-            </div>
-            <button type="submit" class="btn btn-primary w-full py-3">
-                <i class="fas fa-plus mr-2"></i>Add Rule
-            </button>
+            <div><label class="block text-xs text-gray-400 mb-1">Pattern (regex)</label><input type="text" name="pattern" class="input-field" required placeholder="e.g. (password|secret|ssn)"></div>
+            <div><label class="block text-xs text-gray-400 mb-1">Response Message</label><input type="text" name="response_message" class="input-field" placeholder="Blocked by firewall"></div>
+            <button type="submit" class="btn btn-primary w-full"><i class="fas fa-plus mr-1"></i> Add Rule</button>
         </form>
     </div>
 </div>
 
-<!-- Test Rule Modal -->
-<div id="testRuleModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
-    <div class="bg-gray-900 rounded-2xl border border-gray-700 w-full max-w-lg">
-        <div class="flex items-center justify-between p-5 border-b border-gray-700">
-            <div class="flex items-center gap-3">
-                <div class="w-10 h-10 bg-cyan-600/20 rounded-xl flex items-center justify-center">
-                    <i class="fas fa-vial text-cyan-400"></i>
-                </div>
-                <h3 class="text-white font-semibold">Test Firewall Rules</h3>
-            </div>
-            <button onclick="closeTestModal()" class="p-2 text-gray-500 hover:text-white hover:bg-gray-700 rounded-lg transition">
-                <i class="fas fa-times"></i>
-            </button>
+<!-- Test Firewall Modal -->
+<div id="testModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="glass w-full max-w-lg p-6" onclick="event.stopPropagation()">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-bold text-white">Test Firewall</h3>
+            <button onclick="closeModal('testModal')" class="text-gray-400 hover:text-white"><i class="fas fa-times text-xl"></i></button>
         </div>
-        <div class="p-5 space-y-4">
+        <div class="space-y-3">
             <input type="hidden" id="testProfileId">
-            <div>
-                <label class="block text-sm font-medium text-gray-300 mb-1.5">Test Input</label>
-                <textarea id="testInput" rows="3" class="input-field text-sm" placeholder="Enter text to test against firewall rules..."></textarea>
+            <div><label class="block text-xs text-gray-400 mb-1">Enter text to test against firewall rules</label>
+                <textarea id="testInput" class="input-field" rows="3" placeholder="Type something to test..."></textarea></div>
+            <button onclick="runFirewallTest()" class="btn btn-primary w-full"><i class="fas fa-flask mr-1"></i> Test</button>
+            <div id="testResult" class="hidden p-4 rounded-lg">
+                <div class="flex items-center gap-2 mb-2">
+                    <span id="testResultBadge" class="badge"></span>
+                    <span id="testResultRule" class="text-sm text-gray-300"></span>
+                </div>
+                <p id="testResultMsg" class="text-sm text-gray-400"></p>
             </div>
-            <button onclick="runFirewallTest()" class="btn btn-primary w-full py-3">
-                <i class="fas fa-vial mr-2"></i>Test Rules
-            </button>
-            <div id="testResult" class="hidden"></div>
         </div>
     </div>
 </div>
 
-<!-- Toast -->
-<div id="toast" class="fixed bottom-6 right-6 bg-green-600 text-white px-4 py-2.5 rounded-lg shadow-lg z-50 hidden flex items-center gap-2 text-sm font-medium">
-    <i class="fas fa-check-circle"></i>
-    <span id="toastMsg">Done!</span>
-</div>
-
+<div id="toastContainer"></div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-let currentProfileId = '';
-
-const modeDetails = {
-    lockdown: {
-        title: 'Lockdown Mode',
-        color: 'red',
-        description: 'Maximum security. Blocks everything except explicitly allowed content.',
-        features: ['Default: DENY all requests', 'Require human approval for all', 'Max 500 tokens', 'Rate limit: 10/min', 'Log all requests'],
-        use_case: 'Highly sensitive models, production environments'
-    },
-    over_protection: {
-        title: 'Over Protection Mode',
-        color: 'amber',
-        description: 'High security. Blocks risky content, reviews sensitive topics.',
-        features: ['Block PII exposure', 'Block harmful content', 'Review financial topics', 'Review code execution', 'Block competitor info'],
-        use_case: 'Business models, financial services'
-    },
-    standard: {
-        title: 'Standard Mode',
-        color: 'blue',
-        description: 'Balanced security with sensible defaults.',
-        features: ['Block profanity', 'Block PII patterns', 'Allow general topics', 'Max 2000 tokens', 'Rate limit: 30/min'],
-        use_case: 'General purpose models'
-    },
-    open: {
-        title: 'Open Mode',
-        color: 'green',
-        description: 'Minimal security. Only blocks clearly harmful content.',
-        features: ['Block illegal content only', 'Allow everything else', 'Max 4000 tokens', 'Rate limit: 60/min'],
-        use_case: 'Internal tools, trusted environments'
-    },
-    custom: {
-        title: 'Custom Mode',
-        color: 'purple',
-        description: 'Build your own rules from scratch.',
-        features: ['Full control over rules', 'Choose your own defaults', 'Set custom limits', 'Mix allow/deny/review'],
-        use_case: 'Advanced users, specific requirements'
-    }
-};
-
-function selectMode(mode) {
-    document.getElementById('selectedMode').value = mode;
-    document.querySelectorAll('.mode-btn').forEach(btn => {
-        btn.classList.remove('border-blue-500', 'bg-blue-600/10', 'border-red-500', 'bg-red-600/10', 
-            'border-amber-500', 'bg-amber-600/10', 'border-green-500', 'bg-green-600/10', 'border-purple-500', 'bg-purple-600/10');
-        btn.classList.add('border-gray-700');
-    });
-    const selected = document.querySelector(`[data-mode="${mode}"]`);
-    if (selected) {
-        selected.classList.remove('border-gray-700');
-        selected.classList.add(`border-${modeDetails[mode].color}-500`, `bg-${modeDetails[mode].color}-600/10`);
-    }
-    updateModeInfo(mode);
+function escapeHtml(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function showToast(msg, type='success') {
+    const t = document.createElement('div');
+    t.className = 'fixed bottom-6 right-6 px-4 py-3 rounded-xl text-white text-sm z-50 shadow-lg';
+    t.style.background = type === 'error' ? 'rgba(239,68,68,0.95)' : type === 'info' ? 'rgba(6,182,212,0.95)' : 'rgba(16,185,129,0.95)';
+    t.innerHTML = `<i class="fas fa-${type === 'error' ? 'exclamation-circle' : 'check-circle'} mr-2"></i>${escapeHtml(msg)}`;
+    document.body.appendChild(t);
+    setTimeout(() => { t.style.opacity = '0'; t.style.transition = 'opacity .3s'; setTimeout(() => t.remove(), 300); }, 3000);
 }
+function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
 
-function updateModeInfo(mode) {
-    const info = modeDetails[mode];
-    const html = `
-        <div class="p-3 bg-${info.color}-900/20 border border-${info.color}-700/50 rounded-lg mb-3">
-            <p class="text-${info.color}-300 font-medium">${info.title}</p>
-            <p class="text-xs text-gray-400 mt-1">${info.description}</p>
-        </div>
-        <div class="space-y-2">
-            ${info.features.map(f => `<div class="flex items-center gap-2 text-xs"><i class="fas fa-check text-${info.color}-400"></i><span class="text-gray-300">${f}</span></div>`).join('')}
-        </div>
-        <div class="mt-3 p-2 bg-gray-800/50 rounded-lg">
-            <p class="text-[10px] text-gray-500">Best for: <span class="text-gray-300">${info.use_case}</span></p>
-        </div>
-    `;
-    document.getElementById('modeInfoContent').innerHTML = html;
-}
-
-function filterProfiles() {
-    const q = document.getElementById('profileSearch').value.toLowerCase();
-    document.querySelectorAll('.profile-card').forEach(card => {
-        card.style.display = card.dataset.name.includes(q) ? '' : 'none';
-    });
-}
-
-async function showProfileDetail(profileId) {
-    currentProfileId = profileId;
-    const modal = document.getElementById('profileModal');
-    const content = document.getElementById('modalContent');
-    modal.classList.remove('hidden');
-    content.innerHTML = '<div class="text-center py-8"><i class="fas fa-spinner fa-spin text-2xl text-gray-500"></i></div>';
-
+async function openProfile(profileId) {
+    document.getElementById('profileModal').classList.remove('hidden');
+    document.getElementById('modalProfileName').textContent = 'Loading...';
+    document.getElementById('modalProfileContent').innerHTML = '<p class="text-gray-400"><i class="fas fa-spinner fa-spin mr-2"></i>Loading...</p>';
     try {
-        const resp = await fetch(`/api/firewall/profiles/${profileId}`);
-        const data = await resp.json();
-        
-        document.getElementById('modalProfileName').textContent = data.profile.name;
-        document.getElementById('modalProfileMode').textContent = `${data.profile.protection_mode} mode`;
-        
-        let html = `
-            <div class="grid grid-cols-2 gap-4 mb-6">
-                <div class="p-3 bg-gray-800/50 rounded-lg">
-                    <p class="text-xs text-gray-500">Protection Mode</p>
-                    <p class="text-white font-medium">${data.profile.protection_mode}</p>
-                </div>
-                <div class="p-3 bg-gray-800/50 rounded-lg">
-                    <p class="text-xs text-gray-500">Status</p>
-                    <p class="text-white font-medium">${data.profile.is_active ? 'Active' : 'Inactive'}</p>
-                </div>
-                <div class="p-3 bg-gray-800/50 rounded-lg">
-                    <p class="text-xs text-gray-500">Max Tokens</p>
-                    <p class="text-white font-medium">${data.profile.max_tokens_per_request}</p>
-                </div>
-                <div class="p-3 bg-gray-800/50 rounded-lg">
-                    <p class="text-xs text-gray-500">Rate Limit</p>
-                    <p class="text-white font-medium">${data.profile.rate_limit_per_minute}/min</p>
-                </div>
-            </div>
-            
-            <div class="flex items-center justify-between mb-4">
-                <h4 class="text-white font-semibold">Rules (${data.rules.length})</h4>
-                <div class="flex gap-2">
-                    <button onclick="openTestModal('${profileId}')" class="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white text-xs rounded-lg transition">
-                        <i class="fas fa-vial mr-1"></i>Test
-                    </button>
-                    <button onclick="openAddRuleModal('${profileId}')" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white text-xs rounded-lg transition">
-                        <i class="fas fa-plus mr-1"></i>Add Rule
-                    </button>
-                </div>
-            </div>
-        `;
-        
-        if (data.rules.length > 0) {
-            html += '<div class="space-y-2">';
-            data.rules.forEach(rule => {
-                const actionColor = rule.action === 'allow' ? 'green' : rule.action === 'deny' ? 'red' : rule.action === 'human_review' ? 'amber' : 'blue';
-                html += `
-                    <div class="p-3 bg-gray-800/50 rounded-lg border border-gray-700 hover:border-gray-600 transition">
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-center gap-3">
-                                <span class="px-2 py-0.5 bg-${actionColor}-600/20 text-${actionColor}-400 text-[10px] rounded font-medium uppercase">${rule.action}</span>
-                                <span class="text-white text-sm font-medium">${rule.name}</span>
-                                <span class="text-gray-500 text-[10px]">${rule.category}</span>
-                            </div>
-                            <div class="flex items-center gap-2">
-                                <span class="text-gray-500 text-[10px]">${rule.hit_count} hits</span>
-                                <form method="POST" action="/firewall/rule/${rule.id}/delete" class="inline" onsubmit="return confirm('Delete this rule?')">
-                                    <button type="submit" class="p-1 text-gray-500 hover:text-red-400 transition"><i class="fas fa-trash text-xs"></i></button>
-                                </form>
-                            </div>
-                        </div>
-                        <div class="mt-2">
-                            <code class="text-[10px] text-gray-500 font-mono bg-gray-900/50 px-2 py-1 rounded">${rule.pattern}</code>
-                        </div>
-                        ${rule.response_message ? `<p class="text-[10px] text-gray-500 mt-1">Response: "${rule.response_message}"</p>` : ''}
+        const r = await fetch(`/api/firewall/profiles/${profileId}`);
+        const p = await r.json();
+        document.getElementById('modalProfileName').textContent = p.name;
+        let rulesHtml = (p.rules || []).map(r => `
+            <div class="rule-row">
+                <div class="flex-1">
+                    <div class="flex items-center gap-2">
+                        <span class="badge badge-${r.action === 'deny' ? 'red' : r.action === 'allow' ? 'green' : 'amber'}">${escapeHtml(r.action)}</span>
+                        <span class="text-white text-sm font-medium">${escapeHtml(r.name)}</span>
+                        <span class="badge badge-gray">${escapeHtml(r.category)}</span>
                     </div>
-                `;
-            });
-            html += '</div>';
-        } else {
-            html += '<div class="text-center py-6 text-gray-500 text-sm">No rules yet. Add rules to define firewall behavior.</div>';
-        }
-        
-        if (data.recent_logs.length > 0) {
-            html += `
-                <div class="mt-6">
-                    <h4 class="text-white font-semibold mb-3">Recent Activity</h4>
-                    <div class="space-y-2 max-h-48 overflow-y-auto">
-            `;
-            data.recent_logs.slice(0, 10).forEach(log => {
-                const logColor = log.action_taken === 'allow' ? 'green' : log.action_taken === 'deny' ? 'red' : 'amber';
-                html += `
-                    <div class="p-2 bg-gray-800/30 rounded text-xs flex items-center gap-2">
-                        <span class="px-1.5 py-0.5 bg-${logColor}-600/20 text-${logColor}-400 rounded text-[9px] uppercase">${log.action_taken}</span>
-                        <span class="text-gray-400 truncate flex-1">${log.request_text}</span>
-                        <span class="text-gray-600 text-[9px]">${log.created_at[:16]}</span>
-                    </div>
-                `;
-            });
-            html += '</div></div>';
-        }
-        
-        content.innerHTML = html;
-    } catch (e) {
-        content.innerHTML = '<div class="text-center py-8 text-red-400">Failed to load profile details</div>';
-    }
+                    <p class="text-xs text-gray-500 mt-1 font-mono">${escapeHtml(r.pattern)}</p>
+                    ${r.response_message ? `<p class="text-xs text-gray-400 mt-0.5">"${escapeHtml(r.response_message)}"</p>` : ''}
+                </div>
+                <form method="POST" action="/firewall/rule/${r.id}/delete" onsubmit="return confirm('Delete rule?')">
+                    <button type="submit" class="btn btn-danger btn-sm"><i class="fas fa-trash"></i></button>
+                </form>
+            </div>
+        `).join('');
+        document.getElementById('modalProfileContent').innerHTML = `
+            <div class="space-y-3">
+                <div class="grid grid-cols-3 gap-2 text-xs">
+                    <div class="p-2 bg-black/20 rounded"><p class="text-gray-500">Mode</p><p class="text-white">${escapeHtml(p.mode)}</p></div>
+                    <div class="p-2 bg-black/20 rounded"><p class="text-gray-500">Rules</p><p class="text-white">${(p.rules||[]).length}</p></div>
+                    <div class="p-2 bg-black/20 rounded"><p class="text-gray-500">Status</p><p class="${p.is_active ? 'text-green-400' : 'text-gray-400'}">${p.is_active ? 'Active' : 'Inactive'}</p></div>
+                </div>
+                <div class="flex items-center justify-between">
+                    <h4 class="text-sm font-medium text-white">Rules</h4>
+                    <button onclick="openAddRule('${escapeHtml(p.id)}')" class="btn btn-primary btn-sm"><i class="fas fa-plus"></i> Add Rule</button>
+                </div>
+                <div class="space-y-2">${rulesHtml || '<p class="text-gray-500 text-sm text-center py-4">No rules yet</p>'}</div>
+            </div>`;
+    } catch (e) { document.getElementById('modalProfileContent').innerHTML = `<p class="text-red-400">${escapeHtml(e.message)}</p>`; }
 }
 
-function closeProfileModal() {
+function openAddRule(profileId) {
+    document.getElementById('ruleProfileId').value = profileId;
     document.getElementById('profileModal').classList.add('hidden');
+    document.getElementById('ruleModal').classList.remove('hidden');
 }
 
-function openAddRuleModal(profileId) {
-    document.getElementById('addRuleProfileId').value = profileId;
-    document.getElementById('addRuleModal').classList.remove('hidden');
-}
-
-function closeAddRuleModal() {
-    document.getElementById('addRuleModal').classList.add('hidden');
-}
-
-function openTestModal(profileId) {
+function openTestFirewall(profileId) {
     document.getElementById('testProfileId').value = profileId;
-    document.getElementById('testInput').value = '';
     document.getElementById('testResult').classList.add('hidden');
-    document.getElementById('testRuleModal').classList.remove('hidden');
-}
-
-function closeTestModal() {
-    document.getElementById('testRuleModal').classList.add('hidden');
+    document.getElementById('testInput').value = '';
+    document.getElementById('testModal').classList.remove('hidden');
 }
 
 async function runFirewallTest() {
     const profileId = document.getElementById('testProfileId').value;
-    const input = document.getElementById('testInput').value;
-    const resultDiv = document.getElementById('testResult');
-    
-    if (!input.trim()) {
-        resultDiv.innerHTML = '<div class="p-3 bg-red-900/20 border border-red-700/50 rounded-lg text-red-300 text-sm">Please enter test text</div>';
-        resultDiv.classList.remove('hidden');
-        return;
-    }
-    
+    const text = document.getElementById('testInput').value.trim();
+    if (!text) { showToast('Enter text to test', 'error'); return; }
     try {
-        const resp = await fetch(`/api/firewall/check/${profileId}`, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({request_text: input})
+        const r = await fetch(`/api/firewall/check/${profileId}`, {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({request_text: text})
         });
-        const data = await resp.json();
-        
-        const actionColor = data.action === 'allow' ? 'green' : data.action === 'deny' ? 'red' : 'amber';
-        const actionIcon = data.action === 'allow' ? 'check-circle' : data.action === 'deny' ? 'ban' : 'user-check';
-        
-        resultDiv.innerHTML = `
-            <div class="p-3 bg-${actionColor}-900/20 border border-${actionColor}-700/50 rounded-lg">
-                <div class="flex items-center gap-2 mb-2">
-                    <i class="fas fa-${actionIcon} text-${actionColor}-400"></i>
-                    <span class="text-${actionColor}-300 font-medium uppercase">${data.action}</span>
-                </div>
-                <p class="text-sm text-gray-300">${data.reason}</p>
-                ${data.matched_rule ? `<p class="text-xs text-gray-500 mt-1">Rule: ${data.matched_rule}</p>` : ''}
-            </div>
-        `;
+        const d = await r.json();
+        const resultDiv = document.getElementById('testResult');
         resultDiv.classList.remove('hidden');
-    } catch (e) {
-        resultDiv.innerHTML = '<div class="p-3 bg-red-900/20 border border-red-700/50 rounded-lg text-red-300 text-sm">Test failed</div>';
-        resultDiv.classList.remove('hidden');
-    }
+        const badge = document.getElementById('testResultBadge');
+        badge.textContent = d.action ? d.action.toUpperCase() : 'ERROR';
+        badge.className = `badge badge-${d.action === 'deny' ? 'red' : d.action === 'allow' ? 'green' : 'amber'}`;
+        document.getElementById('testResultRule').textContent = d.rule ? `Rule: ${d.rule}` : '';
+        document.getElementById('testResultMsg').textContent = d.response_message || d.reason || (d.action === 'allow' ? 'Request allowed' : '');
+        resultDiv.className = `p-4 rounded-lg ${d.action === 'deny' ? 'bg-red-500/10 border border-red-500/20' : d.action === 'allow' ? 'bg-green-500/10 border border-green-500/20' : 'bg-amber-500/10 border border-amber-500/20'}`;
+    } catch (e) { showToast('Test failed: ' + e.message, 'error'); }
 }
-
-function showToast(msg) {
-    const toast = document.getElementById('toast');
-    document.getElementById('toastMsg').textContent = msg;
-    toast.classList.remove('hidden');
-    setTimeout(() => toast.classList.add('hidden'), 3000);
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-    selectMode('standard');
-});
 </script>
 {% endblock %}

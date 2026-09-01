@@ -587,7 +587,7 @@
 </div>
 
 <!-- KB search modal -->
-<div id="kb-search-modal" class="fixed inset-0 bg-black/60 hidden z-50 flex items-center justify-center p-4">
+<div id="kb-search-modal" class="fixed inset-0 bg-black/60 hidden z-50 items-center justify-center p-4">
     <div class="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-2xl p-6">
         <div class="flex items-center justify-between mb-3">
             <h3 class="text-white font-semibold"><i class="fas fa-search mr-2 text-blue-400"></i>Test KB: <span id="kb-modal-name" class="text-blue-300"></span></h3>
@@ -608,6 +608,39 @@
 <script>
 const TAB_KEY = "mgmt_tab";
 const _state = { chart: null, history: [], activityTimer: null, metricsTimer: null, currentTab: "overview" };
+
+function esc(s) { return s ? String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;') : ''; }
+
+async function refreshModelDropdowns() {
+    try {
+        const r = await fetch('/api/management/models');
+        const data = await r.json();
+        const models = data.models || [];
+        const currentModel = data.current_model;
+        if (!models.length) return;
+        const selectors = ['bench-model', 'info-model-select', 'pg-model'];
+        selectors.forEach(id => {
+            const sel = document.getElementById(id);
+            if (!sel) return;
+            const currentVal = sel.value;
+            const firstOpt = sel.querySelector('option[value=""]') || sel.querySelector('option:first-child');
+            const placeholderText = id === 'info-model-select' ? 'Choose a model…' : (firstOpt ? firstOpt.textContent : 'Select model');
+            sel.innerHTML = `<option value="">${placeholderText}</option>` + models.map(m =>
+                `<option value="${esc(m.id)}" ${m.id === currentModel ? 'selected' : ''}>${esc(m.name)}${m.id === currentModel ? ' (active)' : ''}</option>`
+            ).join('');
+            if (currentVal) sel.value = currentVal;
+        });
+        // KB model dropdown
+        const kbSel = document.querySelector('#kb-create-form select[name="model_id"]');
+        if (kbSel) {
+            const currentVal = kbSel.value;
+            kbSel.innerHTML = '<option value="">Default model</option>' + models.map(m =>
+                `<option value="${esc(m.id)}">${esc(m.name)}</option>`
+            ).join('');
+            if (currentVal) kbSel.value = currentVal;
+        }
+    } catch (e) { console.error('refreshModelDropdowns error:', e); }
+}
 
 function showTab(name) {
     document.querySelectorAll('[id^="panel-"]').forEach(p => p.classList.add('hidden'));
@@ -677,7 +710,7 @@ async function refreshLiveMetrics() {
         const cur = data.current || {};
         document.getElementById('kpi-rpm').textContent = cur.req_per_min || 0;
         document.getElementById('kpi-kb').textContent = document.querySelectorAll('#kb-list [data-kb-id]').length;
-        document.getElementById('kpi-model').textContent = '{{ current_model or "—" }}';
+        document.getElementById('kpi-model').textContent = {{ current_model | tojson if current_model else '"—"' }};
 
         if (cur.cpu != null) {
             document.getElementById('cpu-value').textContent = Math.round(cur.cpu) + '%';
@@ -709,7 +742,7 @@ async function refreshLiveMetrics() {
             document.getElementById('top-models').innerHTML = sorted.map(([m, c]) => {
                 const pct = Math.round((c / total) * 100);
                 return `<div>
-                    <div class="flex items-center justify-between text-xs"><span class="text-gray-200">${m}</span><span class="text-gray-500">${c} (${pct}%)</span></div>
+                    <div class="flex items-center justify-between text-xs"><span class="text-gray-200">${esc(m)}</span><span class="text-gray-500">${c} (${pct}%)</span></div>
                     <div class="w-full bg-gray-700 rounded-full h-1.5 mt-1"><div class="bg-blue-500 h-1.5 rounded-full" style="width:${pct}%"></div></div>
                 </div>`;
             }).join('');
@@ -745,8 +778,8 @@ async function runBenchmark(modelId) {
     const m = sel.value;
     const prompt = document.getElementById('bench-prompt').value;
     if (!m) { alert('Pick a model'); return; }
-    const btn = event && event.target ? event.target : null;
-    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>'; }
+    const btn = document.querySelector('#bench-result')?.previousElementSibling?.querySelector('button') || document.querySelector('button[onclick*="runBenchmark"]');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Running...'; }
     document.getElementById('bench-result').classList.remove('hidden');
     document.getElementById('bench-latency').textContent = '…';
     document.getElementById('bench-prompt-tok').textContent = '…';
@@ -765,8 +798,8 @@ async function runBenchmark(modelId) {
         document.getElementById('bench-comp-tok').textContent = d.completion_tokens;
         document.getElementById('bench-tps').textContent = d.tokens_per_second;
         document.getElementById('bench-preview').textContent = d.preview || '';
-    } catch (e) { document.getElementById('bench-preview').textContent = 'Error: ' + e; }
-    finally { if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-play"></i> Run'; } }
+    } catch (e) { document.getElementById('bench-preview').textContent = 'Error: ' + (e.message || e); }
+    finally { if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-play mr-1"></i>Run'; } }
 }
 
 async function loadModelInfo(modelId) {
@@ -776,17 +809,17 @@ async function loadModelInfo(modelId) {
         const data = await resp.json();
         if (data.detail) { alert('Error: ' + data.detail); return; }
         document.getElementById('model-info-content').classList.remove('hidden');
-        document.getElementById('info-provider').textContent = 'Ollama';
+        document.getElementById('info-provider').textContent = data.provider || 'Ollama';
         document.getElementById('info-caps').textContent = (data.capabilities || []).join(', ');
         document.getElementById('info-rec').textContent = data.recommendation || '—';
         const lighter = document.getElementById('info-lighter');
         if (data.lighter_models && data.lighter_models.length) {
-            lighter.innerHTML = data.lighter_models.map(m => `<span class="px-2 py-1 bg-green-600/20 border border-green-700 rounded text-xs text-green-300">${m}</span>`).join('');
+            lighter.innerHTML = data.lighter_models.map(m => `<span class="px-2 py-1 bg-green-600/20 border border-green-700 rounded text-xs text-green-300">${esc(m)}</span>`).join('');
         } else {
             lighter.innerHTML = '<span class="text-xs text-gray-500">Already the lightest</span>';
         }
         document.getElementById('info-raw').textContent = JSON.stringify(data.details || data, null, 2);
-    } catch (e) { console.error(e); }
+    } catch (e) { console.error('loadModelInfo error:', e); }
 }
 
 // ---------- Knowledge bases ----------
@@ -801,8 +834,12 @@ document.getElementById('kb-create-form')?.addEventListener('submit', async (e) 
     };
     try {
         const r = await fetch('/api/management/kb/create', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
-        if (r.ok) { location.reload(); } else { const d = await r.json(); alert('Failed: ' + (d.detail || JSON.stringify(d))); }
-    } catch (err) { alert('Error: ' + err); }
+        if (r.ok) { location.reload(); } else { 
+            let errMsg = 'Failed';
+            try { const d = await r.json(); errMsg = d.detail || JSON.stringify(d); } catch(e) { errMsg = 'HTTP ' + r.status; }
+            alert('Failed: ' + errMsg); 
+        }
+    } catch (err) { alert('Error: ' + (err.message || err)); }
 });
 
 function openKBModal() { document.getElementById('kb-search-modal').classList.remove('hidden'); document.getElementById('kb-search-modal').classList.add('flex'); }
@@ -831,13 +868,13 @@ async function runKBSearch() {
         out.innerHTML = d.results.map((r, i) => `
             <div class="p-3 bg-gray-800 rounded-lg border border-gray-700">
                 <div class="flex items-center justify-between text-xs text-gray-400 mb-1">
-                    <span>#${i+1} · ${r.source || ''}</span>
+                    <span>#${i+1} · ${esc(r.source || '')}</span>
                     <span class="badge bg-blue-600/20 text-blue-300">score ${r.score}</span>
                 </div>
-                <p class="text-sm text-gray-200 whitespace-pre-wrap">${(r.snippet || '').replace(/</g,'&lt;')}</p>
+                <p class="text-sm text-gray-200 whitespace-pre-wrap">${esc(r.snippet || '')}</p>
             </div>
         `).join('');
-    } catch (e) { out.innerHTML = '<p class="text-red-400 text-sm">Error: ' + e + '</p>'; }
+    } catch (e) { out.innerHTML = '<p class="text-red-400 text-sm">Error: ' + (e.message || e) + '</p>'; }
 }
 document.getElementById('kb-modal-query')?.addEventListener('keydown', (e) => { if (e.key === 'Enter') runKBSearch(); });
 
@@ -849,6 +886,8 @@ async function runPlayground() {
     if (!user.trim()) return;
     const out = document.getElementById('pg-output');
     const meta = document.getElementById('pg-meta');
+    const sendBtn = document.querySelector('button[onclick="runPlayground()"]');
+    if (sendBtn) { sendBtn.disabled = true; sendBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Thinking...'; }
     out.textContent = 'Thinking…';
     meta.textContent = '';
     const messages = [];
@@ -864,7 +903,8 @@ async function runPlayground() {
         out.textContent = d.content || '(empty)';
         const u = d.usage || {};
         meta.textContent = `Model: ${d.model} · ${d.elapsed_s}s · ${u.completion_tokens || 0} completion / ${u.prompt_tokens || 0} prompt tokens`;
-    } catch (e) { out.textContent = 'Error: ' + e; }
+    } catch (e) { out.textContent = 'Error: ' + (e.message || e); }
+    finally { if (sendBtn) { sendBtn.disabled = false; sendBtn.innerHTML = '<i class="fas fa-paper-plane mr-1"></i>Send'; } }
 }
 
 // ---------- Activity ----------
@@ -888,7 +928,7 @@ async function refreshActivity() {
         const minuteAgo = Date.now() - 60000;
         const rpm = rows.filter(r => r.created_at && new Date(r.created_at).getTime() > minuteAgo).length;
         document.getElementById('activity-rpm').textContent = rpm + ' req/min';
-    } catch (e) { console.error(e); }
+    } catch (e) { console.error('refreshActivity error:', e); }
 }
 
 // ---------- Background task progress polling ----------
@@ -901,23 +941,25 @@ async function refreshTasks() {
             if (!t) return;
             const bar = el.querySelector('.bg-blue-500');
             if (bar) bar.style.width = t.progress_percent + '%';
-            const pct = el.querySelector('.text-xs.text-gray-500.w-8');
+            const pct = el.querySelector('.text-xs.text-gray-500') || el.querySelector('.text-xs.text-gray-400');
             if (pct) pct.textContent = t.progress_percent + '%';
         });
         if (_state.currentTab === 'overview') {
             const running = tasks.filter(t => t.status === 'running' || t.status === 'pending').length;
             document.getElementById('active-task-count').textContent = running + ' running';
         }
-    } catch (e) {}
+    } catch (e) { console.error('refreshTasks error:', e); }
 }
 
 // ---------- Boot ----------
 initChart();
 refreshLiveMetrics();
 refreshOllamaStatus();
+refreshModelDropdowns();
 setInterval(refreshLiveMetrics, 5000);
 setInterval(refreshOllamaStatus, 15000);
 setInterval(refreshTasks, 3000);
+setInterval(refreshModelDropdowns, 30000);
 setInterval(() => { if (_state.currentTab === 'activity') refreshActivity(); }, 4000);
 
 // Auto-load info for current model

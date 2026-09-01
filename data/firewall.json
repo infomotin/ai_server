@@ -1,0 +1,85 @@
+{
+  "profiles": [
+    {
+      "id": "test-fw",
+      "name": "Test FW",
+      "description": "",
+      "mode": "standard",
+      "model_id": "",
+      "rules": [
+        {
+          "name": "Block Profanity",
+          "category": "content",
+          "pattern": "\\b(damn|hell|shit|fuck|ass)\\b",
+          "action": "deny",
+          "response_message": "Please keep your language professional.",
+          "id": "test-fw-rule-0",
+          "is_active": true,
+          "priority": 0
+        },
+        {
+          "name": "Block PII",
+          "category": "content",
+          "pattern": "(\\d{3}-\\d{2}-\\d{4}|\\d{16}|password\\s*[:=])",
+          "action": "deny",
+          "response_message": "I cannot process personal identification information.",
+          "id": "test-fw-rule-1",
+          "is_active": true,
+          "priority": 10
+        }
+      ],
+      "is_active": true,
+      "created_at": "2026-09-01T07:09:10.715107Z",
+      "request_count": 5,
+      "blocked_count": 3
+    }
+  ],
+  "active_profile": "test-fw",
+  "logs": [
+    {
+      "profile_id": "test-fw",
+      "text": "Hello, how are you?",
+      "action": "allow",
+      "rule": null,
+      "category": null,
+      "response_message": "",
+      "timestamp": "2026-09-01T07:09:10.748537Z"
+    },
+    {
+      "profile_id": "test-fw",
+      "text": "What the hell is this?",
+      "action": "deny",
+      "rule": "Block Profanity",
+      "category": "content",
+      "response_message": "Please keep your language professional.",
+      "timestamp": "2026-09-01T07:09:10.780716Z"
+    },
+    {
+      "profile_id": "test-fw",
+      "text": "My SSN is 123-45-6789",
+      "action": "deny",
+      "rule": "Block PII",
+      "category": "content",
+      "response_message": "I cannot process personal identification information.",
+      "timestamp": "2026-09-01T07:09:10.806910Z"
+    },
+    {
+      "profile_id": "test-fw",
+      "text": "Class assignment due tomorrow",
+      "action": "allow",
+      "rule": null,
+      "category": null,
+      "response_message": "",
+      "timestamp": "2026-09-01T07:09:10.840600Z"
+    },
+    {
+      "profile_id": "test-fw",
+      "text": "You are an ass",
+      "action": "deny",
+      "rule": "Block Profanity",
+      "category": "content",
+      "response_message": "Please keep your language professional.",
+      "timestamp": "2026-09-01T07:09:10.869490Z"
+    }
+  ]
+}

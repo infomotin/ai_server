@@ -130,12 +130,12 @@
                         <div>
                             <label class="block text-xs font-medium text-gray-400 mb-1">Base Model</label>
                             <select name="base_model" id="baseModel" class="input-field text-sm">
-                                <option value="qwen2.5:0.5b">Qwen 2.5 0.5B</option>
-                                <option value="llama3.2:1b" selected>Llama 3.2 1B</option>
-                                <option value="llama3.2:3b">Llama 3.2 3B</option>
-                                <option value="qwen2.5:3b">Qwen 2.5 3B</option>
-                                <option value="phi3:mini">Phi-3 Mini</option>
-                                <option value="codellama:3.5">Code Llama 3.5</option>
+                                {% for m in ollama_models %}
+                                <option value="{{ m }}" {{ 'selected' if loop.first else '' }}>{{ m }}</option>
+                                {% endfor %}
+                                {% if not ollama_models %}
+                                <option value="llama3.2:1b" selected>llama3.2:1b</option>
+                                {% endif %}
                             </select>
                         </div>
                         <div>
@@ -266,8 +266,12 @@
                 <input type="hidden" name="task_type" id="selectedTaskType" value="">
                 <input type="text" name="name" id="lwModelName" class="input-field text-sm" placeholder="Model name" required>
                 <select name="base_model" class="input-field text-sm">
-                    <option value="qwen2.5:0.5b" selected>Qwen 2.5 0.5B (~397MB)</option>
-                    <option value="llama3.2:1b">Llama 3.2 1B (~1.3GB)</option>
+                    {% for m in ollama_models %}
+                    <option value="{{ m }}" {{ 'selected' if loop.first else '' }}>{{ m }}</option>
+                    {% endfor %}
+                    {% if not ollama_models %}
+                    <option value="qwen2.5:0.5b" selected>qwen2.5:0.5b</option>
+                    {% endif %}
                 </select>
                 <textarea name="custom_knowledge" rows="2" class="input-field text-sm" placeholder="Optional knowledge..."></textarea>
                 <button type="submit" class="w-full py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg text-sm font-medium transition">

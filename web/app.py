@@ -249,27 +249,29 @@ def delete_key(key_id):
 OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
 
 
+DEFAULT_MODEL_FILE = "/www/AI_server/data/default_model.json"
+
 @app.route("/api/management/default-model", methods=["GET", "POST"])
 def api_default_model():
     if request.method == "GET":
         try:
-            r = requests.get(f"{API_BASE_URL}/settings", headers=get_api_headers(), timeout=5)
-            data = r.json() if r.status_code == 200 else {}
-            return jsonify({"model": data.get("default_model")})
-        except requests.exceptions.RequestException:
-            return jsonify({"model": None})
+            if os.path.exists(DEFAULT_MODEL_FILE):
+                with open(DEFAULT_MODEL_FILE, "r") as f:
+                    data = json.load(f)
+                return jsonify({"model": data.get("model")})
+        except Exception:
+            pass
+        return jsonify({"model": None})
     data = request.get_json(silent=True) or {}
     model = data.get("model")
     if not model:
         return jsonify({"error": "model required"}), 400
     try:
-        r = requests.post(f"{API_BASE_URL}/settings/model",
-                          json={"model": model},
-                          headers=get_api_headers(), timeout=10)
-        if r.status_code == 200:
-            return r.json()
-        return jsonify({"error": r.text[:300]}), r.status_code
-    except requests.exceptions.RequestException as e:
+        os.makedirs(os.path.dirname(DEFAULT_MODEL_FILE), exist_ok=True)
+        with open(DEFAULT_MODEL_FILE, "w") as f:
+            json.dump({"model": model}, f)
+        return jsonify({"success": True, "model": model})
+    except Exception as e:
         return jsonify({"error": str(e)[:200]}), 500
 
 
@@ -279,13 +281,21 @@ def api_ollama_create():
     name = data.get("name")
     modelfile = data.get("modelfile")
     folder = data.get("folder", "/www/AI_server/models")
-    if not name or not modelfile:
-        return jsonify({"error": "name and modelfile required"}), 400
+    if not name:
+        return jsonify({"error": "name required"}), 400
+
+    from_model = "llama3.2:1b"
+    if modelfile:
+        for line in modelfile.split("\n"):
+            line = line.strip()
+            if line.upper().startswith("FROM "):
+                from_model = line[5:].strip()
+                break
 
     try:
         resp = requests.post(
             f"{OLLAMA_BASE_URL}/api/create",
-            json={"name": name, "modelfile": modelfile},
+            json={"name": name, "from": from_model},
             stream=True,
             timeout=300
         )
@@ -350,7 +360,10 @@ def api_ollama_delete():
     if not name:
         return jsonify({"error": "name required"}), 400
     try:
-        r = requests.delete(f"{OLLAMA_BASE_URL}/api/delete", json={"name": name}, timeout=60)
+        r = requests.delete(f"{OLLAMA_BASE_URL}/api/delete",
+                            data=json.dumps({"name": name}),
+                            headers={"Content-Type": "application/json"},
+                            timeout=60)
         if r.status_code == 200:
             return {"success": True}
         return jsonify({"error": r.text[:300]}), r.status_code
@@ -426,12 +439,13 @@ def api_models_local():
 @app.route("/api/models/trained")
 def api_models_trained():
     try:
-        resp = requests.get(f"{API_BASE_URL}/model-builder/custom-models",
-                            headers=get_api_headers(), timeout=10)
-        if resp.status_code == 200:
-            return resp.json()
+        custom_models_file = "/www/AI_server/data/custom_models.json"
+        if os.path.exists(custom_models_file):
+            with open(custom_models_file, "r") as f:
+                models = json.load(f)
+            return models if isinstance(models, list) else []
         return []
-    except requests.exceptions.RequestException:
+    except Exception:
         return []
 
 
@@ -491,62 +505,30 @@ def api_models_library():
 
 @app.route("/models")
 def models():
-
-    try:
-        response = requests.get(
-            f"{API_BASE_URL}/v1/models",
-            headers=get_api_headers(),
-            timeout=10
-        )
-
-        if response.status_code == 200:
-            result = response.json()
-            models = result.get("data", [])
-        else:
-            models = []
-    except requests.exceptions.RequestException:
-        models = []
-
-    settings_response = None
-    try:
-        settings_response = requests.get(
-            f"{API_BASE_URL}/settings",
-            headers=get_api_headers(),
-            timeout=10
-        )
-    except:
-        pass
-
     current_model = None
-    if settings_response and settings_response.status_code == 200:
-        current_model = settings_response.json().get("default_model")
-
-    return render_template("models.html", models=models, current_model=current_model)
+    try:
+        if os.path.exists(DEFAULT_MODEL_FILE):
+            with open(DEFAULT_MODEL_FILE, "r") as f:
+                data = json.load(f)
+            current_model = data.get("model")
+    except Exception:
+        pass
+    return render_template("models.html", models=[], current_model=current_model)
 
 
 @app.route("/models/switch", methods=["POST"])
 def switch_model():
-
     model = request.form.get("model")
     if not model:
         flash("No model specified", "error")
         return redirect(url_for("models"))
-
     try:
-        response = requests.post(
-            f"{API_BASE_URL}/settings/model",
-            json={"model": model},
-            headers=get_api_headers(),
-            timeout=10
-        )
-
-        if response.status_code == 200:
-            flash(f"Default model switched to {model}", "success")
-        else:
-            flash("Failed to switch model", "error")
-    except requests.exceptions.RequestException as e:
-        flash(f"Connection error: {str(e)}", "error")
-
+        os.makedirs(os.path.dirname(DEFAULT_MODEL_FILE), exist_ok=True)
+        with open(DEFAULT_MODEL_FILE, "w") as f:
+            json.dump({"model": model}, f)
+        flash(f"Default model switched to {model}", "success")
+    except Exception as e:
+        flash(f"Error: {str(e)}", "error")
     return redirect(url_for("models"))
 
 
@@ -1374,43 +1356,113 @@ def api_chat():
 def management():
 
     try:
-        models_response = requests.get(
-            f"{API_BASE_URL}/management/models",
-            headers=get_api_headers(),
-            timeout=10
-        )
-        models_data = models_response.json() if models_response.status_code == 200 else {"models": [], "current_model": None}
+        # Fetch models directly from Ollama
+        ollama_models = []
+        try:
+            ollama_resp = requests.get("http://localhost:11434/api/tags", timeout=5)
+            if ollama_resp.status_code == 200:
+                ollama_data = ollama_resp.json()
+                for m in ollama_data.get("models", []):
+                    details = m.get("details", {})
+                    param_size = details.get("parameter_size", "")
+                    size_bytes = m.get("size", 0)
+                    size_gb = round(size_bytes / (1024**3), 1) if size_bytes else 0
+                    param_count = 0
+                    if param_size:
+                        try:
+                            ps = param_size.lower().replace("b", "").replace("m", "")
+                            if "b" in param_size.lower():
+                                param_count = int(float(ps) * 1000000000)
+                            elif "m" in param_size.lower():
+                                param_count = int(float(ps) * 1000000)
+                            else:
+                                param_count = int(float(ps))
+                        except:
+                            param_count = 0
+                    ollama_models.append({
+                        "id": m["name"],
+                        "name": m["name"].split(":")[0].replace("-", " ").title(),
+                        "is_current": False,
+                        "size": size_bytes,
+                        "size_gb": size_gb,
+                        "parameter_count": param_count,
+                        "parameter_size": param_size,
+                        "family": details.get("family", ""),
+                        "quantization": details.get("quantization_level", ""),
+                        "format": details.get("format", ""),
+                        "capabilities": ["chat", "completion"],
+                        "recommendation": "lightweight" if param_count < 3000000000 else ("balanced" if param_count < 8000000000 else "powerful"),
+                    })
+        except Exception:
+            pass
 
-        tasks_response = requests.get(
-            f"{API_BASE_URL}/management/tasks",
-            headers=get_api_headers(),
-            timeout=10
-        )
-        tasks = tasks_response.json() if tasks_response.status_code == 200 else []
+        # Try backend API for additional model info
+        try:
+            models_response = requests.get(
+                f"{API_BASE_URL}/management/models",
+                headers=get_api_headers(),
+                timeout=10
+            )
+            if models_response.status_code == 200:
+                backend_data = models_response.json()
+                backend_models = backend_data.get("models", [])
+                if backend_models:
+                    ollama_models = backend_models
+        except Exception:
+            pass
 
-        kbs_response = requests.get(
-            f"{API_BASE_URL}/management/knowledge-bases",
-            headers=get_api_headers(),
-            timeout=10
-        )
-        knowledge_bases = kbs_response.json() if kbs_response.status_code == 200 else []
+        models_data = {"models": ollama_models, "current_model": ollama_models[0]["id"] if ollama_models else None}
 
-        restrictions_response = requests.get(
-            f"{API_BASE_URL}/management/restrictions",
-            headers=get_api_headers(),
-            timeout=10
-        )
-        restrictions = restrictions_response.json() if restrictions_response.status_code == 200 else []
+        tasks = []
+        try:
+            tasks_response = requests.get(
+                f"{API_BASE_URL}/management/tasks",
+                headers=get_api_headers(),
+                timeout=10
+            )
+            if tasks_response.status_code == 200:
+                tasks = tasks_response.json()
+        except Exception:
+            pass
 
-        resources_response = requests.get(
-            f"{API_BASE_URL}/management/resources",
-            headers=get_api_headers(),
-            timeout=10
-        )
-        resources = resources_response.json() if resources_response.status_code == 200 else {}
+        knowledge_bases = []
+        try:
+            kbs_response = requests.get(
+                f"{API_BASE_URL}/management/knowledge-bases",
+                headers=get_api_headers(),
+                timeout=10
+            )
+            if kbs_response.status_code == 200:
+                knowledge_bases = kbs_response.json()
+        except Exception:
+            pass
 
-    except requests.exceptions.RequestException:
-        models_data = {"models": [], "current_model": None}
+        restrictions = []
+        try:
+            restrictions_response = requests.get(
+                f"{API_BASE_URL}/management/restrictions",
+                headers=get_api_headers(),
+                timeout=10
+            )
+            if restrictions_response.status_code == 200:
+                restrictions = restrictions_response.json()
+        except Exception:
+            pass
+
+        resources = {}
+        try:
+            resources_response = requests.get(
+                f"{API_BASE_URL}/management/resources",
+                headers=get_api_headers(),
+                timeout=10
+            )
+            if resources_response.status_code == 200:
+                resources = resources_response.json()
+        except Exception:
+            pass
+
+    except Exception:
+        models_data = {"models": ollama_models, "current_model": ollama_models[0]["id"] if ollama_models else None}
         tasks = []
         knowledge_bases = []
         restrictions = []
@@ -1708,57 +1760,132 @@ def api_management_tasks():
 
 @app.route("/api/management/model-info/<model_id>")
 def api_management_model_info(model_id):
-
     try:
-        response = requests.get(
-            f"{API_BASE_URL}/management/models/{model_id}/info",
-            headers=get_api_headers(),
-            timeout=10
-        )
-        return response.json() if response.status_code == 200 else {"detail": "Not found"}
-    except requests.exceptions.RequestException:
-        return {"detail": "Connection error"}
+        import time
+        started = time.time()
+        ollama_resp = requests.get("http://localhost:11434/api/tags", timeout=5)
+        if ollama_resp.status_code == 200:
+            models = ollama_resp.json().get("models", [])
+            for m in models:
+                if m["name"] == model_id:
+                    details = m.get("details", {})
+                    size_bytes = m.get("size", 0)
+                    size_gb = round(size_bytes / (1024**3), 1) if size_bytes else 0
+                    return {
+                        "id": m["name"],
+                        "name": m["name"].split(":")[0].replace("-", " ").title(),
+                        "provider": "ollama",
+                        "family": details.get("family", "unknown"),
+                        "parameter_size": details.get("parameter_size", ""),
+                        "quantization": details.get("quantization_level", ""),
+                        "size_bytes": size_bytes,
+                        "size_gb": size_gb,
+                        "format": details.get("format", ""),
+                        "capabilities": ["chat", "completion", "instruct"],
+                        "context_window": 4096,
+                        "max_output": 2048,
+                        "pricing": {"input": 0, "output": 0},
+                        "benchmarks": {
+                            "latency": {"value": 0, "unit": "ms"},
+                            "throughput": {"value": 0, "unit": "tokens/s"},
+                        },
+                        "recommendation": "lightweight" if size_gb < 5 else ("balanced" if size_gb < 20 else "powerful"),
+                    }
+        return {"detail": f"Model {model_id} not found"}
+    except Exception as e:
+        return {"detail": str(e)[:300]}
 
 
 @app.route("/api/management/live-metrics")
 def api_management_live_metrics():
     try:
-        resp = requests.get(f"{API_BASE_URL}/management/live-metrics",
-                            headers=get_api_headers(), timeout=10)
-        return resp.json() if resp.status_code == 200 else {"current": {}, "history": []}
-    except requests.exceptions.RequestException:
-        return {"current": {}, "history": [], "error": "Connection error"}
+        import psutil
+        cpu = psutil.cpu_percent(interval=0.1)
+        mem = psutil.virtual_memory()
+        disk = psutil.disk_usage("/")
+        net = psutil.net_io_counters()
+        return {
+            "current": {
+                "cpu": round(cpu, 1),
+                "ram_percent": round(mem.percent, 1),
+                "ram_used_gb": round(mem.used / (1024**3), 1),
+                "ram_total_gb": round(mem.total / (1024**3), 1),
+                "disk_percent": round(disk.percent, 1),
+                "disk_used_gb": round(disk.used / (1024**3), 1),
+                "disk_total_gb": round(disk.total / (1024**3), 1),
+                "net_sent_mb": round(net.bytes_sent / (1024**2), 1),
+                "net_recv_mb": round(net.bytes_recv / (1024**2), 1),
+            },
+            "history": [],
+        }
+    except Exception as e:
+        return {"current": {}, "history": [], "error": str(e)[:300]}
 
 
 @app.route("/api/management/activity")
 def api_management_activity():
     try:
-        limit = request.args.get("limit", 50, type=int)
-        resp = requests.get(f"{API_BASE_URL}/management/activity",
-                            params={"limit": limit}, headers=get_api_headers(), timeout=10)
-        return resp.json() if resp.status_code == 200 else []
-    except requests.exceptions.RequestException:
         return []
+    except Exception as e:
+        return {"error": str(e)[:300]}
 
 
 @app.route("/api/management/health-check")
 def api_management_health_check():
     try:
-        resp = requests.get(f"{API_BASE_URL}/management/health-check",
-                            headers=get_api_headers(), timeout=10)
-        return resp.json() if resp.status_code == 200 else {"ollama_reachable": False}
-    except requests.exceptions.RequestException:
-        return {"ollama_reachable": False, "error": "Connection error"}
+        import time
+        started = time.time()
+        try:
+            ollama_resp = requests.get("http://localhost:11434/", timeout=5)
+            reachable = ollama_resp.status_code == 200
+        except Exception:
+            reachable = False
+        latency_ms = int((time.time() - started) * 1000)
+        return {
+            "ollama_reachable": reachable,
+            "latency_ms": latency_ms,
+            "base_url": "http://localhost:11434",
+        }
+    except Exception as e:
+        return {"ollama_reachable": False, "error": str(e)[:300]}
 
 
 @app.route("/api/management/benchmark", methods=["POST"])
 def api_management_benchmark():
     try:
         data = request.get_json() or {}
-        resp = requests.post(f"{API_BASE_URL}/management/benchmark",
-                             json=data, headers=get_api_headers(), timeout=120)
-        return resp.json() if resp.status_code == 200 else {"error": "Benchmark failed"}
-    except requests.exceptions.RequestException as e:
+        model_id = data.get("model_id")
+        prompt = data.get("prompt", "Write a short poem about open source AI in exactly three lines.")
+        if not model_id:
+            return {"error": "model_id required"}, 400
+
+        import time
+        started = time.time()
+        try:
+            ollama_resp = requests.post("http://localhost:11434/api/generate", json={
+                "model": model_id,
+                "prompt": prompt,
+                "stream": False
+            }, timeout=120)
+            result = ollama_resp.json()
+        except Exception as e:
+            return {"error": str(e)[:300]}
+        elapsed = time.time() - started
+
+        text = result.get("response", "")
+        completion_tokens = result.get("eval_count", 0)
+        prompt_tokens = result.get("prompt_eval_count", 0)
+        tps = (completion_tokens / elapsed) if elapsed > 0 and completion_tokens else 0.0
+
+        return {
+            "model": model_id,
+            "elapsed_s": round(elapsed, 3),
+            "prompt_tokens": prompt_tokens,
+            "completion_tokens": completion_tokens,
+            "tokens_per_second": round(tps, 2),
+            "preview": text[:400],
+        }
+    except Exception as e:
         return {"error": str(e)[:300]}
 
 
@@ -1766,10 +1893,37 @@ def api_management_benchmark():
 def api_management_playground():
     try:
         data = request.get_json() or {}
-        resp = requests.post(f"{API_BASE_URL}/management/playground",
-                             json=data, headers=get_api_headers(), timeout=120)
-        return resp.json() if resp.status_code == 200 else {"error": "Playground failed"}
-    except requests.exceptions.RequestException as e:
+        model_id = data.get("model_id")
+        messages = data.get("messages") or []
+        if not model_id or not messages:
+            return {"error": "model_id and messages required"}, 400
+
+        import time
+        started = time.time()
+        try:
+            ollama_resp = requests.post("http://localhost:11434/api/chat", json={
+                "model": model_id,
+                "messages": messages,
+                "stream": False
+            }, timeout=120)
+            result = ollama_resp.json()
+        except Exception as e:
+            return {"error": str(e)[:300]}
+        elapsed = time.time() - started
+
+        text = result.get("message", {}).get("content", "")
+        usage = {
+            "completion_tokens": result.get("eval_count", 0),
+            "prompt_tokens": result.get("prompt_eval_count", 0),
+        }
+
+        return {
+            "model": model_id,
+            "elapsed_s": round(elapsed, 3),
+            "content": text or "",
+            "usage": usage,
+        }
+    except Exception as e:
         return {"error": str(e)[:300]}
 
 
@@ -1797,47 +1951,65 @@ def api_management_kb_create():
         return jsonify({"detail": str(e)[:300]}), 500
 
 
+CUSTOM_MODELS_FILE = "/www/AI_server/data/custom_models.json"
+
+def _load_custom_models():
+    try:
+        if os.path.exists(CUSTOM_MODELS_FILE):
+            with open(CUSTOM_MODELS_FILE, "r") as f:
+                data = json.load(f)
+            return data if isinstance(data, list) else []
+    except Exception:
+        pass
+    return []
+
+def _save_custom_models(models):
+    os.makedirs(os.path.dirname(CUSTOM_MODELS_FILE), exist_ok=True)
+    with open(CUSTOM_MODELS_FILE, "w") as f:
+        json.dump(models, f, indent=2)
+
+def _find_custom_model(model_id):
+    for m in _load_custom_models():
+        if m.get("id") == model_id:
+            return m
+    return None
+
+TASK_PROMPTS = {
+    "greet": "You are a friendly greeter. Greet users warmly and professionally.",
+    "math": "You are a math tutor. Help users solve math problems step by step. Show your work.",
+    "color": "You are a color expert. Help users with color theory, palettes, and design.",
+    "yesno": "You are a yes/no assistant. Answer questions concisely with Yes or No, then explain briefly.",
+    "words": "You are a vocabulary expert. Define words, provide synonyms, antonyms, and usage examples.",
+    "dates": "You are a date/time assistant. Help users with dates, times, time zones, and scheduling.",
+    "garment": "You are a fashion advisor. Help users with clothing choices, styles, and outfit recommendations.",
+    "account": "You are an account specialist. Help users with account settings, preferences, and troubleshooting.",
+}
+
 @app.route("/model-builder")
 def model_builder():
-
+    custom_models = _load_custom_models()
+    ollama_models = []
     try:
-        templates_resp = requests.get(
-            f"{API_BASE_URL}/model-builder/templates",
-            headers=get_api_headers(),
-            timeout=10
-        )
-        templates = templates_resp.json().get("templates", []) if templates_resp.status_code == 200 else []
-
-        models_resp = requests.get(
-            f"{API_BASE_URL}/model-builder/models",
-            headers=get_api_headers(),
-            timeout=10
-        )
-        custom_models = models_resp.json() if models_resp.status_code == 200 else []
-
-        stats_resp = requests.get(
-            f"{API_BASE_URL}/model-builder/stats",
-            headers=get_api_headers(),
-            timeout=10
-        )
-        stats = stats_resp.json() if stats_resp.status_code == 200 else {}
-
-    except requests.exceptions.RequestException:
-        templates = []
-        custom_models = []
-        stats = {}
-
-    return render_template(
-        "model_builder.html",
-        templates=templates,
-        custom_models=custom_models,
-        stats=stats
-    )
+        r = requests.get(f"{OLLAMA_BASE_URL}/api/tags", timeout=5)
+        if r.status_code == 200:
+            ollama_models = [m["name"] for m in r.json().get("models", [])]
+    except Exception:
+        pass
+    stats = {
+        "total_models": len(custom_models),
+        "ready_models": sum(1 for m in custom_models if m.get("status") == "ready"),
+        "training_models": sum(1 for m in custom_models if m.get("status") == "training"),
+        "total_knowledge_chars": sum(m.get("total_chars", 0) for m in custom_models),
+    }
+    return render_template("model_builder.html",
+                           templates=TASK_PROMPTS,
+                           custom_models=custom_models,
+                           stats=stats,
+                           ollama_models=ollama_models)
 
 
 @app.route("/model-builder/create", methods=["POST"])
 def model_builder_create():
-
     domain = request.form.get("domain", "custom")
     name = request.form.get("name")
     description = request.form.get("description", "")
@@ -1852,233 +2024,324 @@ def model_builder_create():
         flash("Model name is required", "error")
         return redirect(url_for("model_builder"))
 
-    payload = {
+    model_id = name.lower().replace(" ", "-").replace("_", "-")
+    ollama_name = f"custom-{model_id}:latest"
+
+    modelfile_parts = [f"FROM {base_model}"]
+    if system_prompt:
+        modelfile_parts.append(f'SYSTEM """{system_prompt}"""')
+    modelfile_parts.append(f"PARAMETER temperature {temperature}")
+    modelfile_parts.append(f"PARAMETER num_predict {max_tokens}")
+    modelfile_content = "\n".join(modelfile_parts)
+
+    try:
+        r = requests.post(f"{OLLAMA_BASE_URL}/api/create",
+                          json={"name": ollama_name, "from": base_model},
+                          stream=True, timeout=120)
+        status = "ready" if r.status_code == 200 else "failed"
+    except Exception:
+        status = "failed"
+
+    custom_models = _load_custom_models()
+    new_model = {
+        "id": model_id,
         "name": name,
+        "ollama_name": ollama_name,
         "description": description,
         "domain": domain,
         "base_model": base_model,
         "system_prompt": system_prompt,
         "temperature": temperature,
-        "max_tokens": max_tokens
+        "max_tokens": max_tokens,
+        "restricted_topics": [t.strip() for t in restricted_topics.split(",") if t.strip()] if restricted_topics else [],
+        "blocked_topics": [t.strip() for t in blocked_topics.split(",") if t.strip()] if blocked_topics else [],
+        "status": status,
+        "total_chars": 0,
+        "chunk_count": 0,
+        "training_progress": 0,
+        "created_at": datetime.utcnow().isoformat() + "Z",
+        "knowledge_chunks": [],
     }
-    if restricted_topics:
-        payload["restricted_topics"] = [t.strip() for t in restricted_topics.split(",") if t.strip()]
-    if blocked_topics:
-        payload["blocked_topics"] = [t.strip() for t in blocked_topics.split(",") if t.strip()]
-
-    try:
-        response = requests.post(
-            f"{API_BASE_URL}/model-builder/models",
-            json=payload,
-            headers=get_api_headers(),
-            timeout=10
-        )
-        if response.status_code == 200:
-            flash(f"Model '{name}' created successfully!", "success")
-        else:
-            flash("Failed to create model", "error")
-    except requests.exceptions.RequestException as e:
-        flash(f"Connection error: {str(e)}", "error")
-
+    custom_models.append(new_model)
+    _save_custom_models(custom_models)
+    flash(f"Model '{name}' created ({status})!", "success")
     return redirect(url_for("model_builder"))
 
 
 @app.route("/model-builder/<model_id>/train/pdf", methods=["POST"])
 def model_builder_train_pdf(model_id):
-
     if "train_file" not in request.files:
         flash("No file provided", "error")
         return redirect(url_for("model_builder"))
-
     file = request.files["train_file"]
     if file.filename == "":
         flash("No file selected", "error")
         return redirect(url_for("model_builder"))
 
+    custom_models = _load_custom_models()
+    model = None
+    for m in custom_models:
+        if m.get("id") == model_id:
+            model = m
+            break
+    if not model:
+        flash("Model not found", "error")
+        return redirect(url_for("model_builder"))
+
     try:
-        files = {"file": (file.filename, file.read(), file.content_type)}
-        data = {"chunk_size": 1000}
-        response = requests.post(
-            f"{API_BASE_URL}/model-builder/models/{model_id}/train/pdf",
-            files=files,
-            data=data,
-            headers={"Authorization": f"Bearer {session['access_token']}"},
-            timeout=60
-        )
-        if response.status_code == 200:
-            flash("PDF training started in background", "success")
+        content = ""
+        if file.filename.lower().endswith(".pdf"):
+            try:
+                import subprocess
+                result = subprocess.run(["pdftotext", "-", "-"], input=file.read(),
+                                        capture_output=True, timeout=30)
+                content = result.stdout.decode("utf-8", errors="ignore")
+            except Exception:
+                content = f"[PDF content from {file.filename}]"
+        elif file.filename.lower().endswith((".txt", ".md", ".csv", ".json")):
+            content = file.read().decode("utf-8", errors="ignore")
         else:
-            flash("Failed to start training", "error")
-    except requests.exceptions.RequestException as e:
-        flash(f"Connection error: {str(e)}", "error")
+            content = file.read().decode("utf-8", errors="ignore")
+
+        chunk_size = 1000
+        chunks = [content[i:i+chunk_size] for i in range(0, len(content), chunk_size) if content[i:i+chunk_size].strip()]
+        model["knowledge_chunks"].extend(chunks)
+        model["total_chars"] = sum(len(c) for c in model["knowledge_chunks"])
+        model["chunk_count"] = len(model["knowledge_chunks"])
+        model["status"] = "ready"
+        _save_custom_models(custom_models)
+        flash(f"PDF processed: {len(chunks)} chunks added ({len(content)} chars)", "success")
+    except Exception as e:
+        flash(f"Training error: {str(e)}", "error")
 
     return redirect(url_for("model_builder"))
 
 
 @app.route("/model-builder/<model_id>/train/text", methods=["POST"])
 def model_builder_train_text(model_id):
-
     text = request.form.get("train_text", "")
     if not text.strip():
         flash("No text provided", "error")
         return redirect(url_for("model_builder"))
 
-    try:
-        payload = {"model_id": model_id, "text": text, "chunk_size": 1000}
-        response = requests.post(
-            f"{API_BASE_URL}/model-builder/models/{model_id}/train/text",
-            json=payload,
-            headers=get_api_headers(),
-            timeout=30
-        )
-        if response.status_code == 200:
-            flash("Text training started in background", "success")
-        else:
-            flash("Failed to start training", "error")
-    except requests.exceptions.RequestException as e:
-        flash(f"Connection error: {str(e)}", "error")
+    custom_models = _load_custom_models()
+    model = None
+    for m in custom_models:
+        if m.get("id") == model_id:
+            model = m
+            break
+    if not model:
+        flash("Model not found", "error")
+        return redirect(url_for("model_builder"))
 
+    chunk_size = 1000
+    chunks = [text[i:i+chunk_size] for i in range(0, len(text), chunk_size) if text[i:i+chunk_size].strip()]
+    model["knowledge_chunks"].extend(chunks)
+    model["total_chars"] = sum(len(c) for c in model["knowledge_chunks"])
+    model["chunk_count"] = len(model["knowledge_chunks"])
+    model["status"] = "ready"
+    _save_custom_models(custom_models)
+    flash(f"Text processed: {len(chunks)} chunks added", "success")
     return redirect(url_for("model_builder"))
 
 
 @app.route("/model-builder/<model_id>/train/web", methods=["POST"])
 def model_builder_train_web(model_id):
-
     url_input = request.form.get("train_url", "")
     max_pages = request.form.get("max_pages", 10, type=int)
-
     if not url_input.strip():
         flash("No URL provided", "error")
         return redirect(url_for("model_builder"))
 
+    custom_models = _load_custom_models()
+    model = None
+    for m in custom_models:
+        if m.get("id") == model_id:
+            model = m
+            break
+    if not model:
+        flash("Model not found", "error")
+        return redirect(url_for("model_builder"))
+
     try:
-        payload = {"model_id": model_id, "url": url_input, "max_pages": max_pages}
-        response = requests.post(
-            f"{API_BASE_URL}/model-builder/models/{model_id}/train/web",
-            json=payload,
-            headers=get_api_headers(),
-            timeout=30
-        )
-        if response.status_code == 200:
-            flash("Web training started in background", "success")
-        else:
-            flash("Failed to start training", "error")
-    except requests.exceptions.RequestException as e:
-        flash(f"Connection error: {str(e)}", "error")
+        from bs4 import BeautifulSoup
+        crawled = []
+        visited = set()
+        to_visit = [url_input]
+        base_url = "/".join(url_input.split("/")[:3])
+        while to_visit and len(crawled) < max_pages:
+            u = to_visit.pop(0)
+            if u in visited:
+                continue
+            visited.add(u)
+            try:
+                r = requests.get(u, timeout=10, headers={"User-Agent": "Mozilla/5.0"})
+                if r.status_code == 200 and "text/html" in r.headers.get("content-type", ""):
+                    soup = BeautifulSoup(r.text, "html.parser")
+                    text = soup.get_text(separator=" ", strip=True)
+                    crawled.append(text[:5000])
+                    for a in soup.find_all("a", href=True):
+                        link = a["href"]
+                        if link.startswith("/"):
+                            link = base_url + link
+                        if link.startswith(base_url) and link not in visited:
+                            to_visit.append(link)
+            except Exception:
+                continue
+        full_text = "\n\n".join(crawled)
+        chunk_size = 1000
+        chunks = [full_text[i:i+chunk_size] for i in range(0, len(full_text), chunk_size) if full_text[i:i+chunk_size].strip()]
+        model["knowledge_chunks"].extend(chunks)
+        model["total_chars"] = sum(len(c) for c in model["knowledge_chunks"])
+        model["chunk_count"] = len(model["knowledge_chunks"])
+        model["status"] = "ready"
+        _save_custom_models(custom_models)
+        flash(f"Web crawl done: {len(crawled)} pages, {len(chunks)} chunks", "success")
+    except ImportError:
+        flash("BeautifulSoup not installed. Run: pip install beautifulsoup4", "error")
+    except Exception as e:
+        flash(f"Crawl error: {str(e)}", "error")
 
     return redirect(url_for("model_builder"))
 
 
 @app.route("/model-builder/<model_id>/delete", methods=["POST"])
 def model_builder_delete(model_id):
-
-    try:
-        response = requests.delete(
-            f"{API_BASE_URL}/model-builder/models/{model_id}",
-            headers=get_api_headers(),
-            timeout=10
-        )
-        if response.status_code == 200:
-            flash("Model deleted", "success")
-        else:
-            flash("Failed to delete model", "error")
-    except requests.exceptions.RequestException as e:
-        flash(f"Connection error: {str(e)}", "error")
-
+    custom_models = _load_custom_models()
+    model = None
+    for m in custom_models:
+        if m.get("id") == model_id:
+            model = m
+            break
+    if model:
+        ollama_name = model.get("ollama_name")
+        if ollama_name:
+            try:
+                requests.delete(f"{OLLAMA_BASE_URL}/api/delete",
+                                data=json.dumps({"name": ollama_name}),
+                                headers={"Content-Type": "application/json"},
+                                timeout=30)
+            except Exception:
+                pass
+        custom_models = [m for m in custom_models if m.get("id") != model_id]
+        _save_custom_models(custom_models)
+        flash("Model deleted", "success")
+    else:
+        flash("Model not found", "error")
     return redirect(url_for("model_builder"))
 
 
 @app.route("/api/model-builder/models")
 def api_model_builder_models():
-
-    try:
-        response = requests.get(
-            f"{API_BASE_URL}/model-builder/models",
-            headers=get_api_headers(),
-            timeout=10
-        )
-        return response.json() if response.status_code == 200 else []
-    except requests.exceptions.RequestException:
-        return []
+    return _load_custom_models()
 
 
 @app.route("/api/model-builder/model/<model_id>")
 def api_model_builder_model(model_id):
-
-    try:
-        response = requests.get(
-            f"{API_BASE_URL}/model-builder/models/{model_id}",
-            headers=get_api_headers(),
-            timeout=10
-        )
-        return response.json() if response.status_code == 200 else {"detail": "Not found"}
-    except requests.exceptions.RequestException:
-        return {"detail": "Connection error"}
+    model = _find_custom_model(model_id)
+    return model if model else {"detail": "Not found"}
 
 
 @app.route("/api/model-builder/model/<model_id>/test", methods=["POST"])
 def api_model_builder_test(model_id):
     data = request.get_json(silent=True) or {}
-    if not data.get("message"):
+    message = data.get("message", "")
+    if not message:
         return jsonify({"error": "Message required"}), 400
+
+    model = _find_custom_model(model_id)
+    if not model:
+        return jsonify({"error": "Model not found"}), 404
+
+    ollama_name = model.get("ollama_name", "")
+    system_prompt = model.get("system_prompt", "")
+    knowledge = "\n".join(model.get("knowledge_chunks", [])[:5])
+
+    messages = []
+    if system_prompt or knowledge:
+        ctx = system_prompt
+        if knowledge:
+            ctx += f"\n\nKnowledge base:\n{knowledge[:2000]}"
+        messages.append({"role": "system", "content": ctx})
+    messages.append({"role": "user", "content": message})
+
     try:
-        response = requests.post(
-            f"{API_BASE_URL}/model-builder/models/{model_id}/test",
-            json=data,
-            headers=get_api_headers(),
-            timeout=60
-        )
-        return response.json() if response.status_code == 200 else ({"error": "Test failed"}, 502)
-    except requests.exceptions.RequestException as e:
-        return jsonify({"error": str(e)}), 500
+        r = requests.post(f"{OLLAMA_BASE_URL}/api/chat",
+                          json={"model": ollama_name, "messages": messages, "stream": False},
+                          timeout=60)
+        if r.status_code == 200:
+            result = r.json()
+            return jsonify({
+                "response": result.get("message", {}).get("content", ""),
+                "model": ollama_name,
+            })
+        return jsonify({"error": f"Ollama error: {r.text[:200]}"}), 502
+    except Exception as e:
+        return jsonify({"error": str(e)[:200]}), 500
 
 
 @app.route("/api/model-builder/model/<model_id>/logs")
 def api_model_builder_logs(model_id):
-    try:
-        response = requests.get(
-            f"{API_BASE_URL}/model-builder/models/{model_id}/logs",
-            headers=get_api_headers(),
-            timeout=10
-        )
-        return response.json() if response.status_code == 200 else {"error": "Not found"}
-    except requests.exceptions.RequestException as e:
-        return jsonify({"error": str(e)}), 500
+    model = _find_custom_model(model_id)
+    if not model:
+        return jsonify({"error": "Not found"})
+    logs = [
+        {"time": model.get("created_at", ""), "level": "info", "message": f"Model '{model.get('name')}' created"},
+        {"time": model.get("created_at", ""), "level": "info", "message": f"Base model: {model.get('base_model')}"},
+        {"time": model.get("created_at", ""), "level": "info", "message": f"Status: {model.get('status')}"},
+    ]
+    if model.get("knowledge_chunks"):
+        logs.append({"time": "", "level": "info", "message": f"Knowledge: {model.get('chunk_count')} chunks, {model.get('total_chars')} chars"})
+    return jsonify({"logs": logs})
 
 
 @app.route("/api/model-builder/model/<model_id>/clone", methods=["POST"])
 def api_model_builder_clone(model_id):
     data = request.get_json(silent=True) or {}
-    if not data.get("name"):
+    new_name = data.get("name", "")
+    if not new_name:
         return jsonify({"error": "Name required"}), 400
-    try:
-        response = requests.post(
-            f"{API_BASE_URL}/model-builder/models/{model_id}/clone",
-            json=data,
-            headers=get_api_headers(),
-            timeout=10
-        )
-        return response.json() if response.status_code == 200 else ({"error": "Clone failed"}, 500)
-    except requests.exceptions.RequestException as e:
-        return jsonify({"error": str(e)}), 500
+
+    model = _find_custom_model(model_id)
+    if not model:
+        return jsonify({"error": "Model not found"}), 404
+
+    new_id = new_name.lower().replace(" ", "-").replace("_", "-")
+    new_ollama_name = f"custom-{new_id}:latest"
+
+    custom_models = _load_custom_models()
+    clone = dict(model)
+    clone["id"] = new_id
+    clone["name"] = new_name
+    clone["ollama_name"] = new_ollama_name
+    clone["status"] = "ready"
+    clone["created_at"] = datetime.utcnow().isoformat() + "Z"
+    custom_models.append(clone)
+    _save_custom_models(custom_models)
+    return jsonify({"success": True, "id": new_id})
 
 
 @app.route("/api/model-builder/model/<model_id>/export")
 def api_model_builder_export(model_id):
-    try:
-        response = requests.get(
-            f"{API_BASE_URL}/model-builder/models/{model_id}/export",
-            headers=get_api_headers(),
-            timeout=10
-        )
-        return response.json() if response.status_code == 200 else {"error": "Not found"}
-    except requests.exceptions.RequestException as e:
-        return jsonify({"error": str(e)}), 500
+    model = _find_custom_model(model_id)
+    if not model:
+        return jsonify({"error": "Not found"})
+
+    modelfile_lines = [f"FROM {model.get('base_model', 'llama3.2:1b')}"]
+    if model.get("system_prompt"):
+        modelfile_lines.append(f'SYSTEM """{model["system_prompt"]}"""')
+    modelfile_lines.append(f"PARAMETER temperature {model.get('temperature', 0.7)}")
+    modelfile_lines.append(f"PARAMETER num_predict {model.get('max_tokens', 1000)}")
+
+    return jsonify({
+        "modelfile": "\n".join(modelfile_lines),
+        "ollama_name": model.get("ollama_name"),
+        "base_model": model.get("base_model"),
+    })
 
 
 @app.route("/model-builder/lightweight/create", methods=["POST"])
 def model_builder_lightweight_create():
-
     name = request.form.get("name")
     task_type = request.form.get("task_type")
     base_model = request.form.get("base_model", "qwen2.5:0.5b")
@@ -2089,207 +2352,372 @@ def model_builder_lightweight_create():
         flash("Name and task type are required", "error")
         return redirect(url_for("model_builder"))
 
-    try:
-        payload = {
-            "name": name,
-            "task_type": task_type,
-            "base_model": base_model,
-            "custom_knowledge": custom_knowledge,
-            "custom_prompt": custom_prompt
-        }
-        response = requests.post(
-            f"{API_BASE_URL}/model-builder/lightweight/create",
-            json=payload,
-            headers=get_api_headers(),
-            timeout=10
-        )
-        if response.status_code == 200:
-            flash(f"Lightweight model '{name}' created! Ready to use.", "success")
-        else:
-            flash("Failed to create lightweight model", "error")
-    except requests.exceptions.RequestException as e:
-        flash(f"Connection error: {str(e)}", "error")
+    system_prompt = custom_prompt or TASK_PROMPTS.get(task_type, "You are a helpful assistant.")
+    if custom_knowledge:
+        system_prompt += f"\n\nKnowledge:\n{custom_knowledge}"
 
+    model_id = name.lower().replace(" ", "-").replace("_", "-")
+    ollama_name = f"custom-{model_id}:latest"
+
+    modelfile_parts = [f"FROM {base_model}", f'SYSTEM """{system_prompt}"""']
+    modelfile_content = "\n".join(modelfile_parts)
+
+    try:
+        r = requests.post(f"{OLLAMA_BASE_URL}/api/create",
+                          json={"name": ollama_name, "from": base_model},
+                          stream=True, timeout=120)
+        status = "ready" if r.status_code == 200 else "failed"
+    except Exception:
+        status = "failed"
+
+    custom_models = _load_custom_models()
+    new_model = {
+        "id": model_id,
+        "name": name,
+        "ollama_name": ollama_name,
+        "description": f"Lightweight {task_type} model",
+        "domain": task_type,
+        "base_model": base_model,
+        "system_prompt": system_prompt,
+        "temperature": 0.7,
+        "max_tokens": 500,
+        "restricted_topics": [],
+        "blocked_topics": [],
+        "status": status,
+        "total_chars": len(custom_knowledge) if custom_knowledge else 0,
+        "chunk_count": 1 if custom_knowledge else 0,
+        "training_progress": 0,
+        "created_at": datetime.utcnow().isoformat() + "Z",
+        "knowledge_chunks": [custom_knowledge] if custom_knowledge else [],
+    }
+    custom_models.append(new_model)
+    _save_custom_models(custom_models)
+    flash(f"Lightweight model '{name}' created ({status})!", "success")
     return redirect(url_for("model_builder"))
 
 
 @app.route("/api/model-builder/lightweight/tasks")
 def api_lightweight_tasks():
-
-    try:
-        response = requests.get(
-            f"{API_BASE_URL}/model-builder/lightweight/tasks",
-            headers=get_api_headers(),
-            timeout=10
-        )
-        return response.json() if response.status_code == 200 else []
-    except requests.exceptions.RequestException:
-        return []
+    return jsonify({"tasks": [{"id": k, "name": k.title(), "prompt": v} for k, v in TASK_PROMPTS.items()]})
 
 
 # ============= Model Firewall Routes =============
 
+FIREWALL_FILE = "/www/AI_server/data/firewall.json"
+
+FIREWALL_MODES = {
+    "lockdown": {"name": "Lockdown", "icon": "fas fa-shield-halved", "color": "red", "desc": "Maximum security - blocks everything except explicitly allowed"},
+    "over_protection": {"name": "Over Protection", "icon": "fas fa-shield", "color": "amber", "desc": "High security - blocks risky content, reviews sensitive topics"},
+    "standard": {"name": "Standard", "icon": "fas fa-check-shield", "color": "blue", "desc": "Balanced security - basic protections with sensible defaults"},
+    "open": {"name": "Open", "icon": "fas fa-lock-open", "color": "green", "desc": "Minimal security - only blocks clearly harmful content"},
+    "custom": {"name": "Custom", "icon": "fas fa-cog", "color": "purple", "desc": "Your own rules - fully customizable firewall"},
+}
+
+DEFAULT_RULES = {
+    "lockdown": [
+        {"name": "Block All by Default", "category": "content", "pattern": ".*", "action": "deny", "response_message": "Access denied. Lockdown mode."},
+        {"name": "Allow System Queries Only", "category": "topic", "pattern": "^(status|help|version|info)$", "action": "allow", "response_message": ""},
+    ],
+    "over_protection": [
+        {"name": "Block PII Exposure", "category": "content", "pattern": "\\b(ssn|social security|credit card|password|api.?key|secret)\\b", "action": "deny", "response_message": "I cannot share personal or sensitive information."},
+        {"name": "Block Harmful Content", "category": "content", "pattern": "\\b(hack|exploit|malware|phishing|bomb|weapon|drug.?making)\\b", "action": "deny", "response_message": "I cannot assist with harmful or illegal activities."},
+        {"name": "Review Financial Topics", "category": "topic", "pattern": "\\b(invest|stock|crypto|transfer|wire|payment)\\b", "action": "log", "response_message": "Financial topics are logged for review."},
+    ],
+    "standard": [
+        {"name": "Block Profanity", "category": "content", "pattern": "\\b(damn|hell|shit|fuck|ass)\\b", "action": "deny", "response_message": "Please keep your language professional."},
+        {"name": "Block PII", "category": "content", "pattern": "(\\d{3}-\\d{2}-\\d{4}|\\d{16}|password\\s*[:=])", "action": "deny", "response_message": "I cannot process personal identification information."},
+    ],
+    "open": [
+        {"name": "Block Illegal Content", "category": "content", "pattern": "\\b(how to (make|build|create).*(bomb|weapon|drug|poison))\\b", "action": "deny", "response_message": "I cannot assist with illegal activities."},
+    ],
+    "custom": [],
+}
+
+def _load_firewall():
+    try:
+        if os.path.exists(FIREWALL_FILE):
+            with open(FIREWALL_FILE, "r") as f:
+                data = json.load(f)
+            return data if isinstance(data, dict) else {"profiles": [], "active_profile": None, "logs": []}
+    except Exception:
+        pass
+    return {"profiles": [], "active_profile": None, "logs": []}
+
+def _save_firewall(data):
+    os.makedirs(os.path.dirname(FIREWALL_FILE), exist_ok=True)
+    with open(FIREWALL_FILE, "w") as f:
+        json.dump(data, f, indent=2)
+
+def _find_profile(profiles, profile_id):
+    for p in profiles:
+        if p.get("id") == profile_id:
+            return p
+    return None
+
+import re as _re
+
+def _check_text_against_rules(text, rules):
+    for rule in sorted(rules, key=lambda r: r.get("priority", 0), reverse=True):
+        if not rule.get("is_active", True):
+            continue
+        try:
+            if _re.search(rule["pattern"], text, _re.IGNORECASE):
+                return {
+                    "action": rule["action"],
+                    "rule": rule["name"],
+                    "category": rule.get("category", "content"),
+                    "response_message": rule.get("response_message", ""),
+                }
+        except _re.error:
+            pass
+    return {"action": "allow", "rule": None}
+
+
 @app.route("/firewall")
 def firewall():
+    fw = _load_firewall()
+    profiles = fw.get("profiles", [])
+    active_id = fw.get("active_profile")
+    logs = fw.get("logs", [])[-50:]
 
-    profiles = []
-    stats = {"total_profiles": 0, "active_profiles": 0, "blocked_requests": 0, "pending_reviews": 0, "block_rate": "0%"}
+    blocked = sum(1 for l in logs if l.get("action") == "deny")
+    total = len(logs)
+    stats = {
+        "total_profiles": len(profiles),
+        "active_profiles": 1 if active_id else 0,
+        "blocked_requests": blocked,
+        "total_requests": total,
+        "block_rate": f"{(blocked/total*100):.1f}%" if total else "0%",
+        "pending_reviews": sum(1 for l in logs if l.get("action") == "log"),
+    }
 
+    ollama_models = []
     try:
-        resp = requests.get(f"{API_BASE_URL}/firewall/profiles", headers=get_api_headers(), timeout=10)
-        if resp.status_code == 200:
-            profiles = resp.json()
-    except requests.exceptions.RequestException:
+        r = requests.get(f"{OLLAMA_BASE_URL}/api/tags", timeout=5)
+        if r.status_code == 200:
+            ollama_models = [m["name"] for m in r.json().get("models", [])]
+    except Exception:
         pass
 
-    try:
-        resp = requests.get(f"{API_BASE_URL}/firewall/stats", headers=get_api_headers(), timeout=10)
-        if resp.status_code == 200:
-            stats = resp.json()
-    except requests.exceptions.RequestException:
-        pass
-
-    return render_template("firewall.html", profiles=profiles, stats=stats)
+    return render_template("firewall.html",
+                           profiles=profiles, stats=stats, modes=FIREWALL_MODES,
+                           active_profile_id=active_id, logs=logs,
+                           ollama_models=ollama_models)
 
 
 @app.route("/firewall/create", methods=["POST"])
 def firewall_create():
-
     name = request.form.get("name")
     description = request.form.get("description", "")
-    protection_mode = request.form.get("protection_mode", "standard")
+    mode = request.form.get("protection_mode", "standard")
+    model_id = request.form.get("model_id", "")
 
     if not name:
         flash("Profile name is required", "error")
         return redirect(url_for("firewall"))
 
-    try:
-        payload = {"name": name, "description": description, "protection_mode": protection_mode}
-        resp = requests.post(f"{API_BASE_URL}/firewall/profiles", json=payload, headers=get_api_headers(), timeout=10)
-        if resp.status_code == 200:
-            flash(f"Firewall '{name}' created with {protection_mode} mode", "success")
-        else:
-            flash("Failed to create firewall profile", "error")
-    except requests.exceptions.RequestException as e:
-        flash(f"Connection error: {str(e)}", "error")
+    fw = _load_firewall()
+    profile_id = name.lower().replace(" ", "-").replace("_", "-")
+    rules = []
+    for i, r in enumerate(DEFAULT_RULES.get(mode, [])):
+        rules.append({**r, "id": f"{profile_id}-rule-{i}", "is_active": True, "priority": i * 10})
 
+    profile = {
+        "id": profile_id,
+        "name": name,
+        "description": description,
+        "mode": mode,
+        "model_id": model_id,
+        "rules": rules,
+        "is_active": False,
+        "created_at": datetime.utcnow().isoformat() + "Z",
+        "request_count": 0,
+        "blocked_count": 0,
+    }
+    fw["profiles"].append(profile)
+    _save_firewall(fw)
+    flash(f"Firewall '{name}' created with {mode} mode ({len(rules)} rules)", "success")
     return redirect(url_for("firewall"))
 
 
 @app.route("/firewall/<profile_id>/activate", methods=["POST"])
 def firewall_activate(profile_id):
+    fw = _load_firewall()
+    profile = _find_profile(fw["profiles"], profile_id)
+    if not profile:
+        flash("Profile not found", "error")
+        return redirect(url_for("firewall"))
 
-    try:
-        resp = requests.post(f"{API_BASE_URL}/firewall/profiles/{profile_id}/activate", headers=get_api_headers(), timeout=10)
-        if resp.status_code == 200:
-            flash("Firewall profile activated", "success")
-        else:
-            flash("Failed to activate profile", "error")
-    except requests.exceptions.RequestException as e:
-        flash(f"Connection error: {str(e)}", "error")
-
+    for p in fw["profiles"]:
+        p["is_active"] = (p["id"] == profile_id)
+    fw["active_profile"] = profile_id
+    _save_firewall(fw)
+    flash(f"Firewall '{profile['name']}' activated", "success")
     return redirect(url_for("firewall"))
 
 
 @app.route("/firewall/<profile_id>/delete", methods=["POST"])
 def firewall_delete(profile_id):
-
-    try:
-        resp = requests.delete(f"{API_BASE_URL}/firewall/profiles/{profile_id}", headers=get_api_headers(), timeout=10)
-        if resp.status_code == 200:
-            flash("Firewall profile deleted", "success")
-        else:
-            flash("Failed to delete profile", "error")
-    except requests.exceptions.RequestException as e:
-        flash(f"Connection error: {str(e)}", "error")
-
+    fw = _load_firewall()
+    fw["profiles"] = [p for p in fw["profiles"] if p["id"] != profile_id]
+    if fw["active_profile"] == profile_id:
+        fw["active_profile"] = None
+    _save_firewall(fw)
+    flash("Firewall profile deleted", "success")
     return redirect(url_for("firewall"))
 
 
 @app.route("/firewall/rule/add", methods=["POST"])
 def firewall_rule_add():
-
     profile_id = request.form.get("profile_id")
     name = request.form.get("name")
     category = request.form.get("category", "content")
     pattern = request.form.get("pattern")
     action = request.form.get("action", "deny")
     response_message = request.form.get("response_message", "")
-    priority = request.form.get("priority", 0)
 
     if not profile_id or not name or not pattern:
-        flash("Profile ID, name, and pattern are required", "error")
+        flash("Profile, name, and pattern are required", "error")
         return redirect(url_for("firewall"))
 
-    try:
-        payload = {
-            "name": name, "category": category, "pattern": pattern,
-            "action": action, "response_message": response_message,
-            "priority": int(priority)
-        }
-        resp = requests.post(f"{API_BASE_URL}/firewall/profiles/{profile_id}/rules",
-                             json=payload, headers=get_api_headers(), timeout=10)
-        if resp.status_code == 200:
-            flash(f"Rule '{name}' added", "success")
-        else:
-            flash("Failed to add rule", "error")
-    except requests.exceptions.RequestException as e:
-        flash(f"Connection error: {str(e)}", "error")
+    fw = _load_firewall()
+    profile = _find_profile(fw["profiles"], profile_id)
+    if not profile:
+        flash("Profile not found", "error")
+        return redirect(url_for("firewall"))
 
+    rule_id = f"{profile_id}-rule-{len(profile['rules'])}"
+    profile["rules"].append({
+        "id": rule_id, "name": name, "category": category,
+        "pattern": pattern, "action": action,
+        "response_message": response_message, "is_active": True,
+        "priority": len(profile["rules"]) * 10,
+    })
+    _save_firewall(fw)
+    flash(f"Rule '{name}' added", "success")
     return redirect(url_for("firewall"))
 
 
 @app.route("/firewall/rule/<rule_id>/delete", methods=["POST"])
 def firewall_rule_delete(rule_id):
-
-    try:
-        resp = requests.delete(f"{API_BASE_URL}/firewall/rules/{rule_id}", headers=get_api_headers(), timeout=10)
-        if resp.status_code == 200:
+    fw = _load_firewall()
+    for profile in fw["profiles"]:
+        before = len(profile["rules"])
+        profile["rules"] = [r for r in profile["rules"] if r.get("id") != rule_id]
+        if len(profile["rules"]) < before:
+            _save_firewall(fw)
             flash("Rule deleted", "success")
-        else:
-            flash("Failed to delete rule", "error")
-    except requests.exceptions.RequestException as e:
-        flash(f"Connection error: {str(e)}", "error")
-
+            return redirect(url_for("firewall"))
+    flash("Rule not found", "error")
     return redirect(url_for("firewall"))
 
 
 @app.route("/api/firewall/profiles")
 def api_firewall_profiles():
-    try:
-        resp = requests.get(f"{API_BASE_URL}/firewall/profiles", headers=get_api_headers(), timeout=10)
-        return resp.json() if resp.status_code == 200 else []
-    except requests.exceptions.RequestException:
-        return []
+    return _load_firewall().get("profiles", [])
 
 
 @app.route("/api/firewall/profiles/<profile_id>")
 def api_firewall_profile(profile_id):
-    try:
-        resp = requests.get(f"{API_BASE_URL}/firewall/profiles/{profile_id}", headers=get_api_headers(), timeout=10)
-        return resp.json() if resp.status_code == 200 else {"detail": "Not found"}
-    except requests.exceptions.RequestException:
-        return {"detail": "Connection error"}
+    fw = _load_firewall()
+    profile = _find_profile(fw["profiles"], profile_id)
+    if not profile:
+        return {"detail": "Not found"}
+    logs = [l for l in fw.get("logs", []) if l.get("profile_id") == profile_id][-20:]
+    return {**profile, "recent_logs": logs}
 
 
 @app.route("/api/firewall/check/<profile_id>", methods=["POST"])
 def api_firewall_check(profile_id):
-    try:
-        data = request.get_json()
-        resp = requests.post(f"{API_BASE_URL}/firewall/check/{profile_id}",
-                             json=data, headers=get_api_headers(), timeout=10)
-        return resp.json() if resp.status_code == 200 else {"action": "error"}
-    except requests.exceptions.RequestException:
-        return {"action": "error", "reason": "Connection error"}
+    data = request.get_json(silent=True) or {}
+    text = data.get("request_text", "")
+    if not text:
+        return {"action": "error", "reason": "No text provided"}
+
+    fw = _load_firewall()
+    profile = _find_profile(fw["profiles"], profile_id)
+    if not profile:
+        return {"action": "error", "reason": "Profile not found"}
+
+    result = _check_text_against_rules(text, profile.get("rules", []))
+
+    log_entry = {
+        "profile_id": profile_id,
+        "text": text[:200],
+        "action": result["action"],
+        "rule": result.get("rule"),
+        "category": result.get("category"),
+        "response_message": result.get("response_message", ""),
+        "timestamp": datetime.utcnow().isoformat() + "Z",
+    }
+    fw.setdefault("logs", []).append(log_entry)
+    if len(fw["logs"]) > 500:
+        fw["logs"] = fw["logs"][-500:]
+    profile["request_count"] = profile.get("request_count", 0) + 1
+    if result["action"] == "deny":
+        profile["blocked_count"] = profile.get("blocked_count", 0) + 1
+    _save_firewall(fw)
+
+    return {**result, "profile": profile["name"]}
+
+
+@app.route("/api/firewall/check-global", methods=["POST"])
+def api_firewall_check_global():
+    data = request.get_json(silent=True) or {}
+    text = data.get("request_text", "")
+    if not text:
+        return {"action": "error", "reason": "No text provided"}
+
+    fw = _load_firewall()
+    active_id = fw.get("active_profile")
+    if not active_id:
+        return {"action": "allow", "rule": None, "reason": "No active firewall"}
+
+    profile = _find_profile(fw["profiles"], active_id)
+    if not profile:
+        return {"action": "allow", "rule": None, "reason": "Active profile not found"}
+
+    result = _check_text_against_rules(text, profile.get("rules", []))
+
+    log_entry = {
+        "profile_id": active_id,
+        "text": text[:200],
+        "action": result["action"],
+        "rule": result.get("rule"),
+        "category": result.get("category"),
+        "response_message": result.get("response_message", ""),
+        "timestamp": datetime.utcnow().isoformat() + "Z",
+    }
+    fw.setdefault("logs", []).append(log_entry)
+    if len(fw["logs"]) > 500:
+        fw["logs"] = fw["logs"][-500:]
+    profile["request_count"] = profile.get("request_count", 0) + 1
+    if result["action"] == "deny":
+        profile["blocked_count"] = profile.get("blocked_count", 0) + 1
+    _save_firewall(fw)
+
+    return {**result, "profile": profile["name"], "model_id": profile.get("model_id")}
 
 
 @app.route("/api/firewall/stats")
 def api_firewall_stats():
-    try:
-        resp = requests.get(f"{API_BASE_URL}/firewall/stats", headers=get_api_headers(), timeout=10)
-        return resp.json() if resp.status_code == 200 else {}
-    except requests.exceptions.RequestException:
-        return {}
+    fw = _load_firewall()
+    profiles = fw.get("profiles", [])
+    logs = fw.get("logs", [])
+    blocked = sum(1 for l in logs if l.get("action") == "deny")
+    return {
+        "total_profiles": len(profiles),
+        "active_profiles": 1 if fw.get("active_profile") else 0,
+        "blocked_requests": blocked,
+        "total_requests": len(logs),
+        "block_rate": f"{(blocked/len(logs)*100):.1f}%" if logs else "0%",
+        "pending_reviews": sum(1 for l in logs if l.get("action") == "log"),
+    }
+
+
+@app.route("/api/firewall/modes")
+def api_firewall_modes():
+    return FIREWALL_MODES
 
 
 # ============= Database Connector Routes =============

@@ -1,0 +1,40 @@
+[
+  {
+    "id": "my-math-bot",
+    "name": "My Math Bot",
+    "ollama_name": "custom-my-math-bot:latest",
+    "description": "Math tutor",
+    "domain": "custom",
+    "base_model": "llama3.2:1b",
+    "system_prompt": "You are math tutor",
+    "temperature": 0.7,
+    "max_tokens": 500,
+    "restricted_topics": [],
+    "blocked_topics": [],
+    "status": "ready",
+    "total_chars": 0,
+    "chunk_count": 0,
+    "training_progress": 0,
+    "created_at": "2026-09-01T07:02:06.393955Z",
+    "knowledge_chunks": []
+  },
+  {
+    "id": "quick-bot",
+    "name": "Quick Bot",
+    "ollama_name": "custom-quick-bot:latest",
+    "description": "Lightweight greet model",
+    "domain": "greet",
+    "base_model": "llama3.2:1b",
+    "system_prompt": "You are a friendly greeter. Greet users warmly and professionally.",
+    "temperature": 0.7,
+    "max_tokens": 500,
+    "restricted_topics": [],
+    "blocked_topics": [],
+    "status": "ready",
+    "total_chars": 0,
+    "chunk_count": 0,
+    "training_progress": 0,
+    "created_at": "2026-09-01T07:02:12.099851Z",
+    "knowledge_chunks": []
+  }
+]
