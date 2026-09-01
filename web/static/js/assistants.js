@@ -484,6 +484,14 @@ async function sendMessage() {
     el.scrollTop = el.scrollHeight;
     const btn = document.getElementById('sendBtn');
     btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
+    const cmd = detectCommand(text);
+    if (cmd) {
+        const handled = await executeCommand(cmd, text);
+        btn.disabled = false; btn.innerHTML = '<i class="fas fa-paper-plane"></i>';
+        if (handled) return;
+    }
+
     try {
         const data = await api('POST', `${currentAssistantId}/chat`, { message: text, conversation_id: currentConversationId });
         document.getElementById('typingBubble')?.remove();
@@ -1077,7 +1085,205 @@ function deleteAssistantMonitor(id) {
     showToast('Monitor deleted');
 }
 
+// ============= Task Execution Commands =============
+let assistantTodos = JSON.parse(localStorage.getItem('asm_todos') || '[]');
+let assistantReminders = JSON.parse(localStorage.getItem('asm_reminders') || '[]');
+let assistantSchedules = JSON.parse(localStorage.getItem('asm_schedules') || '[]');
+
+function saveTodos() { localStorage.setItem('asm_todos', JSON.stringify(assistantTodos)); }
+function saveReminders() { localStorage.setItem('asm_reminders', JSON.stringify(assistantReminders)); }
+function saveSchedules() { localStorage.setItem('asm_schedules', JSON.stringify(assistantSchedules)); }
+
+function detectCommand(text) {
+    const t = text.toLowerCase().trim();
+    if (/^(show|get|tell me|what's|whats).*(weather|temperature|forecast)/i.test(t)) return {cmd: 'weather', args: t};
+    if (/^(add|set|create|new).*(todo|task|to-do)/i.test(t) || /add.*to.*(list|todo|tasks)/i.test(t)) return {cmd: 'todo_add', args: t};
+    if (/^(show|list|view|get).*(todo|task|to-do|list)/i.test(t)) return {cmd: 'todo_list', args: t};
+    if (/^(remind|set reminder|add reminder|reminder)/i.test(t)) return {cmd: 'reminder_add', args: t};
+    if (/^(show|list|view).*(reminder|reminders)/i.test(t)) return {cmd: 'reminder_list', args: t};
+    if (/^(show|get|read|latest).*(whatsapp|wa|message|messages|chat)/i.test(t)) return {cmd: 'wa_messages', args: t};
+    if (/^(reply|send).*(mail|email)/i.test(t)) return {cmd: 'mail_reply', args: t};
+    if (/^(schedule|set.*schedule|add.*schedule|every.*read|every.*post)/i.test(t)) return {cmd: 'schedule_add', args: t};
+    if (/^(show|list|view).*(schedule|schedules|tasks)/i.test(t)) return {cmd: 'schedule_list', args: t};
+    if (/^(what|what's|tell me|show).*(time|date|day)/i.test(t)) return {cmd: 'datetime', args: t};
+    return null;
+}
+
+async function executeCommand(cmd, text) {
+    const el = document.getElementById('chatMessages');
+    let responseHtml = '';
+
+    switch(cmd.cmd) {
+        case 'datetime': {
+            const now = new Date();
+            responseHtml = `<div class="chat-bubble assistant"><p><i class="fas fa-clock text-cyan-400 mr-2"></i><b>${now.toLocaleDateString([], {weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'})}</b></p><p class="text-sm text-gray-400 mt-1">${now.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})}</p></div>`;
+            break;
+        }
+        case 'todo_add': {
+            const taskText = text.replace(/^(add|set|create|new)\s*(to my |a |the )?(todo|task|to-do|list)/i, '').replace(/^(list|to-do|todo|task)/i, '').trim().replace(/^(to|as|is)\s+/i, '');
+            if (!taskText) { responseHtml = errorBubble('Please specify the task. Example: "add buy milk to my todo list"'); break; }
+            assistantTodos.push({id: Date.now(), task: taskText, done: false, created: new Date().toISOString()});
+            saveTodos();
+            responseHtml = successBubble(`Added to todo list: <b>${escapeHtml(taskText)}</b><br><span class="text-xs text-gray-400">${assistantTodos.filter(t=>!t.done).length} pending tasks</span>`);
+            break;
+        }
+        case 'todo_list': {
+            const pending = assistantTodos.filter(t => !t.done);
+            const done = assistantTodos.filter(t => t.done);
+            if (pending.length === 0 && done.length === 0) {
+                responseHtml = infoBubble('Your todo list is empty. Say "add [task] to my todo list" to get started.');
+            } else {
+                let html = '<div class="chat-bubble assistant"><p class="font-semibold mb-2"><i class="fas fa-list-check text-green-400 mr-2"></i>Your Todo List</p>';
+                pending.forEach((t, i) => {
+                    html += `<div class="flex items-center gap-2 py-1 border-b border-gray-700/30"><input type="checkbox" onchange="toggleTodo(${t.id})" class="accent-green-500"><span class="text-sm text-white">${escapeHtml(t.task)}</span><button onclick="deleteTodo(${t.id})" class="ml-auto text-red-400 hover:text-red-300 text-xs"><i class="fas fa-trash"></i></button></div>`;
+                });
+                if (done.length > 0) {
+                    html += `<p class="text-xs text-gray-500 mt-2">${done.length} completed</p>`;
+                }
+                html += '</div>';
+                responseHtml = html;
+            }
+            break;
+        }
+        case 'reminder_add': {
+            const reminderText = text.replace(/^(remind me to|remind|set reminder|add reminder|set a reminder to|reminder to)/i, '').trim();
+            const timeMatch = text.match(/(in|at|on)\s+(\d+)\s*(minute|min|hour|hr|day)|(tomorrow|today|tonight)/i);
+            let when = 'soon';
+            if (timeMatch) when = timeMatch[0];
+            else if (/tomorrow/i.test(text)) when = 'tomorrow';
+            else if (/tonight/i.test(text)) when = 'tonight';
+            if (!reminderText || reminderText.length < 3) { responseHtml = errorBubble('Please specify the reminder. Example: "remind me to call John at 3pm"'); break; }
+            const r = {id: Date.now(), text: reminderText, when: when, done: false, created: new Date().toISOString()};
+            assistantReminders.push(r);
+            saveReminders();
+            setTimeout(() => {
+                showToast('⏰ Reminder: ' + reminderText, 'info');
+            }, 60000);
+            responseHtml = successBubble(`Reminder set ${when}: <b>${escapeHtml(reminderText)}</b><br><span class="text-xs text-gray-400">I'll notify you when it's time</span>`);
+            break;
+        }
+        case 'reminder_list': {
+            if (assistantReminders.length === 0) {
+                responseHtml = infoBubble('No reminders. Say "remind me to [task]" to set one.');
+            } else {
+                let html = '<div class="chat-bubble assistant"><p class="font-semibold mb-2"><i class="fas fa-bell text-amber-400 mr-2"></i>Your Reminders</p>';
+                assistantReminders.filter(r => !r.done).forEach(r => {
+                    html += `<div class="flex items-center gap-2 py-1 border-b border-gray-700/30"><i class="fas fa-clock text-amber-400 text-xs"></i><span class="text-sm text-white">${escapeHtml(r.text)}</span><span class="text-xs text-gray-500 ml-auto">${escapeHtml(r.when)}</span><button onclick="deleteReminder(${r.id})" class="text-red-400 hover:text-red-300 text-xs ml-2"><i class="fas fa-trash"></i></button></div>`;
+                });
+                html += '</div>';
+                responseHtml = html;
+            }
+            break;
+        }
+        case 'wa_messages': {
+            try {
+                const r = await fetch('/api/integrations/whatsapp/messages');
+                const d = await r.json();
+                const msgs = (d.messages || []).slice(-5).reverse();
+                if (msgs.length === 0) {
+                    responseHtml = infoBubble('No recent WhatsApp messages. Connect WhatsApp first.');
+                } else {
+                    let html = '<div class="chat-bubble assistant"><p class="font-semibold mb-2"><i class="fab fa-whatsapp text-green-400 mr-2"></i>Latest WhatsApp Messages</p>';
+                    msgs.forEach(m => {
+                        const who = m.from_name || (m.from || '').replace('@c.us','');
+                        const text = m.text || (m.type ? '[' + m.type + ']' : '(media)');
+                        html += `<div class="py-1.5 border-b border-gray-700/30"><p class="text-xs text-gray-400">${escapeHtml(who)}</p><p class="text-sm text-white">${escapeHtml(text).substring(0, 80)}</p></div>`;
+                    });
+                    html += '</div>';
+                    responseHtml = html;
+                }
+            } catch(e) { responseHtml = errorBubble('Could not fetch WhatsApp: ' + e.message); }
+            break;
+        }
+        case 'mail_reply': {
+            responseHtml = infoBubble('Mail reply requires an email integration to be configured. Open <a href="/integrations" class="text-cyan-400 underline">Integrations</a> to set up email.');
+            break;
+        }
+        case 'schedule_add': {
+            const scheduleText = text.replace(/^(schedule|set.*schedule|add.*schedule|every)/i, '').trim();
+            if (!scheduleText) { responseHtml = errorBubble('Please describe the schedule. Example: "every morning read new tech news and highlight"'); break; }
+            const s = {id: Date.now(), task: scheduleText, active: true, created: new Date().toISOString(), lastRun: null};
+            assistantSchedules.push(s);
+            saveSchedules();
+            responseHtml = successBubble(`Schedule added: <b>${escapeHtml(scheduleText)}</b><br><span class="text-xs text-gray-400">I'll execute this on a recurring basis. View all schedules with "show my schedules"</span>`);
+            break;
+        }
+        case 'schedule_list': {
+            if (assistantSchedules.length === 0) {
+                responseHtml = infoBubble('No schedules. Say "schedule [task]" to add a recurring task.');
+            } else {
+                let html = '<div class="chat-bubble assistant"><p class="font-semibold mb-2"><i class="fas fa-calendar-check text-purple-400 mr-2"></i>Your Schedules</p>';
+                assistantSchedules.forEach(s => {
+                    html += `<div class="flex items-center gap-2 py-1.5 border-b border-gray-700/30"><i class="fas fa-${s.active ? 'play text-green-400' : 'pause text-gray-500'} text-xs"></i><span class="text-sm text-white">${escapeHtml(s.task)}</span><button onclick="toggleSchedule(${s.id})" class="ml-auto text-xs text-gray-400 hover:text-white">${s.active ? 'Pause' : 'Resume'}</button><button onclick="deleteSchedule(${s.id})" class="text-red-400 hover:text-red-300 text-xs ml-2"><i class="fas fa-trash"></i></button></div>`;
+                });
+                html += '</div>';
+                responseHtml = html;
+            }
+            break;
+        }
+        case 'weather': {
+            try {
+                const r = await fetch('https://wttr.in/?format=j1');
+                if (r.ok) {
+                    const d = await r.json();
+                    const cur = d.current_condition && d.current_condition[0];
+                    if (cur) {
+                        responseHtml = `<div class="chat-bubble assistant"><p class="font-semibold mb-2"><i class="fas fa-cloud-sun text-amber-400 mr-2"></i>Current Weather</p><p class="text-sm text-white">${escapeHtml(cur.weatherDesc[0].value)}, ${cur.temp_C}°C / ${cur.temp_F}°F</p><p class="text-xs text-gray-400 mt-1">Humidity: ${cur.humidity}% · Wind: ${cur.windspeedKmph} km/h</p></div>`;
+                    } else { responseHtml = infoBubble('Weather data not available.'); }
+                } else { throw new Error('API error'); }
+            } catch(e) {
+                responseHtml = infoBubble('Weather API unavailable. Try again later.');
+            }
+            break;
+        }
+        default:
+            return null;
+    }
+
+    document.getElementById('typingBubble')?.remove();
+    el.innerHTML += `<div class="flex justify-start mb-4 chat-message">${responseHtml}</div>`;
+    el.scrollTop = el.scrollHeight;
+    return true;
+}
+
+function successBubble(msg) { return `<div class="chat-bubble assistant" style="background:rgba(16,185,129,0.15);border-color:#10b981;"><p class="text-sm text-white">${msg}</p></div>`; }
+function infoBubble(msg) { return `<div class="chat-bubble assistant" style="background:rgba(6,182,212,0.15);border-color:#06b6d4;"><p class="text-sm text-white">${msg}</p></div>`; }
+function errorBubble(msg) { return `<div class="chat-bubble assistant" style="background:rgba(239,68,68,0.15);border-color:#ef4444;"><p class="text-sm text-white"><i class="fas fa-exclamation-triangle mr-2"></i>${msg}</p></div>`; }
+
+function toggleTodo(id) {
+    const t = assistantTodos.find(x => x.id === id);
+    if (t) { t.done = !t.done; saveTodos(); }
+}
+function deleteTodo(id) {
+    assistantTodos = assistantTodos.filter(x => x.id !== id);
+    saveTodos();
+    showToast('Todo deleted');
+}
+function deleteReminder(id) {
+    assistantReminders = assistantReminders.filter(x => x.id !== id);
+    saveReminders();
+    showToast('Reminder deleted');
+}
+function toggleSchedule(id) {
+    const s = assistantSchedules.find(x => x.id === id);
+    if (s) { s.active = !s.active; saveSchedules(); }
+}
+function deleteSchedule(id) {
+    assistantSchedules = assistantSchedules.filter(x => x.id !== id);
+    saveSchedules();
+    showToast('Schedule deleted');
+}
+
 // ============= Init =============
+
+function quickCommand(text) {
+    const input = document.getElementById('chatInput');
+    if (input) {
+        input.value = text;
+        input.focus();
+        sendMessage();
+    }
+}
 ['createModal', 'detailModal', 'settingsModal', 'integrationModal', 'taskModal', 'addMonitorModal'].forEach(id => {
     const m = document.getElementById(id);
     if (m) m.addEventListener('click', e => { if (e.target === m) {
