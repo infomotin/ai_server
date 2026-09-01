@@ -19,7 +19,7 @@
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 html,body,#app{height:100%;overflow:hidden}
-.ide{display:flex;height:100%;width:100%;background:#1e1e1e}
+.ide{display:flex;height:calc(100% - 24px);width:100%;background:#1e1e1e}
 .exp{width:260px;min-width:200px;background:#1e1e1e;border-right:1px solid #3c3c3c;display:flex;flex-direction:column;overflow:hidden}
 .exp.collapsed{width:0;min-width:0}
 .exp-hdr{padding:10px 12px;background:#252526;border-bottom:1px solid #3c3c3c;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
@@ -94,7 +94,7 @@ html,body,#app{height:100%;overflow:hidden}
 .sbar .g span{display:flex;align-items:center;gap:4px}
 .spinner{display:inline-block;width:12px;height:12px;border:2px solid #007acc;border-top-color:transparent;border-radius:50%;animation:spin .6s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}
-.mbg{position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(3px);z-index:300;display:flex;align-items:center;justify-content:center}
+.mbg{position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(3px);z-index:9999;display:flex;align-items:center;justify-content:center}
 .mbox{background:#252526;border:1px solid #454545;border-radius:10px;width:480px;max-height:85vh;overflow-y:auto}
 .mbox .mh{padding:14px 18px;border-bottom:1px solid #3c3c3c;display:flex;align-items:center;justify-content:space-between}
 .mbox .mh span{color:#fff;font-weight:600;font-size:15px}
@@ -309,9 +309,14 @@ async function refreshTree(){
   const p=document.getElementById('projPath').value||'/www';
   try{
     const r=await fetch(`${API}/files/list`,{method:'POST',headers:H(),body:JSON.stringify({path:p,max_depth:2})});
+    if(!r.ok)throw new Error('HTTP '+r.status);
     const d=await r.json();
-    renderT(d,document.getElementById('fileTree'),0);
-  }catch(e){console.error(e);}
+    if(Array.isArray(d))renderT(d,document.getElementById('fileTree'),0);
+    else document.getElementById('fileTree').innerHTML='<span style="color:#666;padding:8px">No files</span>';
+  }catch(e){
+    console.error('refreshTree error:',e);
+    document.getElementById('fileTree').innerHTML='<span style="color:#f14c4c;padding:8px">Error loading files</span>';
+  }
 }
 
 function renderT(items,el,depth){
@@ -390,18 +395,26 @@ async function runCmd(){
   out.innerHTML+=`<span style="color:#6a9955">$ ${esc(cmd)}</span>\n`;
   try{
     const r=await fetch(`${API}/command/run`,{method:'POST',headers:H(),body:JSON.stringify({command:cmd,cwd:document.getElementById('projPath').value})});
-    const d=await r.json();
-    if(d.stdout)out.innerHTML+=esc(d.stdout);
-    if(d.stderr)out.innerHTML+=`<span style="color:#f14c4c">${esc(d.stderr)}</span>`;
-    if(d.error)out.innerHTML+=`<span style="color:#f14c4c">${esc(d.error)}</span>`;
+    if(!r.ok){
+      const errText=await r.text();
+      out.innerHTML+=`<span style="color:#f14c4c">Error: HTTP ${r.status} - ${esc(errText.substring(0,200))}</span>\n`;
+    }else{
+      const d=await r.json();
+      if(d.stdout)out.innerHTML+=esc(d.stdout);
+      if(d.stderr)out.innerHTML+=`<span style="color:#f14c4c">${esc(d.stderr)}</span>`;
+      if(d.error)out.innerHTML+=`<span style="color:#f14c4c">${esc(d.error)}</span>`;
+    }
   }catch(e){out.innerHTML+=`<span style="color:#f14c4c">${e.message}</span>`}
   out.scrollTop=out.scrollHeight;
 }
 
 function switchBot(p){
-  ['term','out','mcp'].forEach(x=>{
-    document.getElementById('bTab'+x.charAt(0).toUpperCase()+x.slice(1)).classList.toggle('act',p===x);
-    document.getElementById('b'+x.charAt(0).toUpperCase()+x.slice(1)).classList.toggle('hid',p!==x);
+  const tabs=['term','out','mcp'];
+  tabs.forEach(x=>{
+    const tabEl=document.getElementById('bTab'+x.charAt(0).toUpperCase()+x.slice(1));
+    const bodyEl=document.getElementById('b'+x.charAt(0).toUpperCase()+x.slice(1));
+    if(tabEl){tabEl.classList.toggle('act',p===x)}
+    if(bodyEl){bodyEl.classList.toggle('hid',p!==x)}
   });
   if(p==='mcp')loadMcpServers();
 }
@@ -418,6 +431,12 @@ async function sendMsg(){
   addM('assistant',`<span class="spinner"></span> Thinking...`);
   try{
     const r=await fetch(`${API}/sessions/${sess?.id||'new'}/chat`,{method:'POST',headers:H(),body:JSON.stringify({message:msg})});
+    if(!r.ok){
+      const errText=await r.text();
+      rmS();
+      addM('assistant',`<span style="color:#f14c4c">Error: HTTP ${r.status} - ${esc(errText.substring(0,200))}</span>`);
+      return;
+    }
     const d=await r.json();
     rmS();
     if(d.session_id&&sess?.id!==d.session_id){sess={id:d.session_id}}
@@ -449,7 +468,18 @@ function toggleChat(){document.getElementById('chatCol').classList.toggle('hid')
 async function newSess(){sess=null;document.getElementById('chatMsgs').innerHTML='<div style="text-align:center;padding:40px;color:#555"><i class="fas fa-plus" style="font-size:24px;margin-bottom:8px"></i><p style="font-size:12px">New session started</p></div>'}
 
 async function loadProv(){
-  try{const r=await fetch(`${API}/providers`,{headers:H()});provs=await r.json();renderProv();updMDisp()}catch(e){}
+  try{
+    const r=await fetch(`${API}/providers`,{headers:H()});
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    provs=await r.json();
+    if(!Array.isArray(provs))provs=[];
+    renderProv();updMDisp();
+  }catch(e){
+    console.error('loadProv error:',e);
+    provs=[];
+    renderProv();
+    updMDisp();
+  }
 }
 function renderProv(){
   const sel=document.getElementById('provSel');
@@ -487,12 +517,30 @@ async function testProv(){
 }
 async function saveProv(){
   const data={name:document.getElementById('pName').value||document.getElementById('pType').value,provider_type:document.getElementById('pType').value,api_url:document.getElementById('pUrl').value,api_key:document.getElementById('pKey').value||null,model:document.getElementById('pModel').value};
-  await fetch(`${API}/providers`,{method:'POST',headers:H(),body:JSON.stringify(data)});closeProv();loadProv()
+  try{
+    const r=await fetch(`${API}/providers`,{method:'POST',headers:H(),body:JSON.stringify(data)});
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    closeProv();loadProv();
+  }catch(e){
+    const res=document.getElementById('pRes');
+    res.style.display='block';res.className='res e';
+    res.innerHTML='<i class="fas fa-times"></i> '+e.message;
+  }
 }
 function updMDisp(){const act=provs.find(p=>p.is_active)||provs[0];if(act){document.getElementById('mDot').style.background='#4ec9b0';document.getElementById('sModelName').textContent=act.model}else{document.getElementById('mDot').style.background='#666';document.getElementById('sModelName').textContent='No model'}}
 
 async function loadMcpServers(){
-  try{const r=await fetch(`${MCP_API}/servers`,{headers:H()});mcpServers=await r.json();renderMcpServers()}catch(e){document.getElementById('mcpServersList').innerHTML='<span style="color:#f14c4c">Error loading</span>'}
+  try{
+    const r=await fetch(`${MCP_API}/servers`,{headers:H()});
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    mcpServers=await r.json();
+    if(!Array.isArray(mcpServers))mcpServers=[];
+    renderMcpServers();
+  }catch(e){
+    console.error('loadMcpServers error:',e);
+    mcpServers=[];
+    renderMcpServers();
+  }
 }
 function renderMcpServers(){
   const el=document.getElementById('mcpServersList');
@@ -544,9 +592,15 @@ async function disconnectMcp(id){await fetch(`${MCP_API}/servers/${id}/disconnec
 async function deleteMcp(id){if(!confirm('Delete this MCP server?'))return;await fetch(`${MCP_API}/servers/${id}`,{method:'DELETE',headers:H()});loadMcpServers()}
 
 async function initSess(){
-  try{const r=await fetch(`${API}/sessions`,{headers:H()});const ss=await r.json();
-  if(ss.length>0){const s=await fetch(`${API}/sessions/${ss[0].id}`,{headers:H()});sess=await s.json();document.getElementById('modeSel').value=sess.mode||'plan'}
-  }catch(e){}
+  try{
+    const r=await fetch(`${API}/sessions`,{headers:H()});
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    const ss=await r.json();
+    if(Array.isArray(ss)&&ss.length>0){
+      const s=await fetch(`${API}/sessions/${ss[0].id}`,{headers:H()});
+      if(s.ok){sess=await s.json();document.getElementById('modeSel').value=sess.mode||'plan'}
+    }
+  }catch(e){console.error('initSess error:',e)}
 }
 async function switchMode(m){if(!sess)return;await fetch(`${API}/sessions/${sess.id}/mode?mode=${m}`,{method:'PUT',headers:H()});sess.mode=m}
 

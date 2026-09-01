@@ -22,7 +22,10 @@ INTERNAL_API_KEY = os.environ.get("INTERNAL_API_KEY", "sk-local-e77f090788b21621
 
 def get_api_headers():
     headers = {"Content-Type": "application/json"}
-    if "access_token" in session:
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header:
+        headers["Authorization"] = auth_header
+    elif "access_token" in session:
         headers["Authorization"] = f"Bearer {session['access_token']}"
     elif INTERNAL_API_KEY:
         headers["Authorization"] = f"Bearer {INTERNAL_API_KEY}"
