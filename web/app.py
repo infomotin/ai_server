@@ -1,6 +1,7 @@
 import os
 import sys
 import json
+import time
 import requests
 import httpx
 from pathlib import Path
@@ -4255,6 +4256,12 @@ def api_connection_test():
 def api_integration_catalog():
     return jsonify({
         "services": [
+            {"id": "google_one", "name": "Google One", "icon": "fab fa-google", "color": "blue", "category": "google", "auth_type": "oauth2", "description": "All Google services in one login - Gmail, Drive, Calendar, Photos, and more", "scopes": ["gmail", "drive", "calendar", "photos", "tasks"]},
+            {"id": "google_gmail", "name": "Google Mail (Gmail)", "icon": "fas fa-envelope", "color": "red", "category": "google", "auth_type": "oauth2", "description": "Read, send, and manage your emails", "scopes": ["gmail.readonly", "gmail.send"]},
+            {"id": "google_drive", "name": "Google Drive", "icon": "fab fa-google-drive", "color": "blue", "category": "google", "auth_type": "oauth2", "description": "Store and share files in the cloud", "scopes": ["drive.readonly", "drive.file"]},
+            {"id": "google_calendar", "name": "Google Calendar", "icon": "fas fa-calendar", "color": "blue", "category": "google", "auth_type": "oauth2", "description": "Events, scheduling, and reminders", "scopes": ["calendar.readonly", "calendar.events"]},
+            {"id": "google_photos", "name": "Google Photos", "icon": "fas fa-image", "color": "cyan", "category": "google", "auth_type": "oauth2", "description": "Access your photos and albums", "scopes": ["photoslibrary.readonly"]},
+            {"id": "google_tasks", "name": "Google Tasks", "icon": "fas fa-check-square", "color": "green", "category": "google", "auth_type": "oauth2", "description": "Manage your tasks and to-do lists", "scopes": ["tasks"]},
             {"id": "whatsapp_web", "name": "WhatsApp Web", "icon": "fab fa-whatsapp", "color": "green", "category": "messaging", "auth_type": "qr", "description": "Scan QR code to connect WhatsApp Web"},
             {"id": "telegram_bot", "name": "Telegram Bot", "icon": "fab fa-telegram", "color": "sky", "category": "messaging", "auth_type": "token", "description": "Connect via Bot Token from @BotFather"},
             {"id": "slack", "name": "Slack", "icon": "fab fa-slack", "color": "purple", "category": "messaging", "auth_type": "token", "description": "Connect to Slack workspace"},
@@ -4263,7 +4270,6 @@ def api_integration_catalog():
             {"id": "github", "name": "GitHub", "icon": "fab fa-github", "color": "gray", "category": "dev", "auth_type": "token", "description": "Repos, issues, pull requests"},
             {"id": "gitlab", "name": "GitLab", "icon": "fab fa-gitlab", "color": "orange", "category": "dev", "auth_type": "token", "description": "Repos, issues, CI/CD"},
             {"id": "jira", "name": "Jira", "icon": "fab fa-jira", "color": "blue", "category": "dev", "auth_type": "token", "description": "Project management and issues"},
-            {"id": "google_calendar", "name": "Google Calendar", "icon": "fas fa-calendar", "color": "blue", "category": "productivity", "auth_type": "oauth", "description": "Events and scheduling"},
             {"id": "google_sheets", "name": "Google Sheets", "icon": "fas fa-table", "color": "green", "category": "productivity", "auth_type": "oauth", "description": "Spreadsheet integration"},
             {"id": "notion", "name": "Notion", "icon": "fas fa-book", "color": "gray", "category": "productivity", "auth_type": "token", "description": "Notes, docs, databases"},
             {"id": "stripe", "name": "Stripe", "icon": "fas fa-credit-card", "color": "purple", "category": "payments", "auth_type": "token", "description": "Payment processing webhooks"},
@@ -4280,6 +4286,325 @@ def api_integration_catalog():
 
 
 # ============= WhatsApp Web Bridge (Node.js) =============
+
+# ============= Google OAuth2 Integration =============
+
+import hashlib
+import secrets
+
+GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")
+GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "")
+GOOGLE_REDIRECT_URI = os.environ.get("GOOGLE_REDIRECT_URI", "http://203.55.176.101:5000/api/integrations/google/callback")
+
+GOOGLE_SCOPES = {
+    "gmail": "https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send",
+    "gmail.send": "https://www.googleapis.com/auth/gmail.send",
+    "drive": "https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/drive.file",
+    "calendar": "https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/calendar.events",
+    "photos": "https://www.googleapis.com/auth/photoslibrary.readonly",
+    "tasks": "https://www.googleapis.com/auth/tasks",
+    "sheets": "https://www.googleapis.com/auth/spreadsheets",
+    "youtube": "https://www.googleapis.com/auth/youtube.readonly",
+}
+
+google_tokens = {}
+google_state_tokens = {}
+
+def save_google_tokens():
+    try:
+        with open("/www/AI_server/data/google_tokens.json", "w") as f:
+            json.dump(google_tokens, f)
+    except Exception as e:
+        print(f"Error saving Google tokens: {e}")
+
+def load_google_tokens():
+    global google_tokens
+    try:
+        with open("/www/AI_server/data/google_tokens.json", "r") as f:
+            google_tokens = json.load(f)
+    except Exception:
+        google_tokens = {}
+
+load_google_tokens()
+
+@app.route("/api/integrations/google/auth")
+def api_google_auth():
+    service = request.args.get("service", "google_one")
+    state = secrets.token_urlsafe(32)
+    google_state_tokens[state] = service
+    scopes = []
+    if service == "google_one":
+        scopes = [
+            "https://www.googleapis.com/auth/gmail.readonly",
+            "https://www.googleapis.com/auth/gmail.send",
+            "https://www.googleapis.com/auth/drive.readonly",
+            "https://www.googleapis.com/auth/drive.file",
+            "https://www.googleapis.com/auth/calendar.readonly",
+            "https://www.googleapis.com/auth/calendar.events",
+            "https://www.googleapis.com/auth/photoslibrary.readonly",
+            "https://www.googleapis.com/auth/tasks",
+        ]
+    elif service == "google_gmail":
+        scopes = ["https://www.googleapis.com/auth/gmail.readonly", "https://www.googleapis.com/auth/gmail.send"]
+    elif service == "google_drive":
+        scopes = ["https://www.googleapis.com/auth/drive.readonly", "https://www.googleapis.com/auth/drive.file"]
+    elif service == "google_calendar":
+        scopes = ["https://www.googleapis.com/auth/calendar.readonly", "https://www.googleapis.com/auth/calendar.events"]
+    elif service == "google_photos":
+        scopes = ["https://www.googleapis.com/auth/photoslibrary.readonly"]
+    elif service == "google_tasks":
+        scopes = ["https://www.googleapis.com/auth/tasks"]
+    elif service == "google_sheets":
+        scopes = ["https://www.googleapis.com/auth/spreadsheets"]
+
+    if not GOOGLE_CLIENT_ID:
+        return jsonify({
+            "success": False,
+            "error": "Google OAuth not configured. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET environment variables.",
+            "setup_instructions": {
+                "step1": "Go to https://console.cloud.google.com/",
+                "step2": "Create a project or select existing one",
+                "step3": "Enable APIs: Gmail API, Drive API, Calendar API, Photos API",
+                "step4": "Go to Credentials → Create Credentials → OAuth Client ID",
+                "step5": "Set Application type to Web application",
+                "step6": "Add redirect URI: http://203.55.176.101:5000/api/integrations/google/callback",
+                "step7": "Copy Client ID and Client Secret to environment variables",
+            }
+        }), 400
+
+    scopes_str = " ".join(scopes)
+    auth_url = f"https://accounts.google.com/o/oauth2/v2/auth?client_id={GOOGLE_CLIENT_ID}&redirect_uri={GOOGLE_REDIRECT_URI}&response_type=code&scope={requests.utils.quote(scopes_str)}&access_type=offline&prompt=consent&state={state}"
+    return jsonify({"success": True, "auth_url": auth_url})
+
+@app.route("/api/integrations/google/callback")
+def api_google_callback():
+    code = request.args.get("code")
+    state = request.args.get("state")
+    error = request.args.get("error")
+
+    if error:
+        return jsonify({"success": False, "error": f"Google OAuth error: {error}"}), 400
+
+    if not code or state not in google_state_tokens:
+        return jsonify({"success": False, "error": "Invalid callback parameters"}), 400
+
+    service = google_state_tokens.pop(state)
+
+    try:
+        token_data = {
+            "code": code,
+            "client_id": GOOGLE_CLIENT_ID,
+            "client_secret": GOOGLE_CLIENT_SECRET,
+            "redirect_uri": GOOGLE_REDIRECT_URI,
+            "grant_type": "authorization_code",
+        }
+        token_resp = requests.post("https://oauth2.googleapis.com/token", data=token_data, timeout=10)
+        token_resp.raise_for_status()
+        tokens = token_resp.json()
+
+        google_tokens[service] = {
+            "access_token": tokens.get("access_token"),
+            "refresh_token": tokens.get("refresh_token"),
+            "expires_at": time.time() + tokens.get("expires_in", 3600),
+            "connected_at": time.time(),
+        }
+        save_google_tokens()
+
+        return jsonify({
+            "success": True,
+            "service": service,
+            "message": f"{service.replace('google_', 'Google ').title()} connected successfully!"
+        })
+    except Exception as e:
+        return jsonify({"success": False, "error": f"Token exchange failed: {str(e)}"}), 500
+
+@app.route("/api/integrations/google/status")
+def api_google_status():
+    result = {}
+    for service in ["google_one", "google_gmail", "google_drive", "google_calendar", "google_photos", "google_tasks", "google_sheets"]:
+        if service in google_tokens:
+            tok = google_tokens[service]
+            result[service] = {
+                "connected": True,
+                "connected_at": tok.get("connected_at"),
+                "expires_at": tok.get("expires_at"),
+                "name": service.replace("google_", "Google ").title(),
+            }
+        else:
+            result[service] = {"connected": False}
+    return jsonify(result)
+
+@app.route("/api/integrations/google/gmail/messages")
+def api_google_gmail():
+    if "google_gmail" not in google_tokens and "google_one" not in google_tokens:
+        return jsonify({"success": False, "error": "Gmail not connected", "messages": []}), 401
+    tok = google_tokens.get("google_gmail") or google_tokens.get("google_one")
+    if not tok:
+        return jsonify({"success": False, "error": "Not authenticated"}), 401
+
+    try:
+        if time.time() > tok.get("expires_at", 0) - 60:
+            refresh_data = {
+                "client_id": GOOGLE_CLIENT_ID,
+                "client_secret": GOOGLE_CLIENT_SECRET,
+                "refresh_token": tok.get("refresh_token"),
+                "grant_type": "refresh_token",
+            }
+            refresh_resp = requests.post("https://oauth2.googleapis.com/token", data=refresh_data, timeout=10)
+            refresh_resp.raise_for_status()
+            new_tokens = refresh_resp.json()
+            tok["access_token"] = new_tokens.get("access_token")
+            tok["expires_at"] = time.time() + new_tokens.get("expires_in", 3600)
+            save_google_tokens()
+
+        headers = {"Authorization": f"Bearer {tok['access_token']}"}
+        msgs_resp = requests.get("https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=20", headers=headers, timeout=10)
+        if msgs_resp.status_code != 200:
+            return jsonify({"success": False, "error": "Failed to fetch emails", "messages": []})
+
+        data = msgs_resp.json()
+        messages = []
+        for msg in data.get("messages", []):
+            detail_resp = requests.get(f"https://gmail.googleapis.com/gmail/v1/users/me/messages/{msg['id']}?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date", headers=headers, timeout=10)
+            if detail_resp.ok:
+                d = detail_resp.json()
+                headers = {h["name"]: h["value"] for h in d.get("payload", {}).get("headers", [])}
+                messages.append({
+                    "id": d.get("id"),
+                    "from": headers.get("From", "Unknown"),
+                    "subject": headers.get("Subject", "(no subject)"),
+                    "date": headers.get("Date", ""),
+                    "snippet": d.get("snippet", ""),
+                    "read": "UNREAD" not in d.get("labelIds", []),
+                    "platform": "gmail",
+                })
+        return jsonify({"success": True, "messages": messages})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e), "messages": []}), 500
+
+@app.route("/api/integrations/google/calendar/events")
+def api_google_calendar():
+    if "google_calendar" not in google_tokens and "google_one" not in google_tokens:
+        return jsonify({"success": False, "error": "Calendar not connected", "events": []}), 401
+    tok = google_tokens.get("google_calendar") or google_tokens.get("google_one")
+    if not tok:
+        return jsonify({"success": False, "error": "Not authenticated"}), 401
+
+    try:
+        if time.time() > tok.get("expires_at", 0) - 60:
+            refresh_data = {"client_id": GOOGLE_CLIENT_ID, "client_secret": GOOGLE_CLIENT_SECRET, "refresh_token": tok.get("refresh_token"), "grant_type": "refresh_token"}
+            refresh_resp = requests.post("https://oauth2.googleapis.com/token", data=refresh_data, timeout=10)
+            refresh_resp.raise_for_status()
+            new_tokens = refresh_resp.json()
+            tok["access_token"] = new_tokens.get("access_token")
+            tok["expires_at"] = time.time() + new_tokens.get("expires_in", 3600)
+            save_google_tokens()
+
+        headers = {"Authorization": f"Bearer {tok['access_token']}"}
+        now = datetime.datetime.utcnow().isoformat() + "Z"
+        cal_resp = requests.get(f"https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin={now}&maxResults=20&singleEvents=true&orderBy=startTime", headers=headers, timeout=10)
+        if not cal_resp.ok:
+            return jsonify({"success": False, "error": "Failed to fetch calendar", "events": []})
+
+        data = cal_resp.json()
+        events = []
+        for e in data.get("items", []):
+            start = e.get("start", {})
+            events.append({
+                "id": e.get("id"),
+                "title": e.get("summary", "Busy"),
+                "start": start.get("dateTime", start.get("date", "")),
+                "end": e.get("end", {}).get("dateTime", ""),
+                "location": e.get("location", ""),
+                "description": e.get("description", ""),
+                "platform": "calendar",
+            })
+        return jsonify({"success": True, "events": events})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e), "events": []}), 500
+
+@app.route("/api/integrations/google/drive/files")
+def api_google_drive():
+    if "google_drive" not in google_tokens and "google_one" not in google_tokens:
+        return jsonify({"success": False, "error": "Drive not connected", "files": []}), 401
+    tok = google_tokens.get("google_drive") or google_tokens.get("google_one")
+    if not tok:
+        return jsonify({"success": False, "error": "Not authenticated"}), 401
+
+    try:
+        if time.time() > tok.get("expires_at", 0) - 60:
+            refresh_data = {"client_id": GOOGLE_CLIENT_ID, "client_secret": GOOGLE_CLIENT_SECRET, "refresh_token": tok.get("refresh_token"), "grant_type": "refresh_token"}
+            refresh_resp = requests.post("https://oauth2.googleapis.com/token", data=refresh_data, timeout=10)
+            refresh_resp.raise_for_status()
+            tok["access_token"] = refresh_resp.json().get("access_token")
+            tok["expires_at"] = time.time() + 3600
+            save_google_tokens()
+
+        headers = {"Authorization": f"Bearer {tok['access_token']}"}
+        drive_resp = requests.get("https://www.googleapis.com/drive/v3/files?pageSize=20&orderBy=modifiedTime desc&fields=files(id,name,mimeType,size,modifiedTime,thumbnailLink)", headers=headers, timeout=10)
+        if not drive_resp.ok:
+            return jsonify({"success": False, "error": "Failed to fetch Drive files", "files": []})
+
+        data = drive_resp.json()
+        files = []
+        for f in data.get("files", []):
+            is_folder = f.get("mimeType") == "application/vnd.google-apps.folder"
+            files.append({
+                "id": f.get("id"),
+                "name": f.get("name"),
+                "type": "folder" if is_folder else f.get("mimeType", "file").split("/")[-1],
+                "size": f.get("size", 0),
+                "modified": f.get("modifiedTime", ""),
+                "platform": "drive",
+            })
+        return jsonify({"success": True, "files": files})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e), "files": []}), 500
+
+@app.route("/api/integrations/google/photos/albums")
+def api_google_photos():
+    if "google_photos" not in google_tokens and "google_one" not in google_tokens:
+        return jsonify({"success": False, "error": "Photos not connected", "albums": []}), 401
+    tok = google_tokens.get("google_photos") or google_tokens.get("google_one")
+    if not tok:
+        return jsonify({"success": False, "error": "Not authenticated"}), 401
+
+    try:
+        if time.time() > tok.get("expires_at", 0) - 60:
+            refresh_data = {"client_id": GOOGLE_CLIENT_ID, "client_secret": GOOGLE_CLIENT_SECRET, "refresh_token": tok.get("refresh_token"), "grant_type": "refresh_token"}
+            refresh_resp = requests.post("https://oauth2.googleapis.com/token", data=refresh_data, timeout=10)
+            refresh_resp.raise_for_status()
+            tok["access_token"] = refresh_resp.json().get("access_token")
+            tok["expires_at"] = time.time() + 3600
+            save_google_tokens()
+
+        headers = {"Authorization": f"Bearer {tok['access_token']}"}
+        photos_resp = requests.get("https://photoslibrary.googleapis.com/v1/albums?pageSize=20", headers=headers, timeout=10)
+        if not photos_resp.ok:
+            return jsonify({"success": False, "error": "Failed to fetch Photos", "albums": []})
+
+        data = photos_resp.json()
+        albums = []
+        for a in data.get("albums", []):
+            albums.append({
+                "id": a.get("id"),
+                "title": a.get("title", "Untitled"),
+                "cover": a.get("coverPhotoBaseUrl", ""),
+                "count": a.get("mediaItemsCount", "0"),
+                "platform": "photos",
+            })
+        return jsonify({"success": True, "albums": albums})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e), "albums": []}), 500
+
+@app.route("/api/integrations/google/disconnect", methods=["POST"])
+def api_google_disconnect():
+    data = request.get_json(silent=True) or {}
+    service = data.get("service", "google_one")
+    if service in google_tokens:
+        del google_tokens[service]
+        save_google_tokens()
+    return jsonify({"success": True, "message": f"{service.replace('google_', 'Google ')} disconnected"})
 
 WA_BRIDGE_URL = "http://localhost:3333"
 

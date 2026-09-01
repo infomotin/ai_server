@@ -704,6 +704,23 @@ function openConnect(serviceId) {
             <div><label class="block text-xs text-gray-400 mb-1">Password / Secret</label><input type="password" id="cPass" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm"></div>`;
     } else if (svc.auth_type === 'url') {
         fields = `<div><label class="block text-xs text-gray-400 mb-1">Endpoint URL</label><input type="url" id="cUrl" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm" placeholder="https://..."></div>`;
+    } else if (svc.auth_type === 'oauth2') {
+        const scopes = svc.scopes ? svc.scopes.join(', ') : 'Multiple Google services';
+        fields = `<div class="space-y-4">
+            <div class="flex items-center gap-3 p-3 bg-blue-600/20 border border-blue-600/30 rounded-lg">
+                <i class="fab fa-google text-2xl text-blue-400"></i>
+                <div>
+                    <p class="text-white text-sm font-medium">Sign in with Google</p>
+                    <p class="text-xs text-gray-400">Access ${svc.name} with your Google account</p>
+                </div>
+            </div>
+            <div class="bg-gray-700/50 rounded-lg p-3 space-y-2">
+                <p class="text-xs text-gray-400"><i class="fas fa-shield-alt mr-1 text-green-400"></i> 2-Step Authentication enabled</p>
+                <p class="text-xs text-gray-400"><i class="fas fa-lock mr-1 text-green-400"></i> OAuth 2.0 secure login</p>
+                <p class="text-xs text-gray-400"><i class="fas fa-user-shield mr-1 text-green-400"></i> You control permissions</p>
+            </div>
+            ${scopes !== 'Multiple Google services' ? `<p class="text-xs text-gray-500">Permissions: ${scopes}</p>` : ''}
+        </div>`;
     } else if (svc.auth_type === 'oauth') {
         fields = `<p class="text-xs text-gray-500">OAuth flow will open in a new window.</p>`;
     }
@@ -738,9 +755,51 @@ async function testConnect() {
             status.className = 'p-3 rounded-lg bg-red-600/20 border border-red-600 text-red-400 text-sm';
             status.innerHTML = '<i class="fas fa-times mr-1"></i>Connection error';
         }
+    } else if (svc.auth_type === 'oauth2' && svc.id.startsWith('google')) {
+        try {
+            status.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Redirecting to Google...';
+            const r = await fetch(API + '/google/auth?service=' + svc.id);
+            const d = await r.json();
+            if (d.success && d.auth_url) {
+                window.open(d.auth_url, 'google_oauth', 'width=500,height=700');
+                status.className = 'p-3 rounded-lg bg-blue-600/20 border border-blue-600 text-blue-400 text-sm';
+                status.innerHTML = '<i class="fab fa-google mr-1"></i>Google login window opened. Complete login there, then click Check Connection.';
+                window.googleAuthCallback = function() {
+                    checkGoogleConnection(svc.id);
+                };
+            } else if (d.setup_instructions) {
+                status.className = 'p-3 rounded-lg bg-amber-600/20 border border-amber-600 text-amber-400 text-sm';
+                status.innerHTML = '<i class="fas fa-exclamation-triangle mr-1"></i>Google OAuth not configured. ' + d.error;
+            } else {
+                status.className = 'p-3 rounded-lg bg-red-600/20 border border-red-600 text-red-400 text-sm';
+                status.innerHTML = '<i class="fas fa-times mr-1"></i>' + (d.error || 'Failed');
+            }
+        } catch(e) {
+            status.className = 'p-3 rounded-lg bg-red-600/20 border border-red-600 text-red-400 text-sm';
+            status.innerHTML = '<i class="fas fa-times mr-1"></i>Connection error: ' + e.message;
+        }
     } else {
         status.className = 'p-3 rounded-lg bg-green-600/20 border border-green-600 text-green-400 text-sm';
         status.innerHTML = '<i class="fas fa-check mr-1"></i>Ready to save. Click Save to connect.';
+    }
+}
+
+async function checkGoogleConnection(serviceId) {
+    const status = document.getElementById('connectStatus');
+    try {
+        const r = await fetch(API + '/google/status');
+        const d = await r.json();
+        if (d[serviceId] && d[serviceId].connected) {
+            status.className = 'p-3 rounded-lg bg-green-600/20 border border-green-600 text-green-400 text-sm';
+            status.innerHTML = '<i class="fas fa-check mr-1"></i>Connected successfully!';
+            saveConnect();
+        } else {
+            status.className = 'p-3 rounded-lg bg-amber-600/20 border border-amber-600 text-amber-400 text-sm';
+            status.innerHTML = '<i class="fas fa-clock mr-1"></i>Waiting for authorization...';
+        }
+    } catch(e) {
+        status.className = 'p-3 rounded-lg bg-red-600/20 border border-red-600 text-red-400 text-sm';
+        status.innerHTML = '<i class="fas fa-times mr-1"></i>Connection check failed';
     }
 }
 
@@ -756,6 +815,9 @@ function saveConnect() {
 }
 
 function disconnectService(id) {
+    if (id.startsWith('google')) {
+        fetch(API + '/google/disconnect', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({service:id})}).catch(function(){});
+    }
     delete connected[id];
     localStorage.setItem('int_connected', JSON.stringify(connected));
     renderConnected();
