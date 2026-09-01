@@ -1,9 +1,12 @@
 import os
+import sys
 import json
 import requests
 import httpx
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, Response, make_response
 from datetime import datetime
+
+sys.path.insert(0, '/www/AI_server')
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "openlocalai-prod-secret-2024")
@@ -3214,8 +3217,6 @@ def api_integration_test():
 
 @app.route("/api/integrations/read", methods=["POST"])
 def api_integration_read():
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         data = request.get_json()
         integration_type = data.get("integration_type", "")
@@ -3237,8 +3238,6 @@ def api_integration_read():
 
 @app.route("/api/integrations/send", methods=["POST"])
 def api_integration_send():
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         data = request.get_json()
         integration_type = data.get("integration_type", "")
@@ -3261,8 +3260,6 @@ def api_integration_send():
 
 @app.route("/api/integrations/email/read", methods=["POST"])
 def api_email_read():
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         data = request.get_json()
         config = data.get("config", {})
@@ -3283,8 +3280,6 @@ def api_email_read():
 
 @app.route("/api/integrations/email/compose", methods=["POST"])
 def api_email_compose():
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         data = request.get_json()
         resp = requests.post(
@@ -3299,8 +3294,6 @@ def api_email_compose():
 
 @app.route("/api/integrations/telegram/updates", methods=["POST"])
 def api_telegram_updates():
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         data = request.get_json()
         config = data.get("config", {})
@@ -3319,8 +3312,6 @@ def api_telegram_updates():
 
 @app.route("/api/integrations/telegram/send", methods=["POST"])
 def api_telegram_send():
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         data = request.get_json()
         payload = {"to": data.get("chat_id", ""), "text": data.get("text", "")}
@@ -3405,8 +3396,6 @@ def api_telegram_updates_direct():
 
 @app.route("/api/integrations/discord/guilds", methods=["POST"])
 def api_discord_guilds():
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         data = request.get_json()
         config = data.get("config", {})
@@ -3423,8 +3412,6 @@ def api_discord_guilds():
 
 @app.route("/api/integrations/discord/channels", methods=["POST"])
 def api_discord_channels():
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         data = request.get_json()
         guild_id = data.get("guild_id", "")
@@ -3443,8 +3430,6 @@ def api_discord_channels():
 
 @app.route("/api/integrations/discord/messages", methods=["POST"])
 def api_discord_messages():
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         data = request.get_json()
         channel_id = data.get("channel_id", "")
@@ -3464,8 +3449,6 @@ def api_discord_messages():
 
 @app.route("/api/integrations/discord/send", methods=["POST"])
 def api_discord_send():
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         data = request.get_json()
         payload = {"to": data.get("channel_id", ""), "text": data.get("text", "")}
@@ -3484,8 +3467,6 @@ def api_discord_send():
 
 @app.route("/api/integrations/facebook/posts", methods=["POST"])
 def api_facebook_posts():
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         data = request.get_json()
         config = data.get("config", {})
@@ -3504,8 +3485,6 @@ def api_facebook_posts():
 
 @app.route("/api/integrations/facebook/comments", methods=["POST"])
 def api_facebook_comments():
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         data = request.get_json()
         post_id = data.get("post_id", "")
@@ -3524,8 +3503,6 @@ def api_facebook_comments():
 
 @app.route("/api/integrations/facebook/comment", methods=["POST"])
 def api_facebook_comment():
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         data = request.get_json()
         payload = {"to": data.get("post_id", ""), "text": data.get("text", "")}
@@ -3544,8 +3521,6 @@ def api_facebook_comment():
 
 @app.route("/api/integrations/whatsapp/send", methods=["POST"])
 def api_whatsapp_send():
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         data = request.get_json()
         payload = {"to": data.get("to", ""), "text": data.get("text", "")}
@@ -3564,8 +3539,6 @@ def api_whatsapp_send():
 
 @app.route("/api/integrations/messenger/send", methods=["POST"])
 def api_messenger_send():
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         data = request.get_json()
         payload = {"to": data.get("recipient_id", ""), "text": data.get("text", "")}
@@ -3813,7 +3786,7 @@ def api_integration_catalog():
             {"id": "anthropic_api", "name": "Anthropic API", "icon": "fas fa-robot", "color": "amber", "category": "ai", "auth_type": "token", "description": "Claude models"},
             {"id": "mqtt", "name": "MQTT (IoT)", "icon": "fas fa-microchip", "color": "cyan", "category": "iot", "auth_type": "credentials", "description": "IoT device messaging"},
             {"id": "webhook_custom", "name": "Custom Webhook", "icon": "fas fa-plug", "color": "gray", "category": "custom", "auth_type": "url", "description": "Any HTTP endpoint"},
-            {"id": "n8n", "name": "n8n Automation", "icon": "fas faworkflow", "color": "red", "category": "automation", "auth_type": "token", "description": "Workflow automation"},
+            {"id": "n8n", "name": "n8n Automation", "icon": "fas fa-diagram-project", "color": "red", "category": "automation", "auth_type": "token", "description": "Workflow automation"},
             {"id": "zapier", "name": "Zapier", "icon": "fas fa-bolt", "color": "orange", "category": "automation", "auth_type": "token", "description": "App automation platform"},
         ]
     })
@@ -3977,8 +3950,6 @@ def api_whatsapp_chat_link_qr():
 
 @app.route("/api/integrations/whatsapp/test", methods=["POST"])
 def api_whatsapp_test():
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     data = request.get_json(silent=True) or {}
     config = data.get("config", {})
     if not config.get("phone_number_id") or not config.get("access_token"):
@@ -4072,8 +4043,6 @@ def api_whatsapp_messages():
 
 @app.route("/api/integrations/telegram/qr", methods=["POST"])
 def api_telegram_qr():
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     data = request.get_json(silent=True) or {}
     bot_token = data.get("bot_token", "")
     if not bot_token:
@@ -4093,10 +4062,6 @@ def api_telegram_qr():
         return jsonify({"success": True, "image": f"data:image/png;base64,{b64}", "content": qr_content, "instructions": "Scan to open your Telegram bot"})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
-
-
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=False)
 
 
 # ============= Admin RBAC Routes =============
@@ -4594,3 +4559,7 @@ try:
     start_scheduler()
 except Exception as _sched_err:
     print(f"[MonitorScheduler] Could not start: {_sched_err}")
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000, debug=False)

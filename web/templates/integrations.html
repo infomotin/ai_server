@@ -48,6 +48,10 @@
 .platform-email{background:rgba(59,130,246,.2);color:#60a5fa}
 .platform-facebook{background:rgba(99,102,241,.2);color:#818cf8}
 .platform-telegram{background:rgba(14,165,233,.2);color:#38bdf8}
+.scroll-thin::-webkit-scrollbar{width:4px}
+.scroll-thin::-webkit-scrollbar-track{background:transparent}
+.scroll-thin::-webkit-scrollbar-thumb{background:rgba(148,163,184,.3);border-radius:2px}
+.scroll-thin::-webkit-scrollbar-thumb:hover{background:rgba(148,163,184,.5)}
 .msg-bubble{max-width:80%;padding:10px 14px;border-radius:16px;font-size:13px;line-height:1.5}
 .msg-bubble.user{background:linear-gradient(135deg,#6366f1,#8b5cf6);color:white;border-bottom-right-radius:4px;margin-left:auto}
 .msg-bubble.assistant{background:rgba(51,65,85,.7);color:#e2e8f0;border:1px solid rgba(148,163,184,.15);border-bottom-left-radius:4px}
@@ -561,7 +565,8 @@
 {% block scripts %}
 <script>
 var API = '/api/integrations';
-let connected = JSON.parse(localStorage.getItem('int_connected') || '{}');
+let connected = {};
+try { connected = JSON.parse(localStorage.getItem('int_connected') || '{}'); } catch(e) { connected = {}; }
 let catalog = [];
 let currentConnectService = null;
 let cameraStream = null;
@@ -1177,7 +1182,8 @@ function selectAssistantPlatform(platform) {
 }
 
 let selectedMessage = null;
-let learnedConversations = JSON.parse(localStorage.getItem('ai_learned_conversations') || '[]');
+let learnedConversations = [];
+try { learnedConversations = JSON.parse(localStorage.getItem('ai_learned_conversations') || '[]'); } catch(e) { learnedConversations = []; }
 let allLoadedMessages = [];
 let allConversations = {};
 let activeConversation = null;
@@ -1303,7 +1309,7 @@ function selectConversation(key) {
         var align = isInbound ? 'justify-start' : 'justify-end';
         var bg = isInbound ? 'bg-gray-700/70' : 'bg-green-600/30';
         var dir = isInbound ? '' : '<span class="text-[9px] text-green-300/60"><i class="fas fa-check-double mr-1"></i>sent</span>';
-        var icons = {video:'fa-video', image:'fa-image', audio:'fa-microphone', document:'fa-file', voice:'fa-microphone-alt'};
+        var icons = {video:'fa-video', image:'fa-image', audio:'fa-microphone', document:'fa-file', voice:'fa-microphone-lines'};
         var msgContent = m.text || m.body || m.caption || '';
         if (!msgContent && m.type && icons[m.type]) {
             msgContent = '<i class="fas ' + icons[m.type] + ' mr-1"></i>[' + (m.type.charAt(0).toUpperCase() + m.type.slice(1)) + ']';
@@ -1488,7 +1494,7 @@ async function learnAndSend() {
         contact: selectedMessage.contact || selectedMessage.from,
         from_message: selectedMessage.text || selectedMessage.body || '',
         ai_reply: replyText,
-        tone: document.getElementById('aiTone').value,
+        tone: 'professional',
         timestamp: new Date().toISOString(),
         context: aiConversationHistory.slice(-3)
     };
@@ -1624,6 +1630,7 @@ async function sendAIMessage(takeAction) {
 function showActionSteps(response) {
     const container = document.getElementById('actionSteps');
     const list = document.getElementById('actionStepsList');
+    if (!container || !list) return;
     container.classList.remove('hidden');
 
     const steps = response.split(/\n\d+\.|\nStep \d+/i).filter(s => s.trim());
@@ -1795,7 +1802,7 @@ function saveMonitor() {
         group_id: document.getElementById('monitorGroup').value,
         keywords: document.getElementById('monitorKeywords').value,
         interval: parseInt(document.getElementById('monitorInterval').value),
-        notify: 'whatsapp',
+        notify: document.getElementById('notifyChannel').value || 'whatsapp',
         active: true,
     };
 
@@ -1864,7 +1871,11 @@ function createPresetMonitor(type) {
 function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 function showToast(msg, type) {
     const t = document.getElementById('toast');
-    t.className = 'fixed bottom-6 right-6 ' + (type==='error'?'bg-red-600':'bg-green-600') + ' text-white px-4 py-2.5 rounded-lg shadow-lg z-50 flex items-center gap-2 text-sm font-medium';
+    let colorClass = 'bg-green-600';
+    if (type === 'error') colorClass = 'bg-red-600';
+    else if (type === 'warning') colorClass = 'bg-amber-500';
+    else if (type === 'info') colorClass = 'bg-blue-600';
+    t.className = 'fixed bottom-6 right-6 ' + colorClass + ' text-white px-4 py-2.5 rounded-lg shadow-lg z-50 flex items-center gap-2 text-sm font-medium';
     document.getElementById('toastMsg').textContent = msg;
     t.classList.remove('hidden');
     setTimeout(() => t.classList.add('hidden'), 2500);
