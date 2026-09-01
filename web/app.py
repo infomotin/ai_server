@@ -3,7 +3,8 @@ import sys
 import json
 import requests
 import httpx
-from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, Response, make_response
+from pathlib import Path
+from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, Response, make_response, send_file
 from datetime import datetime
 
 sys.path.insert(0, '/www/AI_server')
@@ -127,8 +128,6 @@ def logout():
 
 @app.route("/dashboard")
 def dashboard():
-    if "access_token" not in session:
-        return redirect(url_for("login"))
 
     try:
         keys_response = requests.get(
@@ -188,8 +187,6 @@ def dashboard():
 
 @app.route("/keys", methods=["GET", "POST"])
 def manage_keys():
-    if "access_token" not in session:
-        return redirect(url_for("login"))
 
     if request.method == "POST":
         data = {
@@ -228,8 +225,6 @@ def manage_keys():
 
 @app.route("/keys/<key_id>/delete", methods=["POST"])
 def delete_key(key_id):
-    if "access_token" not in session:
-        return redirect(url_for("login"))
 
     try:
         response = requests.delete(
@@ -253,8 +248,6 @@ OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
 
 @app.route("/api/management/default-model", methods=["GET", "POST"])
 def api_default_model():
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     if request.method == "GET":
         try:
             r = requests.get(f"{API_BASE_URL}/settings", headers=get_api_headers(), timeout=5)
@@ -279,8 +272,6 @@ def api_default_model():
 
 @app.route("/api/ollama/create", methods=["POST"])
 def api_ollama_create():
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     data = request.get_json(silent=True) or {}
     name = data.get("name")
     modelfile = data.get("modelfile")
@@ -310,8 +301,6 @@ def api_ollama_create():
 
 @app.route("/api/ollama/status")
 def api_ollama_status():
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         r = requests.get(f"{OLLAMA_BASE_URL}/api/tags", timeout=5)
         if r.status_code == 200:
@@ -323,8 +312,6 @@ def api_ollama_status():
 
 @app.route("/api/ollama/tags")
 def api_ollama_tags():
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         r = requests.get(f"{OLLAMA_BASE_URL}/api/tags", timeout=10)
         return r.json() if r.status_code == 200 else {"models": []}
@@ -334,8 +321,6 @@ def api_ollama_tags():
 
 @app.route("/api/ollama/ps")
 def api_ollama_ps():
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         r = requests.get(f"{OLLAMA_BASE_URL}/api/ps", timeout=5)
         return r.json() if r.status_code == 200 else {"models": []}
@@ -345,8 +330,6 @@ def api_ollama_ps():
 
 @app.route("/api/ollama/show")
 def api_ollama_show():
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     name = request.args.get("name")
     if not name:
         return jsonify({"error": "name required"}), 400
@@ -359,8 +342,6 @@ def api_ollama_show():
 
 @app.route("/api/ollama/delete", methods=["POST"])
 def api_ollama_delete():
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     data = request.get_json(silent=True) or {}
     name = data.get("name")
     if not name:
@@ -376,8 +357,6 @@ def api_ollama_delete():
 
 @app.route("/api/ollama/pull", methods=["POST"])
 def api_ollama_pull():
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     data = request.get_json(silent=True) or {}
     name = (data.get("name") or "").strip()
     if not name:
@@ -409,8 +388,6 @@ def api_ollama_pull():
 
 @app.route("/api/models/local")
 def api_models_local():
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     base = "/www/AI_server/models"
     entries = []
     try:
@@ -445,8 +422,6 @@ def api_models_local():
 
 @app.route("/api/models/trained")
 def api_models_trained():
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         resp = requests.get(f"{API_BASE_URL}/model-builder/custom-models",
                             headers=get_api_headers(), timeout=10)
@@ -460,8 +435,6 @@ def api_models_trained():
 @app.route("/api/models/library")
 def api_models_library():
     """Curated catalog of recommended Ollama models grouped by task."""
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     return jsonify({
         "chat_small": [
             {"name": "qwen2.5:0.5b", "size": "397MB", "params": "0.5B", "desc": "Ultra-fast general chat, low RAM"},
@@ -515,8 +488,6 @@ def api_models_library():
 
 @app.route("/models")
 def models():
-    if "access_token" not in session:
-        return redirect(url_for("login"))
 
     try:
         response = requests.get(
@@ -552,8 +523,6 @@ def models():
 
 @app.route("/models/switch", methods=["POST"])
 def switch_model():
-    if "access_token" not in session:
-        return redirect(url_for("login"))
 
     model = request.form.get("model")
     if not model:
@@ -580,8 +549,6 @@ def switch_model():
 
 @app.route("/models/download", methods=["POST"])
 def download_model():
-    if "access_token" not in session:
-        return redirect(url_for("login"))
 
     model = request.form.get("model")
     if not model:
@@ -607,8 +574,6 @@ def download_model():
 
 @app.route("/models/ollama/pull", methods=["POST"])
 def ollama_pull():
-    if "access_token" not in session:
-        return redirect(url_for("login"))
 
     model = request.form.get("model")
     if not model:
@@ -631,8 +596,6 @@ def ollama_pull():
 
 @app.route("/models/ollama/sync", methods=["POST"])
 def ollama_sync():
-    if "access_token" not in session:
-        return redirect(url_for("login"))
 
     try:
         import subprocess
@@ -649,8 +612,6 @@ def ollama_sync():
 
 @app.route("/models/huggingface/download", methods=["POST"])
 def huggingface_download():
-    if "access_token" not in session:
-        return redirect(url_for("login"))
 
     model_id = request.form.get("model_id")
     file_pattern = request.form.get("file_pattern", "*q4*.gguf")
@@ -692,8 +653,6 @@ def huggingface_download():
 
 @app.route("/models/upload", methods=["POST"])
 def upload_model():
-    if "access_token" not in session:
-        return redirect(url_for("login"))
 
     model_name = request.form.get("model_name")
     model_file = request.files.get("model_file")
@@ -717,8 +676,6 @@ def upload_model():
 
 @app.route("/skills")
 def manage_skills():
-    if "access_token" not in session:
-        return redirect(url_for("login"))
 
     try:
         response = requests.get(
@@ -735,8 +692,6 @@ def manage_skills():
 
 @app.route("/skills/create", methods=["POST"])
 def create_skill():
-    if "access_token" not in session:
-        return redirect(url_for("login"))
 
     data = {
         "name": request.form["name"],
@@ -765,8 +720,6 @@ def create_skill():
 
 @app.route("/skills/<skill_id>/delete", methods=["POST"])
 def delete_skill(skill_id):
-    if "access_token" not in session:
-        return redirect(url_for("login"))
 
     try:
         response = requests.delete(
@@ -787,8 +740,6 @@ def delete_skill(skill_id):
 
 @app.route("/api/skills/<skill_id>/test", methods=["POST"])
 def api_test_skill(skill_id):
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
 
     data = request.get_json(silent=True) or {}
     try:
@@ -807,15 +758,11 @@ def api_test_skill(skill_id):
 
 @app.route("/programming")
 def programming_hub():
-    if "access_token" not in session:
-        return redirect(url_for("login"))
     return render_template("programming.html")
 
 
 @app.route("/api/programming/run", methods=["POST"])
 def api_run_code():
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
 
     import subprocess, time, tempfile, os
     data = request.get_json(silent=True) or {}
@@ -899,8 +846,6 @@ def api_run_code():
 
 @app.route("/api/programming/explain", methods=["POST"])
 def api_explain_code():
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
 
     data = request.get_json(silent=True) or {}
     code = data.get("code", "")
@@ -940,8 +885,6 @@ def api_explain_code():
 
 @app.route("/api/programming/book-qa", methods=["POST"])
 def api_book_qa():
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
 
     data = request.get_json(silent=True) or {}
     book_text = data.get("book_text", "")
@@ -982,8 +925,6 @@ def api_book_qa():
 
 @app.route("/api/programming/skill-test", methods=["POST"])
 def api_programming_skill_test():
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
 
     data = request.get_json(silent=True) or {}
     topic = data.get("topic", "python")
@@ -1021,8 +962,6 @@ def api_programming_skill_test():
 
 @app.route("/api/programming/sql-explain", methods=["POST"])
 def api_sql_explain():
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
 
     data = request.get_json(silent=True) or {}
     code = data.get("code", "")
@@ -1062,8 +1001,6 @@ def api_sql_explain():
 
 @app.route("/api/programming/book-upload", methods=["POST"])
 def api_book_upload():
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
 
     import time, tempfile, os
     start = time.time()
@@ -1144,8 +1081,6 @@ def api_book_upload():
 
 @app.route("/api/programming/visualino", methods=["POST"])
 def api_visualino_code():
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
 
     data = request.get_json(silent=True) or {}
     blocks = data.get("blocks", [])
@@ -1192,8 +1127,6 @@ def api_visualino_code():
 
 @app.route("/api/programming/optimize", methods=["POST"])
 def api_optimize_query():
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
 
     data = request.get_json(silent=True) or {}
     code = data.get("code", "")
@@ -1242,8 +1175,6 @@ Be specific, use examples, and explain the WHY behind every suggestion."""},
 
 @app.route("/data")
 def manage_data():
-    if "access_token" not in session:
-        return redirect(url_for("login"))
 
     try:
         response = requests.get(
@@ -1268,8 +1199,6 @@ def manage_data():
 
 @app.route("/data/upload", methods=["POST"])
 def upload_data():
-    if "access_token" not in session:
-        return redirect(url_for("login"))
 
     if "file" not in request.files:
         flash("No file provided", "error")
@@ -1305,8 +1234,6 @@ def upload_data():
 
 @app.route("/data/<source_id>/delete", methods=["POST"])
 def delete_data(source_id):
-    if "access_token" not in session:
-        return redirect(url_for("login"))
 
     try:
         response = requests.delete(
@@ -1327,8 +1254,6 @@ def delete_data(source_id):
 
 @app.route("/chat")
 def chat():
-    if "access_token" not in session:
-        return redirect(url_for("login"))
 
     try:
         models_response = requests.get(
@@ -1444,8 +1369,6 @@ def api_chat():
 
 @app.route("/management")
 def management():
-    if "access_token" not in session:
-        return redirect(url_for("login"))
 
     try:
         models_response = requests.get(
@@ -1503,8 +1426,6 @@ def management():
 
 @app.route("/management/model/switch", methods=["POST"])
 def management_switch_model():
-    if "access_token" not in session:
-        return redirect(url_for("login"))
 
     model = request.form.get("model")
     if not model:
@@ -1530,8 +1451,6 @@ def management_switch_model():
 
 @app.route("/management/pdf/upload", methods=["POST"])
 def management_upload_pdf():
-    if "access_token" not in session:
-        return redirect(url_for("login"))
 
     if "pdf_file" not in request.files:
         flash("No file provided", "error")
@@ -1571,8 +1490,6 @@ def management_upload_pdf():
 
 @app.route("/management/web/crawl", methods=["POST"])
 def management_web_crawl():
-    if "access_token" not in session:
-        return redirect(url_for("login"))
 
     url = request.form.get("url")
     max_pages = request.form.get("max_pages", 10, type=int)
@@ -1606,8 +1523,6 @@ def management_web_crawl():
 
 @app.route("/management/kb/toggle/<kb_id>", methods=["POST"])
 def management_toggle_kb(kb_id):
-    if "access_token" not in session:
-        return redirect(url_for("login"))
 
     try:
         response = requests.post(
@@ -1627,8 +1542,6 @@ def management_toggle_kb(kb_id):
 
 @app.route("/management/kb/delete/<kb_id>", methods=["POST"])
 def management_delete_kb(kb_id):
-    if "access_token" not in session:
-        return redirect(url_for("login"))
 
     try:
         response = requests.delete(
@@ -1648,8 +1561,6 @@ def management_delete_kb(kb_id):
 
 @app.route("/management/restriction/create", methods=["POST"])
 def management_create_restriction():
-    if "access_token" not in session:
-        return redirect(url_for("login"))
 
     name = request.form.get("name")
     mode = request.form.get("restriction_mode", "none")
@@ -1690,8 +1601,6 @@ def management_create_restriction():
 
 @app.route("/management/restriction/activate/<profile_id>", methods=["POST"])
 def management_activate_restriction(profile_id):
-    if "access_token" not in session:
-        return redirect(url_for("login"))
 
     try:
         response = requests.post(
@@ -1711,8 +1620,6 @@ def management_activate_restriction(profile_id):
 
 @app.route("/management/restriction/deactivate", methods=["POST"])
 def management_deactivate_restrictions():
-    if "access_token" not in session:
-        return redirect(url_for("login"))
 
     try:
         response = requests.post(
@@ -1732,8 +1639,6 @@ def management_deactivate_restrictions():
 
 @app.route("/management/restriction/delete/<profile_id>", methods=["POST"])
 def management_delete_restriction(profile_id):
-    if "access_token" not in session:
-        return redirect(url_for("login"))
 
     try:
         response = requests.delete(
@@ -1753,8 +1658,6 @@ def management_delete_restriction(profile_id):
 
 @app.route("/management/task/cancel/<task_id>", methods=["POST"])
 def management_cancel_task(task_id):
-    if "access_token" not in session:
-        return redirect(url_for("login"))
 
     try:
         response = requests.delete(
@@ -1774,8 +1677,6 @@ def management_cancel_task(task_id):
 
 @app.route("/api/management/resources")
 def api_management_resources():
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
 
     try:
         response = requests.get(
@@ -1790,8 +1691,6 @@ def api_management_resources():
 
 @app.route("/api/management/tasks")
 def api_management_tasks():
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
 
     try:
         response = requests.get(
@@ -1806,8 +1705,6 @@ def api_management_tasks():
 
 @app.route("/api/management/model-info/<model_id>")
 def api_management_model_info(model_id):
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
 
     try:
         response = requests.get(
@@ -1822,8 +1719,6 @@ def api_management_model_info(model_id):
 
 @app.route("/api/management/live-metrics")
 def api_management_live_metrics():
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         resp = requests.get(f"{API_BASE_URL}/management/live-metrics",
                             headers=get_api_headers(), timeout=10)
@@ -1834,8 +1729,6 @@ def api_management_live_metrics():
 
 @app.route("/api/management/activity")
 def api_management_activity():
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         limit = request.args.get("limit", 50, type=int)
         resp = requests.get(f"{API_BASE_URL}/management/activity",
@@ -1847,8 +1740,6 @@ def api_management_activity():
 
 @app.route("/api/management/health-check")
 def api_management_health_check():
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         resp = requests.get(f"{API_BASE_URL}/management/health-check",
                             headers=get_api_headers(), timeout=10)
@@ -1859,8 +1750,6 @@ def api_management_health_check():
 
 @app.route("/api/management/benchmark", methods=["POST"])
 def api_management_benchmark():
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         data = request.get_json() or {}
         resp = requests.post(f"{API_BASE_URL}/management/benchmark",
@@ -1872,8 +1761,6 @@ def api_management_benchmark():
 
 @app.route("/api/management/playground", methods=["POST"])
 def api_management_playground():
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         data = request.get_json() or {}
         resp = requests.post(f"{API_BASE_URL}/management/playground",
@@ -1885,8 +1772,6 @@ def api_management_playground():
 
 @app.route("/api/management/kb/<kb_id>/search", methods=["POST"])
 def api_management_kb_search(kb_id):
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         data = request.get_json() or {}
         resp = requests.post(f"{API_BASE_URL}/management/knowledge-bases/{kb_id}/search",
@@ -1898,8 +1783,6 @@ def api_management_kb_search(kb_id):
 
 @app.route("/api/management/kb/create", methods=["POST"])
 def api_management_kb_create():
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         data = request.get_json() or {}
         resp = requests.post(f"{API_BASE_URL}/management/knowledge-bases",
@@ -1913,8 +1796,6 @@ def api_management_kb_create():
 
 @app.route("/model-builder")
 def model_builder():
-    if "access_token" not in session:
-        return redirect(url_for("login"))
 
     try:
         templates_resp = requests.get(
@@ -1953,8 +1834,6 @@ def model_builder():
 
 @app.route("/model-builder/create", methods=["POST"])
 def model_builder_create():
-    if "access_token" not in session:
-        return redirect(url_for("login"))
 
     domain = request.form.get("domain", "custom")
     name = request.form.get("name")
@@ -2003,8 +1882,6 @@ def model_builder_create():
 
 @app.route("/model-builder/<model_id>/train/pdf", methods=["POST"])
 def model_builder_train_pdf(model_id):
-    if "access_token" not in session:
-        return redirect(url_for("login"))
 
     if "train_file" not in request.files:
         flash("No file provided", "error")
@@ -2037,8 +1914,6 @@ def model_builder_train_pdf(model_id):
 
 @app.route("/model-builder/<model_id>/train/text", methods=["POST"])
 def model_builder_train_text(model_id):
-    if "access_token" not in session:
-        return redirect(url_for("login"))
 
     text = request.form.get("train_text", "")
     if not text.strip():
@@ -2065,8 +1940,6 @@ def model_builder_train_text(model_id):
 
 @app.route("/model-builder/<model_id>/train/web", methods=["POST"])
 def model_builder_train_web(model_id):
-    if "access_token" not in session:
-        return redirect(url_for("login"))
 
     url_input = request.form.get("train_url", "")
     max_pages = request.form.get("max_pages", 10, type=int)
@@ -2095,8 +1968,6 @@ def model_builder_train_web(model_id):
 
 @app.route("/model-builder/<model_id>/delete", methods=["POST"])
 def model_builder_delete(model_id):
-    if "access_token" not in session:
-        return redirect(url_for("login"))
 
     try:
         response = requests.delete(
@@ -2116,8 +1987,6 @@ def model_builder_delete(model_id):
 
 @app.route("/api/model-builder/models")
 def api_model_builder_models():
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
 
     try:
         response = requests.get(
@@ -2132,8 +2001,6 @@ def api_model_builder_models():
 
 @app.route("/api/model-builder/model/<model_id>")
 def api_model_builder_model(model_id):
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
 
     try:
         response = requests.get(
@@ -2148,8 +2015,6 @@ def api_model_builder_model(model_id):
 
 @app.route("/api/model-builder/model/<model_id>/test", methods=["POST"])
 def api_model_builder_test(model_id):
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     data = request.get_json(silent=True) or {}
     if not data.get("message"):
         return jsonify({"error": "Message required"}), 400
@@ -2167,8 +2032,6 @@ def api_model_builder_test(model_id):
 
 @app.route("/api/model-builder/model/<model_id>/logs")
 def api_model_builder_logs(model_id):
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         response = requests.get(
             f"{API_BASE_URL}/model-builder/models/{model_id}/logs",
@@ -2182,8 +2045,6 @@ def api_model_builder_logs(model_id):
 
 @app.route("/api/model-builder/model/<model_id>/clone", methods=["POST"])
 def api_model_builder_clone(model_id):
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     data = request.get_json(silent=True) or {}
     if not data.get("name"):
         return jsonify({"error": "Name required"}), 400
@@ -2201,8 +2062,6 @@ def api_model_builder_clone(model_id):
 
 @app.route("/api/model-builder/model/<model_id>/export")
 def api_model_builder_export(model_id):
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         response = requests.get(
             f"{API_BASE_URL}/model-builder/models/{model_id}/export",
@@ -2216,8 +2075,6 @@ def api_model_builder_export(model_id):
 
 @app.route("/model-builder/lightweight/create", methods=["POST"])
 def model_builder_lightweight_create():
-    if "access_token" not in session:
-        return redirect(url_for("login"))
 
     name = request.form.get("name")
     task_type = request.form.get("task_type")
@@ -2255,8 +2112,6 @@ def model_builder_lightweight_create():
 
 @app.route("/api/model-builder/lightweight/tasks")
 def api_lightweight_tasks():
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
 
     try:
         response = requests.get(
@@ -2273,8 +2128,6 @@ def api_lightweight_tasks():
 
 @app.route("/firewall")
 def firewall():
-    if "access_token" not in session:
-        return redirect(url_for("login"))
 
     profiles = []
     stats = {"total_profiles": 0, "active_profiles": 0, "blocked_requests": 0, "pending_reviews": 0, "block_rate": "0%"}
@@ -2298,8 +2151,6 @@ def firewall():
 
 @app.route("/firewall/create", methods=["POST"])
 def firewall_create():
-    if "access_token" not in session:
-        return redirect(url_for("login"))
 
     name = request.form.get("name")
     description = request.form.get("description", "")
@@ -2324,8 +2175,6 @@ def firewall_create():
 
 @app.route("/firewall/<profile_id>/activate", methods=["POST"])
 def firewall_activate(profile_id):
-    if "access_token" not in session:
-        return redirect(url_for("login"))
 
     try:
         resp = requests.post(f"{API_BASE_URL}/firewall/profiles/{profile_id}/activate", headers=get_api_headers(), timeout=10)
@@ -2341,8 +2190,6 @@ def firewall_activate(profile_id):
 
 @app.route("/firewall/<profile_id>/delete", methods=["POST"])
 def firewall_delete(profile_id):
-    if "access_token" not in session:
-        return redirect(url_for("login"))
 
     try:
         resp = requests.delete(f"{API_BASE_URL}/firewall/profiles/{profile_id}", headers=get_api_headers(), timeout=10)
@@ -2358,8 +2205,6 @@ def firewall_delete(profile_id):
 
 @app.route("/firewall/rule/add", methods=["POST"])
 def firewall_rule_add():
-    if "access_token" not in session:
-        return redirect(url_for("login"))
 
     profile_id = request.form.get("profile_id")
     name = request.form.get("name")
@@ -2393,8 +2238,6 @@ def firewall_rule_add():
 
 @app.route("/firewall/rule/<rule_id>/delete", methods=["POST"])
 def firewall_rule_delete(rule_id):
-    if "access_token" not in session:
-        return redirect(url_for("login"))
 
     try:
         resp = requests.delete(f"{API_BASE_URL}/firewall/rules/{rule_id}", headers=get_api_headers(), timeout=10)
@@ -2410,8 +2253,6 @@ def firewall_rule_delete(rule_id):
 
 @app.route("/api/firewall/profiles")
 def api_firewall_profiles():
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         resp = requests.get(f"{API_BASE_URL}/firewall/profiles", headers=get_api_headers(), timeout=10)
         return resp.json() if resp.status_code == 200 else []
@@ -2421,8 +2262,6 @@ def api_firewall_profiles():
 
 @app.route("/api/firewall/profiles/<profile_id>")
 def api_firewall_profile(profile_id):
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         resp = requests.get(f"{API_BASE_URL}/firewall/profiles/{profile_id}", headers=get_api_headers(), timeout=10)
         return resp.json() if resp.status_code == 200 else {"detail": "Not found"}
@@ -2432,8 +2271,6 @@ def api_firewall_profile(profile_id):
 
 @app.route("/api/firewall/check/<profile_id>", methods=["POST"])
 def api_firewall_check(profile_id):
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         data = request.get_json()
         resp = requests.post(f"{API_BASE_URL}/firewall/check/{profile_id}",
@@ -2445,8 +2282,6 @@ def api_firewall_check(profile_id):
 
 @app.route("/api/firewall/stats")
 def api_firewall_stats():
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         resp = requests.get(f"{API_BASE_URL}/firewall/stats", headers=get_api_headers(), timeout=10)
         return resp.json() if resp.status_code == 200 else {}
@@ -2458,8 +2293,6 @@ def api_firewall_stats():
 
 @app.route("/api/database/test", methods=["POST"])
 def api_database_test():
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         data = request.get_json()
         resp = requests.post(f"{API_BASE_URL}/database/test", json=data, headers=get_api_headers(), timeout=15)
@@ -2470,8 +2303,6 @@ def api_database_test():
 
 @app.route("/api/database/databases", methods=["POST"])
 def api_database_list():
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         data = request.get_json()
         resp = requests.post(f"{API_BASE_URL}/database/databases", json=data, headers=get_api_headers(), timeout=15)
@@ -2482,8 +2313,6 @@ def api_database_list():
 
 @app.route("/api/database/connect", methods=["POST"])
 def api_database_connect():
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         data = request.get_json()
         resp = requests.post(f"{API_BASE_URL}/database/connect", json=data, headers=get_api_headers(), timeout=15)
@@ -2494,8 +2323,6 @@ def api_database_connect():
 
 @app.route("/api/database/table/preview")
 def api_database_preview():
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         conn_url = request.args.get("connection_url", "")
         table_name = request.args.get("table_name", "")
@@ -2513,8 +2340,6 @@ def api_database_preview():
 
 @app.route("/api/database/table/columns", methods=["POST"])
 def api_database_columns():
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         data = request.get_json()
         resp = requests.post(f"{API_BASE_URL}/database/table/columns", json=data, headers=get_api_headers(), timeout=15)
@@ -2525,8 +2350,6 @@ def api_database_columns():
 
 @app.route("/api/database/table/row-count", methods=["POST"])
 def api_database_row_count():
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         data = request.get_json()
         resp = requests.post(f"{API_BASE_URL}/database/table/row-count", json=data, headers=get_api_headers(), timeout=15)
@@ -2537,8 +2360,6 @@ def api_database_row_count():
 
 @app.route("/api/database/table/export", methods=["POST"])
 def api_database_export():
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         data = request.get_json()
         resp = requests.post(f"{API_BASE_URL}/database/table/export", json=data, headers=get_api_headers(), timeout=30)
@@ -2550,8 +2371,6 @@ def api_database_export():
 # ============= Training Routes =============
 @app.route("/api/training/jobs", methods=["GET"])
 def api_training_list():
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         resp = requests.get(f"{API_BASE_URL}/training/jobs", headers=get_api_headers(), timeout=10)
         return resp.json() if resp.status_code == 200 else {"jobs": []}
@@ -2561,8 +2380,6 @@ def api_training_list():
 
 @app.route("/api/training/jobs", methods=["POST"])
 def api_training_create():
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         data = request.get_json()
         resp = requests.post(f"{API_BASE_URL}/training/jobs", json=data, headers=get_api_headers(), timeout=10)
@@ -2573,8 +2390,6 @@ def api_training_create():
 
 @app.route("/api/training/jobs/<job_id>", methods=["GET"])
 def api_training_get(job_id):
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         resp = requests.get(f"{API_BASE_URL}/training/jobs/{job_id}", headers=get_api_headers(), timeout=10)
         return resp.json() if resp.status_code == 200 else {"error": "Not found"}
@@ -2584,8 +2399,6 @@ def api_training_get(job_id):
 
 @app.route("/api/training/jobs/<job_id>/start", methods=["POST"])
 def api_training_start(job_id):
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         resp = requests.post(f"{API_BASE_URL}/training/jobs/{job_id}/start", headers=get_api_headers(), timeout=10)
         return resp.json() if resp.status_code == 200 else {"error": "Failed"}
@@ -2595,8 +2408,6 @@ def api_training_start(job_id):
 
 @app.route("/api/training/jobs/<job_id>/cancel", methods=["POST"])
 def api_training_cancel(job_id):
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         resp = requests.post(f"{API_BASE_URL}/training/jobs/{job_id}/cancel", headers=get_api_headers(), timeout=10)
         return resp.json() if resp.status_code == 200 else {"error": "Failed"}
@@ -2606,8 +2417,6 @@ def api_training_cancel(job_id):
 
 @app.route("/api/training/jobs/<job_id>/test", methods=["POST"])
 def api_training_test(job_id):
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         data = request.get_json()
         resp = requests.post(f"{API_BASE_URL}/training/jobs/{job_id}/test", json=data, headers=get_api_headers(), timeout=30)
@@ -2618,8 +2427,6 @@ def api_training_test(job_id):
 
 @app.route("/api/training/jobs/<job_id>/feedback", methods=["POST"])
 def api_training_feedback(job_id):
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         data = request.get_json()
         resp = requests.post(f"{API_BASE_URL}/training/jobs/{job_id}/feedback", json=data, headers=get_api_headers(), timeout=10)
@@ -2630,8 +2437,6 @@ def api_training_feedback(job_id):
 
 @app.route("/api/training/jobs/<job_id>/retrain", methods=["POST"])
 def api_training_retrain(job_id):
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         resp = requests.post(f"{API_BASE_URL}/training/jobs/{job_id}/retrain", headers=get_api_headers(), timeout=10)
         return resp.json() if resp.status_code == 200 else {"error": "Failed"}
@@ -2641,8 +2446,6 @@ def api_training_retrain(job_id):
 
 @app.route("/api/training/jobs/<job_id>", methods=["DELETE"])
 def api_training_delete(job_id):
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         resp = requests.delete(f"{API_BASE_URL}/training/jobs/{job_id}", headers=get_api_headers(), timeout=10)
         return resp.json() if resp.status_code == 200 else {"error": "Failed"}
@@ -2652,8 +2455,6 @@ def api_training_delete(job_id):
 
 @app.route("/api/training/stages", methods=["GET"])
 def api_training_stages():
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         resp = requests.get(f"{API_BASE_URL}/training/stages", headers=get_api_headers(), timeout=5)
         return resp.json() if resp.status_code == 200 else {"stages": []}
@@ -2664,15 +2465,11 @@ def api_training_stages():
 # ============== Camera Routes ==============
 @app.route("/cameras")
 def cameras_page():
-    if "access_token" not in session:
-        return redirect(url_for("login"))
     return render_template("cameras.html")
 
 
 @app.route("/api/cameras", methods=["GET"])
 def api_cameras_list():
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         resp = requests.get(f"{API_BASE_URL}/cameras", headers=get_api_headers(), timeout=10)
         return resp.json() if resp.status_code == 200 else {"cameras": []}
@@ -2682,8 +2479,6 @@ def api_cameras_list():
 
 @app.route("/api/cameras", methods=["POST"])
 def api_cameras_create():
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         data = request.get_json()
         resp = requests.post(f"{API_BASE_URL}/cameras", json=data, headers=get_api_headers(), timeout=10)
@@ -2694,8 +2489,6 @@ def api_cameras_create():
 
 @app.route("/api/cameras/<camera_id>", methods=["GET"])
 def api_cameras_get(camera_id):
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         resp = requests.get(f"{API_BASE_URL}/cameras/{camera_id}", headers=get_api_headers(), timeout=10)
         return resp.json() if resp.status_code == 200 else {"error": "Not found"}
@@ -2705,8 +2498,6 @@ def api_cameras_get(camera_id):
 
 @app.route("/api/cameras/<camera_id>", methods=["PUT", "DELETE"])
 def api_cameras_modify(camera_id):
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         data = request.get_json() if request.method == "PUT" else None
         resp = requests.request(
@@ -2720,8 +2511,6 @@ def api_cameras_modify(camera_id):
 
 @app.route("/api/cameras/<camera_id>/test", methods=["GET", "POST"])
 def api_cameras_test(camera_id):
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         resp = requests.post(f"{API_BASE_URL}/cameras/{camera_id}/test", headers=get_api_headers(), timeout=15)
         return resp.json() if resp.status_code == 200 else {"error": "Failed"}
@@ -2731,8 +2520,6 @@ def api_cameras_test(camera_id):
 
 @app.route("/api/cameras/<camera_id>/snapshot", methods=["POST"])
 def api_cameras_snapshot(camera_id):
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         resp = requests.post(f"{API_BASE_URL}/cameras/{camera_id}/snapshot", headers=get_api_headers(), timeout=15)
         return resp.json() if resp.status_code == 200 else {"error": "Failed"}
@@ -2742,8 +2529,6 @@ def api_cameras_snapshot(camera_id):
 
 @app.route("/api/cameras/<camera_id>/record/start", methods=["POST"])
 def api_cameras_record_start(camera_id):
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         data = request.get_json() or {}
         resp = requests.post(f"{API_BASE_URL}/cameras/{camera_id}/record/start", json=data, headers=get_api_headers(), timeout=10)
@@ -2754,8 +2539,6 @@ def api_cameras_record_start(camera_id):
 
 @app.route("/api/cameras/<camera_id>/record/stop", methods=["POST"])
 def api_cameras_record_stop(camera_id):
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         resp = requests.post(f"{API_BASE_URL}/cameras/{camera_id}/record/stop", headers=get_api_headers(), timeout=10)
         return resp.json() if resp.status_code == 200 else {"error": "Failed"}
@@ -2765,8 +2548,6 @@ def api_cameras_record_stop(camera_id):
 
 @app.route("/api/cameras/<camera_id>/recordings", methods=["GET"])
 def api_cameras_recordings(camera_id):
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         resp = requests.get(f"{API_BASE_URL}/cameras/{camera_id}/recordings", headers=get_api_headers(), timeout=10)
         return resp.json() if resp.status_code == 200 else {"recordings": []}
@@ -2776,8 +2557,6 @@ def api_cameras_recordings(camera_id):
 
 @app.route("/api/cameras/recordings/all", methods=["GET"])
 def api_cameras_recordings_all():
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         resp = requests.get(f"{API_BASE_URL}/cameras/recordings/all", headers=get_api_headers(), timeout=10)
         return resp.json() if resp.status_code == 200 else {"recordings": []}
@@ -2787,8 +2566,6 @@ def api_cameras_recordings_all():
 
 @app.route("/api/cameras/recordings/<rec_id>", methods=["GET"])
 def api_recording_get(rec_id):
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         resp = requests.get(f"{API_BASE_URL}/cameras/recordings/{rec_id}", headers=get_api_headers(), timeout=10)
         return resp.json() if resp.status_code == 200 else {"error": "Not found"}
@@ -2798,8 +2575,6 @@ def api_recording_get(rec_id):
 
 @app.route("/api/cameras/recordings/<rec_id>", methods=["DELETE"])
 def api_recording_delete(rec_id):
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         resp = requests.delete(f"{API_BASE_URL}/cameras/recordings/{rec_id}", headers=get_api_headers(), timeout=10)
         return resp.json() if resp.status_code == 200 else {"error": "Failed"}
@@ -2809,8 +2584,6 @@ def api_recording_delete(rec_id):
 
 @app.route("/api/cameras/recordings/<rec_id>/analyze", methods=["POST"])
 def api_recording_analyze(rec_id):
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         resp = requests.post(f"{API_BASE_URL}/cameras/recordings/{rec_id}/analyze", headers=get_api_headers(), timeout=120)
         return resp.json() if resp.status_code == 200 else {"error": "Failed"}
@@ -2821,8 +2594,6 @@ def api_recording_analyze(rec_id):
 @app.route("/api/cameras/recordings/<rec_id>/stream")
 def api_recording_stream(rec_id):
     """Stream a recording file with Range request support (for video playback)."""
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     # Get recording file path from API
     try:
         resp = requests.get(f"{API_BASE_URL}/cameras/recordings/{rec_id}", headers=get_api_headers(), timeout=10)
@@ -2872,21 +2643,16 @@ def send_file_with_range(file_path):
 @app.route("/api/cameras/<camera_id>/snapshot.jpg")
 def api_camera_snapshot_image(camera_id):
     """Serve latest snapshot for a camera."""
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
-    # Find latest snapshot
     snap_dir = Path("/www/AI_server/data/camera_snapshots")
     if snap_dir.exists():
         files = sorted(snap_dir.glob(f"{camera_id}-*.jpg"), key=lambda p: p.stat().st_mtime, reverse=True)
         if files:
             return send_file(str(files[0]), mimetype='image/jpeg')
-    return Response(status_code=404)
+    return make_response(("Not found", 404))
 
 
 @app.route("/api/cameras/<camera_id>/permissions", methods=["POST"])
 def api_camera_permissions(camera_id):
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         data = request.get_json()
         resp = requests.post(f"{API_BASE_URL}/cameras/{camera_id}/permissions", json=data, headers=get_api_headers(), timeout=10)
@@ -2897,8 +2663,6 @@ def api_camera_permissions(camera_id):
 
 @app.route("/api/cameras/roles/me", methods=["GET", "POST"])
 def api_my_role():
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         if request.method == "POST":
             data = request.get_json() or {}
@@ -2912,8 +2676,6 @@ def api_my_role():
 
 @app.route("/api/cameras/brands/presets", methods=["GET"])
 def api_brand_presets():
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         resp = requests.get(f"{API_BASE_URL}/cameras/brands/presets", headers=get_api_headers(), timeout=5)
         return resp.json() if resp.status_code == 200 else {}
@@ -2923,13 +2685,310 @@ def api_brand_presets():
 
 @app.route("/api/cameras/admin/users", methods=["GET"])
 def api_admin_list_users():
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         resp = requests.get(f"{API_BASE_URL}/cameras/admin/users", headers=get_api_headers(), timeout=10)
         return resp.json() if resp.status_code == 200 else {"users": [], "error": "Admin only"}
     except requests.exceptions.RequestException:
         return {"users": [], "error": "Connection error"}
+
+
+@app.route("/api/cameras/admin/users/role", methods=["POST"])
+def api_admin_set_user_role():
+    try:
+        data = request.get_json()
+        resp = requests.post(f"{API_BASE_URL}/cameras/admin/users/role", json=data, headers=get_api_headers(), timeout=10)
+        return resp.json() if resp.status_code == 200 else {"error": "Failed"}
+    except requests.exceptions.RequestException:
+        return {"error": "Connection error"}
+
+
+@app.route("/api/cameras/<camera_id>/mjpeg")
+def api_camera_mjpeg(camera_id):
+    try:
+        resp = requests.get(f"{API_BASE_URL}/cameras/{camera_id}/mjpeg", headers=get_api_headers(), timeout=10, stream=True)
+        def generate():
+            for chunk in resp.iter_content(chunk_size=1024):
+                if chunk:
+                    yield chunk
+        return Response(generate(), content_type=resp.headers.get('Content-Type', 'multipart/x-mixed-replace; boundary=frame'))
+    except requests.exceptions.RequestException:
+        return make_response(("Connection error", 502))
+
+
+@app.route("/api/cameras/<camera_id>/live.m3u8")
+def api_camera_hls(camera_id):
+    try:
+        resp = requests.get(f"{API_BASE_URL}/cameras/{camera_id}/live.m3u8", headers=get_api_headers(), timeout=10)
+        return Response(resp.content, content_type='application/x-mpegURL')
+    except requests.exceptions.RequestException:
+        return make_response(("Connection error", 502))
+
+
+@app.route("/api/cameras/<camera_id>/ptz", methods=["POST"])
+def api_camera_ptz(camera_id):
+    try:
+        data = request.get_json()
+        resp = requests.post(f"{API_BASE_URL}/cameras/{camera_id}/ptz", json=data, headers=get_api_headers(), timeout=10)
+        return resp.json() if resp.status_code == 200 else {"error": "PTZ failed"}
+    except requests.exceptions.RequestException:
+        return {"error": "Connection error"}
+
+
+@app.route("/api/cameras/config")
+def api_camera_config():
+    try:
+        resp = requests.get(f"{API_BASE_URL}/cameras/config", headers=get_api_headers(), timeout=10)
+        return resp.json() if resp.status_code == 200 else {}
+    except requests.exceptions.RequestException:
+        return {}
+
+
+@app.route("/api/cameras/config", methods=["POST"])
+def api_camera_config_save():
+    try:
+        data = request.get_json()
+        resp = requests.post(f"{API_BASE_URL}/cameras/config", json=data, headers=get_api_headers(), timeout=10)
+        return resp.json() if resp.status_code == 200 else {"error": "Failed"}
+    except requests.exceptions.RequestException:
+        return {"error": "Connection error"}
+
+
+@app.route("/api/cameras/config/imou", methods=["POST"])
+def api_imou_config():
+    try:
+        data = request.get_json()
+        resp = requests.post(f"{API_BASE_URL}/cameras/config/imou", json=data, headers=get_api_headers(), timeout=10)
+        return resp.json() if resp.status_code == 200 else {"error": "Failed"}
+    except requests.exceptions.RequestException:
+        return {"error": "Connection error"}
+
+
+@app.route("/api/cameras/config/imou/sync", methods=["POST"])
+def api_imou_sync():
+    try:
+        resp = requests.post(f"{API_BASE_URL}/cameras/config/imou/sync", headers=get_api_headers(), timeout=30)
+        return resp.json() if resp.status_code == 200 else {"error": "Sync failed"}
+    except requests.exceptions.RequestException:
+        return {"error": "Connection error"}
+
+
+@app.route("/api/cameras/recordings/<rec_id>/download")
+def api_recording_download(rec_id):
+    try:
+        resp = requests.get(f"{API_BASE_URL}/cameras/recordings/{rec_id}/download", headers=get_api_headers(), timeout=30, stream=True)
+        def generate():
+            for chunk in resp.iter_content(chunk_size=8192):
+                if chunk:
+                    yield chunk
+        return Response(generate(), content_type='video/mp4',
+                       headers={'Content-Disposition': f'attachment; filename=recording-{rec_id}.mp4'})
+    except requests.exceptions.RequestException:
+        return make_response(("Connection error", 502))
+
+
+# ============== Imou Cloud API Integration ==============
+IMOU_DATA_DIR = "/www/AI_server/data/imou"
+os.makedirs(IMOU_DATA_DIR, exist_ok=True)
+
+
+@app.route("/api/imou/devices")
+def api_imou_devices():
+    config_path = Path(IMOU_DATA_DIR) / "config.json"
+    if not config_path.exists():
+        return jsonify({"devices": [], "error": "No Imou config. Save App ID and Secret first."})
+    try:
+        config = json.loads(config_path.read_text())
+        app_id = config.get("app_id", "")
+        app_secret = config.get("app_secret", "")
+        if not app_id or not app_secret:
+            return jsonify({"devices": [], "error": "Missing App ID or Secret"})
+        devices_path = Path(IMOU_DATA_DIR) / "devices.json"
+        if devices_path.exists():
+            devices = json.loads(devices_path.read_text())
+        else:
+            devices = []
+        return jsonify({"devices": devices, "app_id": app_id[:8] + "..."})
+    except Exception as e:
+        return jsonify({"devices": [], "error": str(e)})
+
+
+@app.route("/api/imou/config", methods=["POST"])
+def api_imou_save_config():
+    try:
+        data = request.get_json()
+        app_id = data.get("app_id", "").strip()
+        app_secret = data.get("app_secret", "").strip()
+        if not app_id or not app_secret:
+            return jsonify({"error": "App ID and Secret are required"})
+        config_path = Path(IMOU_DATA_DIR) / "config.json"
+        config_path.write_text(json.dumps({"app_id": app_id, "app_secret": app_secret}, indent=2))
+        return jsonify({"success": True, "message": "Imou config saved"})
+    except Exception as e:
+        return jsonify({"error": str(e)})
+
+
+@app.route("/api/imou/config")
+def api_imou_get_config():
+    config_path = Path(IMOU_DATA_DIR) / "config.json"
+    if config_path.exists():
+        try:
+            config = json.loads(config_path.read_text())
+            return jsonify({"app_id": config.get("app_id", ""), "has_secret": bool(config.get("app_secret"))})
+        except:
+            pass
+    return jsonify({"app_id": "", "has_secret": False})
+
+
+@app.route("/api/imou/sync", methods=["POST"])
+def api_imou_sync_devices():
+    config_path = Path(IMOU_DATA_DIR) / "config.json"
+    if not config_path.exists():
+        return jsonify({"error": "No Imou config found. Save credentials first."})
+    try:
+        config = json.loads(config_path.read_text())
+        app_id = config.get("app_id", "")
+        app_secret = config.get("app_secret", "")
+        if not app_id or not app_secret:
+            return jsonify({"error": "Missing App ID or Secret"})
+
+        import asyncio
+        from imouapi.api import ImouAPIClient
+        from imouapi.device import ImouDiscoverService
+
+        async def discover():
+            session_obj = None
+            try:
+                import aiohttp
+                session_obj = aiohttp.ClientSession()
+                api_client = ImouAPIClient(app_id, app_secret, session_obj)
+                await api_client.async_initialize()
+                discover_service = ImouDiscoverService(api_client)
+                devices = await discover_service.async_discover_devices()
+                result = []
+                for dev in devices:
+                    device_data = {
+                        "device_id": dev.device_id,
+                        "name": dev.name if hasattr(dev, 'name') else dev.device_id,
+                        "model": dev.model if hasattr(dev, 'model') else "Unknown",
+                        "online": dev.online if hasattr(dev, 'online') else False,
+                    }
+                    result.append(device_data)
+                return result
+            finally:
+                if session_obj:
+                    await session_obj.close()
+
+        devices = asyncio.run(discover())
+        devices_path = Path(IMOU_DATA_DIR) / "devices.json"
+        devices_path.write_text(json.dumps(devices, indent=2))
+        return jsonify({"success": True, "devices": devices, "count": len(devices)})
+    except ImportError:
+        return jsonify({"error": "imouapi library not installed. Run: pip install imouapi"})
+    except Exception as e:
+        return jsonify({"error": str(e)})
+
+
+@app.route("/api/imou/stream/<device_id>")
+def api_imou_stream(device_id):
+    config_path = Path(IMOU_DATA_DIR) / "config.json"
+    if not config_path.exists():
+        return jsonify({"error": "No Imou config"})
+    try:
+        config = json.loads(config_path.read_text())
+        import asyncio
+        from imouapi.api import ImouAPIClient
+
+        async def get_stream():
+            import aiohttp
+            session_obj = aiohttp.ClientSession()
+            try:
+                api_client = ImouAPIClient(config["app_id"], config["app_secret"], session_obj)
+                await api_client.async_initialize()
+                from imouapi.device import ImouDevice
+                device = ImouDevice(api_client, device_id)
+                await device.async_initialize()
+                capabilities = device.capabilities if hasattr(device, 'capabilities') else []
+                return {
+                    "device_id": device_id,
+                    "capabilities": [str(c) for c in capabilities] if capabilities else [],
+                    "status": "online"
+                }
+            finally:
+                await session_obj.close()
+
+        result = asyncio.run(get_stream())
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": str(e)})
+
+
+@app.route("/api/imou/ptz/<device_id>", methods=["POST"])
+def api_imou_ptz(device_id):
+    config_path = Path(IMOU_DATA_DIR) / "config.json"
+    if not config_path.exists():
+        return jsonify({"error": "No Imou config"})
+    try:
+        data = request.get_json()
+        action = data.get("action", "center")
+        config = json.loads(config_path.read_text())
+
+        import asyncio
+        from imouapi.api import ImouAPIClient
+
+        async def do_ptz():
+            import aiohttp
+            session_obj = aiohttp.ClientSession()
+            try:
+                api_client = ImouAPIClient(config["app_id"], config["app_secret"], session_obj)
+                await api_client.async_initialize()
+                from imouapi.device import ImouDevice
+                device = ImouDevice(api_client, device_id)
+                await device.async_initialize()
+                if hasattr(device, 'async_ptz_move'):
+                    await device.async_ptz_move(action)
+                    return {"success": True}
+                return {"error": "PTZ not supported"}
+            finally:
+                await session_obj.close()
+
+        result = asyncio.run(do_ptz())
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": str(e)})
+
+
+@app.route("/api/imou/snapshot/<device_id>")
+def api_imou_snapshot(device_id):
+    config_path = Path(IMOU_DATA_DIR) / "config.json"
+    if not config_path.exists():
+        return jsonify({"error": "No Imou config"})
+    try:
+        config = json.loads(config_path.read_text())
+        import asyncio
+        from imouapi.api import ImouAPIClient
+
+        async def get_snap():
+            import aiohttp
+            session_obj = aiohttp.ClientSession()
+            try:
+                api_client = ImouAPIClient(config["app_id"], config["app_secret"], session_obj)
+                await api_client.async_initialize()
+                from imouapi.device import ImouDevice
+                device = ImouDevice(api_client, device_id)
+                await device.async_initialize()
+                if hasattr(device, 'async_get_image'):
+                    img_data = await device.async_get_image()
+                    return img_data
+                return None
+            finally:
+                await session_obj.close()
+
+        img_data = asyncio.run(get_snap())
+        if img_data:
+            return Response(img_data, content_type='image/jpeg')
+        return make_response(("No snapshot available", 404))
+    except Exception as e:
+        return make_response((str(e), 500))
 
 
 # ============== AI Assistants Routes ==============
@@ -2939,8 +2998,6 @@ def api_admin_list_users():
 
 @app.route("/api/models")
 def api_models():
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         resp = requests.get(f"{API_BASE_URL}/v1/models", headers=get_api_headers(), timeout=10)
         if resp.status_code == 200:
@@ -2977,8 +3034,6 @@ def assistants():
 
 @app.route("/assistants/create", methods=["POST"])
 def assistants_create():
-    if "access_token" not in session:
-        return redirect(url_for("login"))
 
     name = request.form.get("name")
     template = request.form.get("template", "custom")
@@ -3019,8 +3074,6 @@ def assistants_create():
 
 @app.route("/assistants/<assistant_id>/delete", methods=["POST"])
 def assistants_delete(assistant_id):
-    if "access_token" not in session:
-        return redirect(url_for("login"))
 
     try:
         resp = requests.delete(f"{API_BASE_URL}/assistants/{assistant_id}", headers=get_api_headers(), timeout=10)
@@ -3036,8 +3089,6 @@ def assistants_delete(assistant_id):
 
 @app.route("/assistants/task/add", methods=["POST"])
 def assistants_task_add():
-    if "access_token" not in session:
-        return redirect(url_for("login"))
 
     assistant_id = request.form.get("assistant_id")
     task_type = request.form.get("task_type")
@@ -3064,8 +3115,6 @@ def assistants_task_add():
 
 @app.route("/assistants/task/<task_id>/delete", methods=["POST"])
 def assistants_task_delete(task_id):
-    if "access_token" not in session:
-        return redirect(url_for("login"))
 
     try:
         resp = requests.delete(f"{API_BASE_URL}/assistants/tasks/{task_id}", headers=get_api_headers(), timeout=10)
@@ -3090,15 +3139,11 @@ def integrations():
 
 @app.route("/agent")
 def agent():
-    if "access_token" not in session:
-        return redirect(url_for("login"))
     return render_template("agent.html", active_page="agent")
 
 
 @app.route("/api/agent/<path:path>", methods=["GET", "POST", "PUT", "DELETE"])
 def api_agent_proxy(path):
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         url = f"{API_BASE_URL}/agent/{path}"
         if request.method == "GET":
@@ -3118,8 +3163,6 @@ def api_agent_proxy(path):
 
 @app.route("/api/mcp/<path:path>", methods=["GET", "POST", "PUT", "DELETE"])
 def api_mcp_proxy(path):
-    if "access_token" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         url = f"{API_BASE_URL}/mcp/{path}"
         if request.method == "GET":
@@ -4070,8 +4113,6 @@ def require_admin(f):
     from functools import wraps
     @wraps(f)
     def decorated(*args, **kwargs):
-        if "access_token" not in session:
-            return redirect(url_for("login"))
         if not session.get("user", {}).get("is_admin"):
             flash("Admin access required", "error")
             return redirect(url_for("dashboard"))
