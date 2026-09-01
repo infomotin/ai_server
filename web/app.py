@@ -4376,6 +4376,54 @@ def api_google_auth():
     auth_url = f"https://accounts.google.com/o/oauth2/v2/auth?client_id={GOOGLE_CLIENT_ID}&redirect_uri={GOOGLE_REDIRECT_URI}&response_type=code&scope={requests.utils.quote(scopes_str)}&access_type=offline&prompt=consent&state={state}"
     return jsonify({"success": True, "auth_url": auth_url})
 
+@app.route("/api/integrations/google/setup", methods=["POST"])
+def api_google_setup():
+    data = request.get_json(silent=True) or {}
+    client_id = data.get("client_id", "").strip()
+    client_secret = data.get("client_secret", "").strip()
+
+    if not client_id or not client_secret:
+        return jsonify({"success": False, "error": "Client ID and Client Secret are required"}), 400
+
+    try:
+        env_path = "/www/AI_server/.env"
+        env_content = ""
+        try:
+            with open(env_path, "r") as f:
+                env_content = f.read()
+        except FileNotFoundError:
+            pass
+
+        lines = env_content.split("\n")
+        new_lines = []
+        found_client_id = False
+        found_client_secret = False
+        for line in lines:
+            if line.startswith("GOOGLE_CLIENT_ID="):
+                new_lines.append(f"GOOGLE_CLIENT_ID={client_id}")
+                found_client_id = True
+            elif line.startswith("GOOGLE_CLIENT_SECRET="):
+                new_lines.append(f"GOOGLE_CLIENT_SECRET={client_secret}")
+                found_client_secret = True
+            else:
+                new_lines.append(line)
+
+        if not found_client_id:
+            new_lines.append(f"GOOGLE_CLIENT_ID={client_id}")
+        if not found_client_secret:
+            new_lines.append(f"GOOGLE_CLIENT_SECRET={client_secret}")
+
+        with open(env_path, "w") as f:
+            f.write("\n".join(new_lines))
+
+        global GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
+        GOOGLE_CLIENT_ID = client_id
+        GOOGLE_CLIENT_SECRET = client_secret
+
+        return jsonify({"success": True, "message": "Credentials saved to .env file. Please restart the server."})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
 @app.route("/api/integrations/google/callback")
 def api_google_callback():
     code = request.args.get("code")
