@@ -1830,6 +1830,17 @@ def api_management_activity():
         return {"error": str(e)[:300]}
 
 
+@app.route("/api/assistant/weather")
+def api_assistant_weather():
+    try:
+        r = requests.get("https://wttr.in/?format=j1", timeout=10, headers={"User-Agent": "curl/7.68.0"})
+        if r.status_code == 200:
+            return jsonify({"success": True, "data": r.json()})
+        return jsonify({"success": False, "error": f"wttr.in returned {r.status}"}), 502
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)[:200]}), 500
+
+
 @app.route("/api/management/health-check")
 def api_management_health_check():
     try:

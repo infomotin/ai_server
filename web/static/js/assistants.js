@@ -1096,12 +1096,12 @@ function saveSchedules() { localStorage.setItem('asm_schedules', JSON.stringify(
 
 function detectCommand(text) {
     const t = text.toLowerCase().trim();
-    if (/^(show|get|tell me|what's|whats).*(weather|temperature|forecast)/i.test(t)) return {cmd: 'weather', args: t};
+    if (/^(show|get|tell me|what's|whats|what|how).*(weather|temperature|forecast)/i.test(t)) return {cmd: 'weather', args: t};
     if (/^(add|set|create|new).*(todo|task|to-do)/i.test(t) || /add.*to.*(list|todo|tasks)/i.test(t)) return {cmd: 'todo_add', args: t};
     if (/^(show|list|view|get).*(todo|task|to-do|list)/i.test(t)) return {cmd: 'todo_list', args: t};
     if (/^(remind|set reminder|add reminder|reminder)/i.test(t)) return {cmd: 'reminder_add', args: t};
     if (/^(show|list|view).*(reminder|reminders)/i.test(t)) return {cmd: 'reminder_list', args: t};
-    if (/^(show|get|read|latest).*(whatsapp|wa|message|messages|chat)/i.test(t)) return {cmd: 'wa_messages', args: t};
+    if (/^(show|get|read|latest|my).*(whatsapp|wa|message|messages|chat)/i.test(t)) return {cmd: 'wa_messages', args: t};
     if (/^(reply|send).*(mail|email)/i.test(t)) return {cmd: 'mail_reply', args: t};
     if (/^(schedule|set.*schedule|add.*schedule|every.*read|every.*post)/i.test(t)) return {cmd: 'schedule_add', args: t};
     if (/^(show|list|view).*(schedule|schedules|tasks)/i.test(t)) return {cmd: 'schedule_list', args: t};
@@ -1177,22 +1177,24 @@ async function executeCommand(cmd, text) {
         }
         case 'wa_messages': {
             try {
-                const r = await fetch('/api/integrations/whatsapp/messages');
-                const d = await r.json();
-                const msgs = (d.messages || []).slice(-5).reverse();
-                if (msgs.length === 0) {
-                    responseHtml = infoBubble('No recent WhatsApp messages. Connect WhatsApp first.');
-                } else {
-                    let html = '<div class="chat-bubble assistant"><p class="font-semibold mb-2"><i class="fab fa-whatsapp text-green-400 mr-2"></i>Latest WhatsApp Messages</p>';
-                    msgs.forEach(m => {
-                        const who = m.from_name || (m.from || '').replace('@c.us','');
-                        const text = m.text || (m.type ? '[' + m.type + ']' : '(media)');
-                        html += `<div class="py-1.5 border-b border-gray-700/30"><p class="text-xs text-gray-400">${escapeHtml(who)}</p><p class="text-sm text-white">${escapeHtml(text).substring(0, 80)}</p></div>`;
-                    });
-                    html += '</div>';
-                    responseHtml = html;
-                }
-            } catch(e) { responseHtml = errorBubble('Could not fetch WhatsApp: ' + e.message); }
+                const r = await fetch('/api/integrations/whatsapp/messages', {method: 'GET'});
+                if (r.ok) {
+                    const d = await r.json();
+                    const msgs = (d.messages || []).slice(-5).reverse();
+                    if (msgs.length === 0) {
+                        responseHtml = infoBubble('No recent WhatsApp messages. Connect WhatsApp in <a href="/integrations" class="text-cyan-400 underline">Integrations</a>.');
+                    } else {
+                        let html = '<div class="chat-bubble assistant"><p class="font-semibold mb-2"><i class="fab fa-whatsapp text-green-400 mr-2"></i>Latest WhatsApp Messages</p>';
+                        msgs.forEach(m => {
+                            const who = m.from_name || (m.from || '').replace('@c.us','');
+                            const txt = m.text || (m.type ? '[' + m.type + ']' : '(media)');
+                            html += '<div class="py-1.5 border-b border-gray-700/30"><p class="text-xs text-gray-400">' + escapeHtml(who) + '</p><p class="text-sm text-white">' + escapeHtml(txt).substring(0, 80) + '</p></div>';
+                        });
+                        html += '</div>';
+                        responseHtml = html;
+                    }
+                } else { responseHtml = errorBubble('WhatsApp API returned ' + r.status); }
+            } catch(e) { responseHtml = errorBubble('WhatsApp fetch failed: ' + e.message + '. Check if WhatsApp is connected.'); }
             break;
         }
         case 'mail_reply': {
@@ -1223,17 +1225,15 @@ async function executeCommand(cmd, text) {
         }
         case 'weather': {
             try {
-                const r = await fetch('https://wttr.in/?format=j1');
+                const r = await fetch('/api/assistant/weather');
                 if (r.ok) {
                     const d = await r.json();
-                    const cur = d.current_condition && d.current_condition[0];
-                    if (cur) {
-                        responseHtml = `<div class="chat-bubble assistant"><p class="font-semibold mb-2"><i class="fas fa-cloud-sun text-amber-400 mr-2"></i>Current Weather</p><p class="text-sm text-white">${escapeHtml(cur.weatherDesc[0].value)}, ${cur.temp_C}°C / ${cur.temp_F}°F</p><p class="text-xs text-gray-400 mt-1">Humidity: ${cur.humidity}% · Wind: ${cur.windspeedKmph} km/h</p></div>`;
-                    } else { responseHtml = infoBubble('Weather data not available.'); }
-                } else { throw new Error('API error'); }
-            } catch(e) {
-                responseHtml = infoBubble('Weather API unavailable. Try again later.');
-            }
+                    if (d.success && d.data && d.data.current_condition) {
+                        const cur = d.data.current_condition[0];
+                        responseHtml = '<div class="chat-bubble assistant"><p class="font-semibold mb-2"><i class="fas fa-cloud-sun text-amber-400 mr-2"></i>Current Weather</p><p class="text-sm text-white">' + escapeHtml(cur.weatherDesc[0].value) + ', ' + cur.temp_C + '°C / ' + cur.temp_F + '°F</p><p class="text-xs text-gray-400 mt-1">Humidity: ' + cur.humidity + '% · Wind: ' + cur.windspeedKmph + ' km/h</p></div>';
+                    } else { responseHtml = infoBubble('Weather data not available: ' + (d.error || 'unknown')); }
+                } else { responseHtml = errorBubble('Weather API returned ' + r.status); }
+            } catch(e) { responseHtml = errorBubble('Weather fetch failed: ' + e.message); }
             break;
         }
         default:
