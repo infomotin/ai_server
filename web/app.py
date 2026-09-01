@@ -1832,8 +1832,10 @@ def api_management_activity():
 
 @app.route("/api/assistant/weather")
 def api_assistant_weather():
+    city = request.args.get('city', 'Dhaka')
     try:
-        r = requests.get("https://wttr.in/?format=j1", timeout=10, headers={"User-Agent": "curl/7.68.0"})
+        url = f"https://wttr.in/{city.replace(' ', '+')}?format=j1"
+        r = requests.get(url, timeout=10, headers={"User-Agent": "curl/7.68.0"})
         if r.status_code == 200:
             return jsonify({"success": True, "data": r.json()})
         return jsonify({"success": False, "error": f"wttr.in returned {r.status}"}), 502
