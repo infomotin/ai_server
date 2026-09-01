@@ -560,7 +560,7 @@
 
 {% block scripts %}
 <script>
-const API = '/api/integrations';
+var API = '/api/integrations';
 let connected = JSON.parse(localStorage.getItem('int_connected') || '{}');
 let catalog = [];
 let currentConnectService = null;
@@ -756,12 +756,19 @@ async function initWhatsAppWeb() {
         const r = await fetch(API + '/whatsapp/qr', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({session_id: waSessionId})});
         const d = await r.json();
         if (d.success) {
-            document.getElementById('waQrImage').src = d.image;
-            document.getElementById('waQrResult').classList.remove('hidden');
-            document.getElementById('waConnectedBox').classList.add('hidden');
-            updateWAStatus('qr_ready', 'Scan QR code with WhatsApp');
-            showToast('QR code ready! Scan with WhatsApp', 'success');
-            if (!waQrRefreshInterval) waQrRefreshInterval = setInterval(refreshWhatsAppQR, 25000);
+            if (d.already_connected) {
+                document.getElementById('waQrResult').classList.add('hidden');
+                document.getElementById('waConnectedBox').classList.remove('hidden');
+                updateWAStatus('ready', 'Already Connected');
+                showToast('WhatsApp is already connected!', 'success');
+            } else {
+                document.getElementById('waQrImage').src = d.image;
+                document.getElementById('waQrResult').classList.remove('hidden');
+                document.getElementById('waConnectedBox').classList.add('hidden');
+                updateWAStatus('qr_ready', 'Scan QR code with WhatsApp');
+                showToast('QR code ready! Scan with WhatsApp', 'success');
+                if (!waQrRefreshInterval) waQrRefreshInterval = setInterval(refreshWhatsAppQR, 25000);
+            }
         } else if (d.fallback) {
             showToast('Bridge not running. Using chat link instead.', 'info');
             generateChatLinkQR();
@@ -787,15 +794,17 @@ async function checkWhatsAppStatus() {
     try {
         const r = await fetch(API + '/whatsapp/status?session_id=' + waSessionId);
         const d = await r.json();
+        console.log('WhatsApp status:', d);
         if (d.success) {
             updateWAStatus(d.status, d.status === 'ready' ? 'Connected & Ready' : (d.status || 'Unknown'));
             if (d.status === 'ready') {
                 document.getElementById('waQrResult').classList.add('hidden');
-                document.getElementById('waConnectedBox').classList.remove('hidden');
+                const connectedBox = document.getElementById('waConnectedBox');
+                if (connectedBox) connectedBox.classList.remove('hidden');
                 if (waQrRefreshInterval) { clearInterval(waQrRefreshInterval); waQrRefreshInterval = null; }
             }
         }
-    } catch(e) {}
+    } catch(e) { console.error('WhatsApp status check failed:', e); }
 }
 
 function updateWAStatus(status, text) {
@@ -1227,7 +1236,12 @@ async function loadUnifiedInbox() {
             var icons = {whatsapp:'fab fa-whatsapp', email:'fas fa-envelope', facebook:'fab fa-facebook', telegram:'fab fa-telegram'};
             var c = colors[plat] || 'gray';
             var lastMsg = conv.messages[conv.messages.length - 1];
-            var preview = (lastMsg.text || lastMsg.body || '').substring(0, 40);
+            var rawPreview = lastMsg.text || lastMsg.body || lastMsg.caption || '';
+            if (!rawPreview && lastMsg.type) {
+                var typeIcons = {video:'[Video]', image:'[Image]', audio:'[Audio]', document:'[File]', voice:'[Voice]'};
+                rawPreview = typeIcons[lastMsg.type] || '[' + lastMsg.type + ']';
+            }
+            var preview = rawPreview.substring(0, 40);
             var unread = conv.messages.filter(function(m){return !m.read && m.direction === 'inbound'}).length;
             var isActive = activeConversation === key;
             return '<div class="unified-inbox-item ' + (isActive ? 'selected' : '') + '" onclick="selectConversation(\'' + esc(key) + '\')" data-key="' + esc(key) + '">' +
@@ -1289,9 +1303,16 @@ function selectConversation(key) {
         var align = isInbound ? 'justify-start' : 'justify-end';
         var bg = isInbound ? 'bg-gray-700/70' : 'bg-green-600/30';
         var dir = isInbound ? '' : '<span class="text-[9px] text-green-300/60"><i class="fas fa-check-double mr-1"></i>sent</span>';
+        var icons = {video:'fa-video', image:'fa-image', audio:'fa-microphone', document:'fa-file', voice:'fa-microphone-alt'};
+        var msgContent = m.text || m.body || m.caption || '';
+        if (!msgContent && m.type && icons[m.type]) {
+            msgContent = '<i class="fas ' + icons[m.type] + ' mr-1"></i>[' + (m.type.charAt(0).toUpperCase() + m.type.slice(1)) + ']';
+        } else if (!msgContent) {
+            msgContent = '(no content)';
+        }
         return '<div class="flex ' + align + ' mb-3">' +
             '<div class="max-w-[80%] ' + bg + ' rounded-2xl px-4 py-2.5">' +
-                '<p class="text-white text-sm whitespace-pre-wrap">' + esc(m.text || m.body || '(no text)') + '</p>' +
+                '<p class="text-white text-sm whitespace-pre-wrap">' + (msgContent.startsWith('<i') ? msgContent : esc(msgContent)) + '</p>' +
                 '<div class="flex items-center justify-end gap-2 mt-1">' +
                     '<span class="text-[9px] text-gray-500">' + formatTime(m.timestamp) + '</span>' +
                     dir +
@@ -1454,8 +1475,6 @@ async function aiVoiceAssist() {
         setTimeout(function(){ var s = document.getElementById('aiVoiceStatus'); if (s) s.remove(); }, 5000);
     };
     recognition.start();
-}
-    if (selectedMessage) await generateReply(selectedMessage);
 }
 
 async function learnAndSend() {
