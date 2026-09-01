@@ -1239,11 +1239,19 @@ async function loadUnifiedInbox() {
             const r = await fetch(API + '/whatsapp/messages');
             const d = await r.json();
             if (d.messages) messages.push(...d.messages.map(function(m){
-                var chatId = m.from && m.from !== 'status@broadcast' ? m.from : (m.to || m.chatId || '');
-                var cleanId = (chatId || '').replace('@c.us','').replace('@g.us','').replace('@broadcast','');
+                var isStatusBroadcast = m.from === 'status@broadcast' || (m.from && m.from.includes('broadcast'));
+                var cleanTo = (m.to || '').replace('@c.us','').replace('@g.us','');
+                var chatId, contactName;
+                if (isStatusBroadcast) {
+                    chatId = 'status_' + (m.from_name || m.id || Math.random().toString(36).substr(2,6));
+                    contactName = (m.from_name && m.from_name !== 'status@broadcast') ? m.from_name + ' (Status)' : 'Status Update';
+                } else {
+                    chatId = m.from || m.to || m.chatId || '';
+                    contactName = m.from_name || m.pushName || (chatId || '').replace('@c.us','').replace('@g.us','') || cleanTo || 'Unknown';
+                }
                 return Object.assign({}, m, {
                     platform: 'whatsapp',
-                    contact: m.from_name || m.pushName || cleanId || 'Unknown',
+                    contact: contactName,
                     from: chatId,
                     text: m.text || m.body || m.message || (m.type ? '[' + (m.type.charAt(0).toUpperCase() + m.type.slice(1)) + ']' : ''),
                 });
