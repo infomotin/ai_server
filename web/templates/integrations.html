@@ -1187,6 +1187,7 @@ try { learnedConversations = JSON.parse(localStorage.getItem('ai_learned_convers
 let allLoadedMessages = [];
 let allConversations = {};
 let activeConversation = null;
+let _sendingMessage = false;
 
 async function loadUnifiedInbox() {
     const el = document.getElementById('contactList');
@@ -1199,28 +1200,35 @@ async function loadUnifiedInbox() {
         if (platform === 'whatsapp' || platform === 'all') {
             const r = await fetch(API + '/whatsapp/messages');
             const d = await r.json();
-            if (d.messages) messages.push(...d.messages.map(function(m){return Object.assign({}, m, {platform: 'whatsapp', contact: m.from_name || m.from || (m.from||'').replace('@c.us','')});}));
+            if (d.messages) messages.push(...d.messages.map(function(m){
+                return Object.assign({}, m, {
+                    platform: 'whatsapp',
+                    contact: m.contact || m.from_name || m.pushName || (m.from||'').replace('@c.us','').replace('@g.us',''),
+                    from: m.from || m.chatId || '',
+                    text: m.text || m.body || m.message || (m.type ? '[' + m.type + ']' : ''),
+                });
+            }));
         }
     } catch(e) { console.log('WhatsApp fetch error:', e); }
     try {
         if (platform === 'email' || platform === 'all') {
             const r = await fetch(API + '/email/messages');
             const d = await r.json();
-            if (d.messages) messages.push(...d.messages.map(function(m){return Object.assign({}, m, {platform: 'email', contact: m.from || m.from_name || 'Unknown'});}));
+            if (d.messages) messages.push(...d.messages.map(function(m){return Object.assign({}, m, {platform: 'email', contact: m.from || m.from_name || 'Unknown', text: m.text || m.body || ''});}));
         }
     } catch(e) { console.log('Email fetch error:', e); }
     try {
         if (platform === 'facebook' || platform === 'all') {
             const r = await fetch(API + '/facebook/messages');
             const d = await r.json();
-            if (d.messages) messages.push(...d.messages.map(function(m){return Object.assign({}, m, {platform: 'facebook', contact: m.from || 'Unknown'});}));
+            if (d.messages) messages.push(...d.messages.map(function(m){return Object.assign({}, m, {platform: 'facebook', contact: m.from || 'Unknown', text: m.text || m.body || ''});}));
         }
     } catch(e) { console.log('Facebook fetch error:', e); }
     try {
         if (platform === 'telegram' || platform === 'all') {
             const r = await fetch(API + '/telegram/messages');
             const d = await r.json();
-            if (d.messages) messages.push(...d.messages.map(function(m){return Object.assign({}, m, {platform: 'telegram', contact: m.from || 'Unknown'});}));
+            if (d.messages) messages.push(...d.messages.map(function(m){return Object.assign({}, m, {platform: 'telegram', contact: m.from || 'Unknown', text: m.text || m.body || ''});}));
         }
     } catch(e) { console.log('Telegram fetch error:', e); }
 
@@ -1370,17 +1378,19 @@ function showContactPanel(conv) {
 }
 
 async function sendChatMessage(aiMode) {
+    if (_sendingMessage) return;
     if (!activeConversation || !allConversations[activeConversation]) return;
     var conv = allConversations[activeConversation];
     var input = document.getElementById('chatInput');
     var text = input.value.trim();
     if (!text && !aiMode) return;
 
+    _sendingMessage = true;
     var chatEl = document.getElementById('chatMessages');
     if (aiMode) {
         var lastMsg = conv.messages[conv.messages.length - 1];
         text = text || 'Generate a reply to: "' + (lastMsg.text || lastMsg.body || '') + '"';
-        chatEl.innerHTML += '<div class="flex justify-center mb-3"><div class="bg-purple-600/20 text-purple-300 text-xs px-3 py-1 rounded-full"><i class="fas fa-robot mr-1"></i>AI is thinking...</div></div>';
+        chatEl.innerHTML += '<div class="flex justify-center mb-3 ai-thinking"><div class="bg-purple-600/20 text-purple-300 text-xs px-3 py-1 rounded-full"><i class="fas fa-robot mr-1"></i>AI is thinking...</div></div>';
         chatEl.scrollTop = chatEl.scrollHeight;
         try {
             var r = await fetch('/api/ai/chat', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({
@@ -1390,9 +1400,14 @@ async function sendChatMessage(aiMode) {
             })});
             var d = await r.json();
             var reply = d.choices?.[0]?.message?.content || 'Thanks for your message.';
-            input.value = reply;
-            sendChatMessage(false);
-        } catch(e) { showToast('AI error: ' + e.message, 'error'); }
+            chatEl.querySelectorAll('.ai-thinking').forEach(function(el){el.remove();});
+            chatEl.innerHTML += '<div class="flex justify-start mb-3"><div class="bg-purple-600/20 rounded-2xl px-4 py-2.5 max-w-[80%]"><p class="text-white text-sm whitespace-pre-wrap">' + esc(reply) + '</p><div class="flex items-center justify-end mt-1"><span class="text-[9px] text-gray-500">AI draft</span><button onclick="_sendDraftReply(\'' + esc(reply).replace(/'/g, "\\'") + '\')" class="ml-2 text-[9px] text-green-400 hover:text-green-300"><i class="fas fa-paper-plane mr-1"></i>Send</button></div></div></div>';
+            chatEl.scrollTop = chatEl.scrollHeight;
+        } catch(e) {
+            chatEl.querySelectorAll('.ai-thinking').forEach(function(el){el.remove();});
+            showToast('AI error: ' + e.message, 'error');
+        }
+        _sendingMessage = false;
         return;
     }
 
@@ -1416,6 +1431,12 @@ async function sendChatMessage(aiMode) {
         chatEl.scrollTop = chatEl.scrollHeight;
         input.value = '';
     }
+    setTimeout(function(){ _sendingMessage = false; }, 300);
+}
+
+function _sendDraftReply(reply) {
+    var input = document.getElementById('chatInput');
+    if (input) { input.value = reply; sendChatMessage(false); }
 }
 
 function callContact() {
@@ -1484,41 +1505,52 @@ async function aiVoiceAssist() {
 }
 
 async function learnAndSend() {
-    if (!selectedMessage) return;
+    if (!selectedMessage) { showToast('Select a conversation first', 'error'); return; }
     const replyText = document.getElementById('aiReplySuggestion').textContent.trim();
-    if (!replyText) { showToast('No reply to send', 'error'); return; }
-    const plat = selectedMessage.platform || 'whatsapp';
+    if (!replyText || replyText.includes('Generating') || replyText.includes('Error')) {
+        showToast('Generate an AI reply first', 'error');
+        return;
+    }
+    const plat = selectedMessage.platform || (activeConversation ? allConversations[activeConversation].platform : 'whatsapp');
     const learnEntry = {
         id: Date.now(),
         platform: plat,
-        contact: selectedMessage.contact || selectedMessage.from,
+        contact: selectedMessage.contact || (activeConversation ? allConversations[activeConversation].contact : 'Unknown'),
         from_message: selectedMessage.text || selectedMessage.body || '',
         ai_reply: replyText,
         tone: 'professional',
         timestamp: new Date().toISOString(),
-        context: aiConversationHistory.slice(-3)
+        context: (typeof aiConversationHistory !== 'undefined' ? aiConversationHistory.slice(-3) : [])
     };
     learnedConversations.push(learnEntry);
     if (learnedConversations.length > 50) learnedConversations = learnedConversations.slice(-50);
     localStorage.setItem('ai_learned_conversations', JSON.stringify(learnedConversations));
     updateLearnedList();
-    showToast(`Learned & queued reply to ${selectedMessage.contact}`, 'success');
-    if (plat === 'whatsapp') {
-        const phone = (selectedMessage.from || '').replace('@c.us','').replace('@g.us','');
-        if (phone) {
-            try {
-                const r = await fetch(API + '/whatsapp/send-wa', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({session_id: waSessionId || 'wa_default', to: phone, text: replyText})
-                });
-                const d = await r.json();
-                if (d.success) showToast('Reply sent via WhatsApp!', 'success');
-                else showToast('Learned. Send failed: ' + (d.message || 'unknown'), 'warning');
-            } catch(e) {
-                showToast('Learned. Send error: ' + e.message, 'warning');
+
+    const conv = activeConversation ? allConversations[activeConversation] : null;
+    const phone = (conv ? conv.from : selectedMessage.from || '').replace('@c.us','').replace('@g.us','');
+
+    if (plat === 'whatsapp' && phone && phone !== 'status@broadcast') {
+        try {
+            const r = await fetch(API + '/whatsapp/send-wa', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({session_id: waSessionId || 'wa_default', to: phone, text: replyText})
+            });
+            const d = await r.json();
+            if (d.success) {
+                if (conv) {
+                    conv.messages.push({from: phone, text: replyText, direction: 'outbound', timestamp: new Date().toISOString(), platform: 'whatsapp', contact: conv.contact});
+                }
+                showToast('Learned & sent via WhatsApp!', 'success');
+            } else {
+                showToast('Learned. Send failed: ' + (d.message || d.error || 'unknown'), 'warning');
             }
+        } catch(e) {
+            showToast('Learned. Send error: ' + e.message, 'warning');
         }
+    } else if (plat === 'whatsapp' && (!phone || phone === 'status@broadcast')) {
+        showToast('Learned! Cannot reply to status/broadcast', 'info');
     } else {
         showToast('Learned! (Auto-send only for WhatsApp currently)', 'info');
     }
