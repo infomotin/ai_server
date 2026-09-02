@@ -249,7 +249,7 @@ def delete_key(key_id):
     return redirect(url_for("manage_keys"))
 
 
-OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
+OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://localhost:8080")
 
 
 DEFAULT_MODEL_FILE = "/www/AI_server/data/default_model.json"
@@ -318,9 +318,9 @@ def api_ollama_create():
 @app.route("/api/ollama/status")
 def api_ollama_status():
     try:
-        r = requests.get(f"{OLLAMA_BASE_URL}/api/tags", timeout=5)
+        r = requests.get(f"{OLLAMA_BASE_URL}/v1/models", timeout=5)
         if r.status_code == 200:
-            return {"online": True, "version": r.headers.get("server", "ok")}
+            return {"online": True, "version": "llama.cpp"}
         return {"online": False}
     except requests.exceptions.RequestException as e:
         return {"online": False, "error": str(e)[:200]}
@@ -329,8 +329,14 @@ def api_ollama_status():
 @app.route("/api/ollama/tags")
 def api_ollama_tags():
     try:
-        r = requests.get(f"{OLLAMA_BASE_URL}/api/tags", timeout=10)
-        return r.json() if r.status_code == 200 else {"models": []}
+        r = requests.get(f"{OLLAMA_BASE_URL}/v1/models", timeout=10)
+        if r.status_code == 200:
+            data = r.json()
+            models = []
+            for m in data.get("data", []):
+                models.append({"name": m.get("id", ""), "model": m.get("id", "")})
+            return {"models": models}
+        return {"models": []}
     except requests.exceptions.RequestException as e:
         return {"models": [], "error": str(e)[:200]}
 
@@ -338,8 +344,14 @@ def api_ollama_tags():
 @app.route("/api/ollama/ps")
 def api_ollama_ps():
     try:
-        r = requests.get(f"{OLLAMA_BASE_URL}/api/ps", timeout=5)
-        return r.json() if r.status_code == 200 else {"models": []}
+        r = requests.get(f"{OLLAMA_BASE_URL}/v1/models", timeout=5)
+        if r.status_code == 200:
+            data = r.json()
+            models = []
+            for m in data.get("data", []):
+                models.append({"name": m.get("id", "")})
+            return {"models": models}
+        return {"models": []}
     except requests.exceptions.RequestException:
         return {"models": []}
 
@@ -1861,7 +1873,7 @@ def api_management_health_check():
         return {
             "ollama_reachable": reachable,
             "latency_ms": latency_ms,
-            "base_url": "http://localhost:11434",
+            "base_url": "http://localhost:8080",
         }
     except Exception as e:
         return {"ollama_reachable": False, "error": str(e)[:300]}
