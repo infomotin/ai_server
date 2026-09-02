@@ -31,7 +31,8 @@ def get_api_headers():
     elif "access_token" in session:
         headers["Authorization"] = f"Bearer {session['access_token']}"
     else:
-        # Auto-login as agent user if no token
+        # Auto-login as agent user if no token, but DO NOT modify the session
+        # to avoid overwriting the current user's session
         try:
             response = requests.post(
                 f"{API_BASE_URL}/auth/login",
@@ -42,7 +43,6 @@ def get_api_headers():
                 result = response.json()
                 agent_token = result.get("access_token")
                 if agent_token:
-                    session["access_token"] = agent_token
                     headers["Authorization"] = f"Bearer {agent_token}"
         except Exception:
             pass
