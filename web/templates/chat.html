@@ -39,9 +39,20 @@
                 <input type="number" id="max-tokens" value="1000" min="1" max="4096" class="input-field">
             </div>
 
-            <div class="mt-auto pt-4 border-t border-gray-700">
+            <div class="mb-4 p-3 bg-gray-700/50 rounded-lg">
+                <div class="flex items-center justify-between text-xs text-gray-400">
+                    <span><i class="fas fa-history mr-1"></i>History</span>
+                    <span id="historyCount">0 msgs</span>
+                </div>
+                <div class="text-[10px] text-gray-500 mt-1">Context remembered across reloads</div>
+            </div>
+
+            <div class="mt-auto pt-4 border-t border-gray-700 space-y-2">
+                <button onclick="newChat()" class="w-full py-2 bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 rounded-lg text-sm transition">
+                    <i class="fas fa-plus mr-1"></i>New Chat
+                </button>
                 <button onclick="clearChat()" class="w-full text-center text-gray-400 hover:text-white text-sm transition">
-                    <i class="fas fa-trash mr-1"></i>Clear Chat
+                    <i class="fas fa-trash mr-1"></i>Clear All History
                 </button>
             </div>
         </div>
@@ -80,7 +91,35 @@ const tempVal = document.getElementById('temp-val');
 
 temperature.addEventListener('input', () => tempVal.textContent = temperature.value);
 
+// Load history from localStorage on page load
+const STORAGE_KEY = 'chat_history_v1';
 let history = [];
+try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+        history = JSON.parse(saved);
+        // Replay history to UI
+        if (history.length > 0) {
+            chatMessages.innerHTML = '';
+            history.forEach(m => addMessage(m.role, m.content, false));
+        }
+    }
+} catch(e) { history = []; }
+updateHistoryCount();
+
+function saveHistory() {
+    try {
+        // Keep last 50 messages to avoid localStorage quota issues
+        const trimmed = history.slice(-50);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(trimmed));
+        updateHistoryCount();
+    } catch(e) { /* quota exceeded - clear old */ localStorage.removeItem(STORAGE_KEY); }
+}
+
+function updateHistoryCount() {
+    const el = document.getElementById('historyCount');
+    if (el) el.textContent = history.length + ' msgs';
+}
 
 chatForm.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -90,6 +129,7 @@ chatForm.addEventListener('submit', async (e) => {
     addMessage('user', msg);
     messageInput.value = '';
     history.push({ role: 'user', content: msg });
+    saveHistory();
 
     try {
         const resp = await fetch('/api/chat', {
@@ -108,6 +148,7 @@ chatForm.addEventListener('submit', async (e) => {
             const content = data.choices[0].message.content;
             addMessage('assistant', content);
             history.push({ role: 'assistant', content });
+            saveHistory();
         } else {
             addMessage('assistant', 'Error: ' + (data.detail?.message || data.error || 'Request failed'));
         }
@@ -116,7 +157,7 @@ chatForm.addEventListener('submit', async (e) => {
     }
 });
 
-function addMessage(role, content) {
+function addMessage(role, content, scroll=true) {
     const isUser = role === 'user';
     const div = document.createElement('div');
     div.className = `flex items-start gap-3 ${isUser ? 'justify-end' : ''}`;
@@ -124,12 +165,22 @@ function addMessage(role, content) {
         ? `<div class="bg-blue-600 rounded-xl rounded-tr-none p-4 max-w-[80%]"><p class="text-sm text-gray-200 whitespace-pre-wrap">${esc(content)}</p></div><div class="w-8 h-8 bg-gray-600 rounded-full flex items-center justify-center flex-shrink-0"><i class="fas fa-user text-white text-xs"></i></div>`
         : `<div class="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center flex-shrink-0"><i class="fas fa-robot text-white text-xs"></i></div><div class="bg-gray-700 rounded-xl rounded-tl-none p-4 max-w-[80%]"><p class="text-sm text-gray-200 whitespace-pre-wrap">${esc(content)}</p></div>`;
     chatMessages.appendChild(div);
-    chatMessages.scrollTop = chatMessages.scrollHeight;
+    if (scroll) chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
 function clearChat() {
+    if (!confirm('Clear all chat history? This cannot be undone.')) return;
     history = [];
+    localStorage.removeItem(STORAGE_KEY);
+    updateHistoryCount();
     chatMessages.innerHTML = `<div class="flex items-start gap-3"><div class="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center flex-shrink-0"><i class="fas fa-robot text-white text-xs"></i></div><div class="bg-gray-700 rounded-xl rounded-tl-none p-4 max-w-[80%]"><p class="text-sm text-gray-200">Chat cleared. How can I help?</p></div></div>`;
+}
+
+function newChat() {
+    history = [];
+    localStorage.removeItem(STORAGE_KEY);
+    updateHistoryCount();
+    chatMessages.innerHTML = `<div class="flex items-start gap-3"><div class="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center flex-shrink-0"><i class="fas fa-robot text-white text-xs"></i></div><div class="bg-gray-700 rounded-xl rounded-tl-none p-4 max-w-[80%]"><p class="text-sm text-gray-200">New chat started. How can I help?</p></div></div>`;
 }
 
 function esc(t) { const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }

@@ -427,8 +427,8 @@
                         <div>
                             <label class="block text-xs text-gray-400 mb-1 font-semibold">Model</label>
                             <select id="trainModel" class="input-field text-sm">
-                                <option value="qwen2.5:0.5b" selected>qwen2.5:0.5b (Fast)</option>
-                                <option value="qwen2.5-coder:1.5b">qwen2.5-coder:1.5b (Coder)</option>
+                                <option value="llama3.2:1b" selected>llama3.2:1b (Fast)</option>
+                                <option value="llama3.2:1b">llama3.2:1b (Coder)</option>
                                 <option value="llama3.2:1b">llama3.2:1b (General)</option>
                             </select>
                         </div>
@@ -1921,7 +1921,7 @@ function renderTrainingHistory() {
                 </div>
                 <div class="bg-gray-900/40 rounded p-1.5">
                     <p class="text-[10px] text-gray-500">Model</p>
-                    <p class="text-xs text-cyan-300 truncate" title="${escHtml(cfg.model||'')}">${escHtml(cfg.model || 'qwen2.5:0.5b')}</p>
+                    <p class="text-xs text-cyan-300 truncate" title="${escHtml(cfg.model||'')}">${escHtml(cfg.model || 'llama3.2:1b')}</p>
                 </div>
                 <div class="bg-gray-900/40 rounded p-1.5">
                     <p class="text-[10px] text-gray-500">Q&A Pairs</p>
@@ -1940,7 +1940,7 @@ function renderTrainingHistory() {
                         <i class="fas fa-robot text-green-400 text-xs"></i>
                         <span class="text-[10px] text-green-300 font-semibold uppercase">Trained Model</span>
                     </div>
-                    <p class="text-xs text-white font-mono">${escHtml(cfg.model || 'qwen2.5:0.5b')}</p>
+                    <p class="text-xs text-white font-mono">${escHtml(cfg.model || 'llama3.2:1b')}</p>
                     <p class="text-[10px] text-gray-500">Loss: ${(j.metrics?.loss||0).toFixed(3)} • Chunks: ${j.metrics?.chunks_created||0}</p>
                 </div>
                 <div class="bg-cyan-900/20 border border-cyan-700/30 rounded-lg p-2.5">

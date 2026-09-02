@@ -483,7 +483,7 @@ def api_models_library():
     """Curated catalog of recommended Ollama models grouped by task."""
     return jsonify({
         "chat_small": [
-            {"name": "qwen2.5:0.5b", "size": "397MB", "params": "0.5B", "desc": "Ultra-fast general chat, low RAM"},
+            {"name": "llama3.2:1b", "size": "397MB", "params": "0.5B", "desc": "Ultra-fast general chat, low RAM"},
             {"name": "llama3.2:1b", "size": "1.3GB", "params": "1B", "desc": "Strong tiny model from Meta"},
             {"name": "gemma2:2b", "size": "1.6GB", "params": "2B", "desc": "Google's compact model"},
             {"name": "phi3:mini", "size": "2.3GB", "params": "3.8B", "desc": "Microsoft's small but smart model"},
@@ -503,7 +503,7 @@ def api_models_library():
             {"name": "deepseek-r1:32b", "size": "20GB", "params": "32B", "desc": "Strong reasoning"}
         ],
         "code": [
-            {"name": "qwen2.5-coder:1.5b", "size": "1GB", "params": "1.5B", "desc": "Lightweight coding"},
+            {"name": "llama3.2:1b", "size": "1GB", "params": "1.5B", "desc": "Lightweight coding"},
             {"name": "codellama:3.5", "size": "3.5GB", "params": "3.5B", "desc": "Code completion"},
             {"name": "qwen2.5-coder:7b", "size": "4.7GB", "params": "7B", "desc": "Strong coding at 7B"},
             {"name": "deepseek-coder-v2:16b", "size": "8.9GB", "params": "16B", "desc": "Top coding quality"}
@@ -863,7 +863,7 @@ def api_explain_code():
 
     data = request.get_json(silent=True) or {}
     code = data.get("code", "")
-    model = data.get("model", "qwen2.5-coder:1.5b")
+    model = data.get("model", "llama3.2:1b")
 
     if not code.strip():
         return jsonify({"success": False, "error": "No code provided"}), 400
@@ -903,7 +903,7 @@ def api_book_qa():
     data = request.get_json(silent=True) or {}
     book_text = data.get("book_text", "")
     book_title = data.get("book_title", "Unknown Book")
-    model = data.get("model", "qwen2.5-coder:1.5b")
+    model = data.get("model", "llama3.2:1b")
 
     if not book_text.strip():
         return jsonify({"success": False, "error": "No book text provided"}), 400
@@ -943,7 +943,7 @@ def api_programming_skill_test():
     data = request.get_json(silent=True) or {}
     topic = data.get("topic", "python")
     difficulty = data.get("difficulty", "medium")
-    model = data.get("model", "qwen2.5-coder:1.5b")
+    model = data.get("model", "llama3.2:1b")
 
     import time
     start = time.time()
@@ -979,7 +979,7 @@ def api_sql_explain():
 
     data = request.get_json(silent=True) or {}
     code = data.get("code", "")
-    model = data.get("model", "qwen2.5-coder:1.5b")
+    model = data.get("model", "llama3.2:1b")
 
     if not code.strip():
         return jsonify({"success": False, "error": "No SQL provided"}), 400
@@ -1018,7 +1018,7 @@ def api_book_upload():
 
     import time, tempfile, os
     start = time.time()
-    model = request.form.get("model", "qwen2.5-coder:1.5b")
+    model = request.form.get("model", "llama3.2:1b")
     book_title = request.form.get("book_title", "Unknown Book")
     mode = request.form.get("mode", "analyze")
 
@@ -1099,7 +1099,7 @@ def api_visualino_code():
     data = request.get_json(silent=True) or {}
     blocks = data.get("blocks", [])
     board = data.get("board", "esp32")
-    model = data.get("model", "qwen2.5-coder:1.5b")
+    model = data.get("model", "llama3.2:1b")
 
     block_desc = "\n".join([f"- {b.get('type','?')}: {b.get('label','')}" for b in blocks])
 
@@ -1144,7 +1144,7 @@ def api_optimize_query():
 
     data = request.get_json(silent=True) or {}
     code = data.get("code", "")
-    model = data.get("model", "qwen2.5-coder:1.5b")
+    model = data.get("model", "llama3.2:1b")
 
     if not code.strip():
         return jsonify({"success": False, "error": "No SQL provided"}), 400
@@ -2387,7 +2387,7 @@ def api_model_builder_export(model_id):
 def model_builder_lightweight_create():
     name = request.form.get("name")
     task_type = request.form.get("task_type")
-    base_model = request.form.get("base_model", "qwen2.5:0.5b")
+    base_model = request.form.get("base_model", "llama3.2:1b")
     custom_knowledge = request.form.get("custom_knowledge", "")
     custom_prompt = request.form.get("custom_prompt", "")
 

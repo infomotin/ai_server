@@ -270,7 +270,7 @@
                     <option value="{{ m }}" {{ 'selected' if loop.first else '' }}>{{ m }}</option>
                     {% endfor %}
                     {% if not ollama_models %}
-                    <option value="qwen2.5:0.5b" selected>qwen2.5:0.5b</option>
+                    <option value="llama3.2:1b" selected>llama3.2:1b</option>
                     {% endif %}
                 </select>
                 <textarea name="custom_knowledge" rows="2" class="input-field text-sm" placeholder="Optional knowledge..."></textarea>

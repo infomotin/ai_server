@@ -69,8 +69,8 @@
         <div class="flex items-center gap-3">
             <span class="text-xs text-gray-500">AI Model:</span>
             <select id="aiModelSelect" class="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white" onchange="changeAIModel()">
-                <option value="qwen2.5-coder:1.5b" selected>qwen2.5-coder:1.5b (Coder)</option>
-                <option value="qwen2.5:0.5b">qwen2.5:0.5b (Light)</option>
+                <option value="llama3.2:1b" selected>llama3.2:1b (Coder)</option>
+                <option value="llama3.2:1b">llama3.2:1b (Light)</option>
                 <option value="llama3.2:1b">llama3.2:1b (General)</option>
             </select>
             <span id="modelStatus" class="flex items-center gap-1.5 text-xs"><span class="w-2 h-2 rounded-full bg-green-500"></span><span class="text-green-400">Active</span></span>
@@ -771,13 +771,13 @@ let dfdDrag = null;
 let quizCorrect = 0, quizTotal = 0;
 let examQuestions = [], examAnswers = {}, examTimer = null;
 
-let currentAIModel = 'qwen2.5-coder:1.5b';
+let currentAIModel = 'llama3.2:1b';
 const AI_MODEL = () => currentAIModel;
 
 function changeAIModel() {
     currentAIModel = document.getElementById('aiModelSelect').value;
     const statusEl = document.getElementById('modelStatus');
-    if (currentAIModel === 'qwen2.5-coder:1.5b') {
+    if (currentAIModel === 'llama3.2:1b') {
         statusEl.innerHTML = '<span class="w-2 h-2 rounded-full bg-green-500"></span><span class="text-green-400">Active</span>';
     } else {
         statusEl.innerHTML = '<span class="w-2 h-2 rounded-full bg-gray-500"></span><span class="text-gray-400">Standby</span>';

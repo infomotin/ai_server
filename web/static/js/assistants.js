@@ -165,9 +165,9 @@ async function loadModels() {
             availableModels = models.data.map(m => m.id);
         }
     } catch (e) {
-        availableModels = ['qwen2.5-coder:1.5b', 'llama3.2:1b', 'qwen2.5:0.5b'];
+        availableModels = ['llama3.2:1b', 'llama3.2:1b', 'llama3.2:1b'];
     }
-    if (availableModels.length === 0) availableModels = ['qwen2.5-coder:1.5b'];
+    if (availableModels.length === 0) availableModels = ['llama3.2:1b'];
 }
 
 function populateModels() {
