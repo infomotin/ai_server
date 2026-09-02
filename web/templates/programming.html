@@ -1314,6 +1314,7 @@ function stepAlgo() {
         document.getElementById('algoSwaps').innerHTML = `<i class="fas fa-arrows-alt-h mr-1"></i>Swaps: ${algoSwaps}`;
         document.getElementById('algoStatus').textContent = `Pass ${pass + 1}/${n}...`;
         document.getElementById('algoArray').textContent = algoArray.join(', ');
+    }
     } else if (sel === 'insertion') {
         const idx = algoStepCount;
         if (idx < algoArray.length) {
@@ -1341,6 +1342,7 @@ function stepAlgo() {
         document.getElementById('algoSwaps').innerHTML = `<i class="fas fa-arrows-alt-h mr-1"></i>Swaps: ${algoSwaps}`;
         document.getElementById('algoStatus').textContent = `Step ${algoStepCount}...`;
         document.getElementById('algoArray').textContent = algoArray.join(', ');
+    }
     } else if (sel === 'binary') {
         const targetInput = document.getElementById('algoTargetInput')?.value.trim();
         const target = targetInput ? parseInt(targetInput) : algoArray[Math.floor(algoArray.length / 2)];
@@ -1349,6 +1351,7 @@ function stepAlgo() {
         renderBars({ pivot: Math.floor(algoArray.length / 2) });
         renderAlgoCode(3);
         document.getElementById('algoStatus').textContent = 'Searching...';
+    }
     } else if (sel === 'bfs') {
         if (graphState.visited.length === 0 && graphState.queue.length === 0) {
             graphState.queue = ['A'];
@@ -1371,6 +1374,7 @@ function stepAlgo() {
             document.getElementById('algoStatus').textContent = 'Done!';
             renderAlgoCode(-1);
         }
+    }
     } else if (sel === 'dfs') {
         if (graphState.visited.length === 0 && graphState.stack.length === 0) {
             graphState.stack = ['A'];
