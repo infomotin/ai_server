@@ -44,6 +44,7 @@ class SessionCreate(BaseModel):
 
 class MessageSend(BaseModel):
     message: str
+    provider_id: Optional[str] = None
 
 
 class FileWrite(BaseModel):
@@ -298,7 +299,7 @@ async def chat(
         if not session:
             raise HTTPException(status_code=404, detail="Session not found")
 
-    result = run_agent_turn(session, data.message, db)
+    result = run_agent_turn(session, data.message, db, provider_id=data.provider_id)
     result["session_id"] = session.id
     return result
 

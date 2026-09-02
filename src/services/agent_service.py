@@ -456,7 +456,7 @@ class AgentService:
             return {"success": False, "error": f"Error: {str(e)[:200]}"}
 
 
-def run_agent_turn(session: AgentSession, user_message: str, db=None) -> Dict[str, Any]:
+def run_agent_turn(session: AgentSession, user_message: str, db=None, provider_id: str = None) -> Dict[str, Any]:
     """Run a single turn in the agent session."""
     if db is None:
         from src.models.engine import get_db_session
@@ -466,7 +466,13 @@ def run_agent_turn(session: AgentSession, user_message: str, db=None) -> Dict[st
             break
 
     provider = None
-    if session.provider_id:
+    if provider_id:
+        provider = db.query(AgentProvider).filter_by(id=provider_id).first()
+        if provider:
+            session.provider_id = provider_id
+            db.commit()
+    
+    if not provider and session.provider_id:
         provider = db.query(AgentProvider).filter_by(id=session.provider_id).first()
 
     if not provider:

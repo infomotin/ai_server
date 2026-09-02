@@ -54,7 +54,7 @@ html,body,#app{height:100%;overflow:hidden}
 .bot-body{flex:1;overflow:hidden;display:flex;flex-direction:column}
 .bot-body.hid{display:none}
 .term-box{flex:1;background:#1e1e1e;color:#ccc;font-family:'Cascadia Code','Fira Code',monospace;font-size:13px;padding:8px 12px;overflow-y:auto;white-space:pre-wrap;word-break:break-all}
-.chat-col{width:380px;min-width:320px;background:#1e1e1e;border-left:1px solid #3c3c3c;display:flex;flex-direction:column;overflow:hidden}
+.chat-col{width:380px;min-width:320px;flex-shrink:0;background:#1e1e1e;border-left:1px solid #3c3c3c;display:flex;flex-direction:column;overflow:hidden}
 .chat-col.hid{display:none}
 .chat-hdr{padding:10px 14px;background:#252526;border-bottom:1px solid #3c3c3c;display:flex;align-items:center;justify-content:space-between}
 .chat-hdr .l{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:#ccc}
@@ -479,8 +479,10 @@ async function sendMsg(){
   const inp=document.getElementById('chatInput'),msg=inp.value.trim();if(!msg)return;inp.value='';
   addM('user',msg);
   addM('assistant',`<span class="spinner"></span> Thinking...`);
+  const sel=document.getElementById('provSel');
+  const provId=sel.value==='system'?provs.find(p=>p.provider_type==='ollama')?.id||'system':sel.value;
   try{
-    const r=await fetch(`${API}/sessions/${sess?.id||'new'}/chat`,{method:'POST',headers:H(),body:JSON.stringify({message:msg})});
+    const r=await fetch(`${API}/sessions/${sess?.id||'new'}/chat`,{method:'POST',headers:H(),body:JSON.stringify({message:msg,provider_id:provId})});
     if(!r.ok){
       const errText=await r.text();
       rmS();
