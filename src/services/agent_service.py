@@ -323,6 +323,7 @@ PROVIDER_URLS = {
     "mistral": "https://api.mistral.ai/v1",
     "together": "https://api.together.xyz/v1",
     "openrouter": "https://openrouter.ai/api/v1",
+    "llamacpp": "http://localhost:8080",
     "ollama": "http://localhost:11434",
     "custom": None
 }
@@ -507,10 +508,10 @@ def run_agent_turn(session: AgentSession, user_message: str, db=None, provider_i
     ).order_by(AgentMessage.created_at).all()
 
     # Use shorter prompt for small local models
-    is_small_model = provider.provider_type == "ollama"
+    is_small_model = provider.provider_type in ("ollama", "llamacpp")
     if is_small_model:
-        system_prompt = "You are a coding agent. Use tools to help users. Be concise."
-        tools = TOOL_DEFINITIONS[:4]  # Only first 4 tools for small models
+        system_prompt = "You are a coding agent. Reply concisely. Do NOT use function calls - just answer directly."
+        tools = None  # Don't send tools to small models - they cause format errors
     else:
         system_prompt = SYSTEM_PROMPT_BUILD if session.mode == "build" else SYSTEM_PROMPT_PLAN
         tools = TOOL_DEFINITIONS
