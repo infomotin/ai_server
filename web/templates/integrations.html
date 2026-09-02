@@ -1037,6 +1037,16 @@ async function checkWhatsAppStatus() {
                 const connectedBox = document.getElementById('waConnectedBox');
                 if (connectedBox) connectedBox.classList.remove('hidden');
                 if (waQrRefreshInterval) { clearInterval(waQrRefreshInterval); waQrRefreshInterval = null; }
+                if (!connected['whatsapp_web']) {
+                    connected['whatsapp_web'] = {name: 'WhatsApp', connected: true, timestamp: Date.now()};
+                    localStorage.setItem('int_connected', JSON.stringify(connected));
+                }
+            } else {
+                document.getElementById('waConnectedBox')?.classList.add('hidden');
+                if (connected['whatsapp_web']) {
+                    delete connected['whatsapp_web'];
+                    localStorage.setItem('int_connected', JSON.stringify(connected));
+                }
             }
         }
     } catch(e) { console.error('WhatsApp status check failed:', e); }
