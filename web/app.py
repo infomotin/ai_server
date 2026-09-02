@@ -62,7 +62,6 @@ def _proxy_request(method, url, timeout=30, headers=None):
         return requests.delete(url, headers=headers, params=request.args, timeout=timeout)
     return None
 
-
 def _handle_proxy_response(resp):
     try:
         data = resp.json()
@@ -3733,9 +3732,7 @@ def api_assistants_proxy_root():
 
 def _assistants_proxy_forward(path):
     url = f"{API_BASE_URL}/assistants/{path}" if path else f"{API_BASE_URL}/assistants"
-    headers = {"Content-Type": "application/json"}
-    jwt_token = os.environ.get("ASSISTANTS_JWT", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI4NzUyOTA2NS05OGQ5LTQ5MzYtODcwYy1lYjUyMjVmOTNkNDMiLCJleHAiOjE3ODgzMjIwODYsImlhdCI6MTc4ODIzNTY4NiwidHlwZSI6ImFjY2VzcyJ9.T7hRe-53LjUxFgZhF0PSghQ46Qnl-i6b5epoXb5XbwY")
-    headers["Authorization"] = f"Bearer {jwt_token}"
+    headers = get_api_headers()
     try:
         resp = _proxy_request(request.method, url, timeout=60, headers=headers)
         if resp is None:
