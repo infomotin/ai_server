@@ -72,6 +72,16 @@ def _handle_proxy_response(resp):
     return data, resp.status_code
 
 
+@app.route("/favicon.ico")
+def favicon():
+    from flask import send_file, redirect
+    return send_file("/www/AI_server/web/static/favicon.svg", mimetype="image/svg+xml")
+
+@app.route("/undefined")
+def undefined_route():
+    from flask import send_file, redirect
+    return redirect("/")
+
 @app.route("/")
 def index():
     return render_template("index.html")
