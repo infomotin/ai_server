@@ -365,9 +365,9 @@ async def agent_stats(
 ):
     sessions = db.query(AgentSession).filter_by(user_id=current_user.id).count()
     providers = db.query(AgentProvider).filter_by(user_id=current_user.id).count()
-    messages = db.query(AgentMessage).join(AgentSession).filter(AgentSession.user_id == current_user.id).count()
+    messages = db.query(AgentMessage).join(AgentSession, AgentMessage.session_id == AgentSession.id).filter(AgentSession.user_id == current_user.id).count()
 
-    total_tokens = db.query(AgentMessage.tokens_used).join(AgentSession).filter(
+    total_tokens = db.query(AgentMessage.tokens_used).join(AgentSession, AgentMessage.session_id == AgentSession.id).filter(
         AgentSession.user_id == current_user.id,
         AgentMessage.tokens_used.isnot(None)
     ).all()
