@@ -970,7 +970,7 @@ async function initWhatsAppWeb() {
                 updateWAStatus('ready', 'Already Connected');
                 showToast('WhatsApp is already connected!', 'success');
             } else {
-                document.getElementById('waQrImage').src = d.image;
+                if(d.image){document.getElementById('waQrImage').src=d.image}
                 document.getElementById('waQrResult').classList.remove('hidden');
                 document.getElementById('waConnectedBox').classList.add('hidden');
                 updateWAStatus('qr_ready', 'Scan QR code with WhatsApp');
@@ -1002,7 +1002,7 @@ async function checkWhatsAppStatus() {
     try {
         const r = await fetch(API + '/whatsapp/status?session_id=' + waSessionId);
         const d = await r.json();
-        console.log('WhatsApp status:', d);
+        console.log('WhatsApp status:', d.status, d.already_connected ? '(already connected)' : '');
         if (d.success) {
             updateWAStatus(d.status, d.status === 'ready' ? 'Connected & Ready' : (d.status || 'Unknown'));
             if (d.status === 'ready') {
@@ -1047,7 +1047,7 @@ async function generateChatLinkQR() {
     try {
         const r = await fetch(API + '/whatsapp/chat-link-qr', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({phone, message: 'Hello!'})});
         const d = await r.json();
-        if (d.success) {
+        if (d.success && d.image) {
             document.getElementById('waQrImage').src = d.image;
             document.getElementById('waQrResult').classList.remove('hidden');
             showToast('Chat link QR generated', 'success');
