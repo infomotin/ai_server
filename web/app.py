@@ -440,6 +440,26 @@ def api_ollama_pull():
                     headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
+@app.route("/v1/models", methods=["GET"])
+def api_v1_models():
+    try:
+        resp = requests.get(f"{OLLAMA_BASE_URL}/v1/models", timeout=10)
+        return resp.json() if resp.status_code == 200 else jsonify({"error": "Failed to get models"}), resp.status_code
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/v1/chat/completions", methods=["POST"])
+def api_v1_chat_completions():
+    from flask import request
+    try:
+        data = request.get_json()
+        resp = requests.post(f"{OLLAMA_BASE_URL}/v1/chat/completions", json=data, timeout=120)
+        return resp.json() if resp.status_code == 200 else jsonify({"error": "Failed"}), resp.status_code
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/models/local")
 def api_models_local():
     base = "/www/AI_server/models"
