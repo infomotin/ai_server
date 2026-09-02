@@ -16,6 +16,8 @@ app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 DATA_DIR = "/www/AI_server/data"
 os.makedirs(DATA_DIR, exist_ok=True)
 app.config['SESSION_COOKIE_SECURE'] = False
+app.jinja_env.auto_reload = True
+app.config['TEMPLATES_AUTO_RELOAD'] = True
 
 API_BASE_URL = os.environ.get("API_BASE_URL", "http://localhost:8000")
 INTERNAL_API_KEY = os.environ.get("INTERNAL_API_KEY", "sk-local-e77f090788b216214cef92750879745214bb5a44a244fe4513d0615901837cab")

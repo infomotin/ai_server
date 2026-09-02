@@ -189,7 +189,8 @@ html,body,#app{height:100%;overflow:hidden}
     <div class="prov-bar">
       <span class="dot" id="mDot"></span>
       <select id="provSel" onchange="changeProvider(this.value)"><option value="">No provider</option></select>
-      <button onclick="showAddProv()">+</button>
+      <button onclick="showAddProv()" title="Add Provider"><i class="fas fa-plus"></i></button>
+      <button onclick="editProv()" title="Edit Provider"><i class="fas fa-cog"></i></button>
     </div>
     <div class="chat-msgs" id="chatMsgs">
       <div style="text-align:center;padding:40px 20px;color:#555">
@@ -268,6 +269,32 @@ html,body,#app{height:100%;overflow:hidden}
       <button class="btn-s" onclick="saveProv()">Save</button>
     </div>
     <div class="res" id="pRes"></div>
+  </div>
+</div>
+
+<!-- Edit Provider Modal -->
+<div id="editProvModal" class="mbg" style="display:none">
+  <div class="mbox">
+    <div class="mh"><span>Edit Provider</span><button onclick="closeEditProv()">&times;</button></div>
+    <div class="mc">
+      <label>Name</label>
+      <input type="text" id="epName" placeholder="Provider name">
+      <label>API URL</label>
+      <input type="text" id="epUrl" placeholder="https://api.openrouter.ai/v1">
+      <label>API Key</label>
+      <div style="position:relative">
+        <input type="password" id="epKey" placeholder="sk-..." style="width:calc(100% - 40px)">
+        <button onclick="toggleKeyVis('epKey')" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:#888;cursor:pointer"><i class="fas fa-eye"></i></button>
+      </div>
+      <label>Model</label>
+      <input type="text" id="epModel" placeholder="model name">
+      <div style="margin-top:10px;display:flex;gap:8px">
+        <button onclick="testEditProv()" class="btn-t" style="flex:1;padding:8px;border:none;border-radius:5px;cursor:pointer">Test</button>
+        <button onclick="saveEditProv()" class="btn-s" style="flex:1;padding:8px;border:none;border-radius:5px;cursor:pointer">Save</button>
+        <button onclick="deleteEditProv()" style="flex:1;padding:8px;background:#8b2d2d;color:#fff;border:none;border-radius:5px;cursor:pointer">Delete</button>
+      </div>
+    </div>
+    <div class="res" id="epRes"></div>
   </div>
 </div>
 
@@ -506,12 +533,22 @@ async function loadProv(){
 }
 function renderProv(){
   const sel=document.getElementById('provSel');
-  sel.innerHTML=(provs.length?provs.map(p=>`<option value="${p.id}">${p.model} (${p.provider_type})</option>`).join(''):'<option value="">No provider</option>');
+  let opts='<option value="system">🤖 System Own Model (llama3.2:1b - Free)</option>';
+  if(provs.length){
+    opts+=provs.map(p=>`<option value="${p.id}">${p.name||p.model} (${p.provider_type})</option>`).join('');
+  }
+  sel.innerHTML=opts;
   const act=provs.find(p=>p.is_active)||provs[0];
-  if(act){sel.value=act.id;document.getElementById('mDot').style.background='#4ec9b0'}else{document.getElementById('mDot').style.background='#666'}
+  if(act){sel.value=act.id;document.getElementById('mDot').style.background='#4ec9b0'}
+  else{sel.value='system';document.getElementById('mDot').style.background='#4ec9b0';document.getElementById('sModelName').textContent='llama3.2:1b (System)'}
 }
 async function changeProvider(id){
   if(!id)return;
+  if(id==='system'){
+    document.getElementById('mDot').style.background='#4ec9b0';
+    document.getElementById('sModelName').textContent='llama3.2:1b (System)';
+    return;
+  }
   const p=provs.find(pr=>pr.id===id);
   if(!p)return;
   updMDisp();
@@ -560,6 +597,54 @@ async function saveProv(){
     const res=document.getElementById('pRes');
     res.style.display='block';res.className='res e';
     res.innerHTML='<i class="fas fa-times"></i> '+e.message;
+  }
+}
+function editProv(){
+  const id=document.getElementById('provSel').value;
+  if(!id||id==='system'){showToast('Select a provider to edit');return}
+  const p=provs.find(pr=>pr.id===id);
+  if(!p)return;
+  document.getElementById('epName').value=p.name||'';
+  document.getElementById('epUrl').value=p.api_url||'';
+  document.getElementById('epKey').value='';
+  document.getElementById('epKey').placeholder=p.has_key?'•••••••• (key saved)':'Enter new key...';
+  document.getElementById('epModel').value=p.model||'';
+  document.getElementById('editProvModal').style.display='flex';
+  document.getElementById('editProvModal').dataset.provId=id;
+}
+function closeEditProv(){document.getElementById('editProvModal').style.display='none'}
+function toggleKeyVis(id){const el=document.getElementById(id);el.type=el.type==='password'?'text':'password'}
+async function testEditProv(){
+  const id=document.getElementById('editProvModal').dataset.provId;
+  const res=document.getElementById('epRes');res.style.display='block';res.className='res e';res.innerHTML='<span class="spinner"></span> Testing...';
+  try{
+    const t=await fetch(`${API}/providers/${id}/test`,{method:'POST',headers:H()});
+    const td=await t.json();
+    if(td.success){res.className='res s';res.innerHTML='<i class="fas fa-check"></i> Working!'}
+    else{res.className='res e';res.innerHTML=`<i class="fas fa-times"></i> ${td.error||'Failed'}`}
+  }catch(e){res.className='res e';res.innerHTML=e.message}
+}
+async function saveEditProv(){
+  const id=document.getElementById('editProvModal').dataset.provId;
+  const data={name:document.getElementById('epName').value,api_url:document.getElementById('epUrl').value,model:document.getElementById('epModel').value};
+  const key=document.getElementById('epKey').value;
+  if(key)data.api_key=key;
+  const res=document.getElementById('epRes');res.style.display='block';res.className='res e';res.innerHTML='<span class="spinner"></span> Saving...';
+  try{
+    const r=await fetch(`${API}/providers/${id}`,{method:'PUT',headers:H(),body:JSON.stringify(data)});
+    const d=await r.json();
+    if(d.success){res.className='res s';res.innerHTML='<i class="fas fa-check"></i> Saved!';loadProv();setTimeout(closeEditProv,1000)}
+    else{res.className='res e';res.innerHTML='<i class="fas fa-times"></i> Failed'}
+  }catch(e){res.className='res e';res.innerHTML=e.message}
+}
+async function deleteEditProv(){
+  const id=document.getElementById('editProvModal').dataset.provId;
+  if(!confirm('Delete this provider?'))return;
+  try{
+    await fetch(`${API}/providers/${id}`,{method:'DELETE',headers:H()});
+    closeEditProv();loadProv();showToast('Provider deleted');
+  }catch(e){showToast('Delete failed')}
+}
   }
 }
 function updMDisp(){const act=provs.find(p=>p.is_active)||provs[0];if(act){document.getElementById('mDot').style.background='#4ec9b0';document.getElementById('sModelName').textContent=act.model}else{document.getElementById('mDot').style.background='#666';document.getElementById('sModelName').textContent='No model'}}
