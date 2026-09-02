@@ -645,8 +645,6 @@ async function deleteEditProv(){
     closeEditProv();loadProv();showToast('Provider deleted');
   }catch(e){showToast('Delete failed')}
 }
-  }
-}
 function updMDisp(){const act=provs.find(p=>p.is_active)||provs[0];if(act){document.getElementById('mDot').style.background='#4ec9b0';document.getElementById('sModelName').textContent=act.model}else{document.getElementById('mDot').style.background='#666';document.getElementById('sModelName').textContent='No model'}}
 
 async function loadMcpServers(){
