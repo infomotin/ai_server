@@ -185,20 +185,29 @@ print("\nHello from OpenLocalAI Programming Hub!")</textarea>
                             <option value="insertion">Insertion Sort</option>
                             <option value="merge">Merge Sort</option>
                             <option value="quick">Quick Sort</option>
+                            <option value="heap">Heap Sort</option>
                             <option value="binary">Binary Search</option>
                             <option value="linear">Linear Search</option>
+                            <option value="bfs">BFS (Graph)</option>
+                            <option value="dfs">DFS (Graph)</option>
                         </select>
                         <div class="flex items-center gap-1.5">
                             <span class="text-[10px] text-gray-500">Speed:</span>
-                            <input type="range" id="algoSpeed" min="50" max="1000" value="400" step="50" class="w-20 h-1 accent-blue-500" title="Auto-play speed">
+                            <input type="range" id="algoSpeed" min="20" max="1000" value="300" step="20" class="w-20 h-1 accent-blue-500" title="Auto-play speed">
                         </div>
-                        <button onclick="initAlgo()" class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded-lg text-xs text-white transition"><i class="fas fa-sync mr-1"></i>Reset</button>
+                        <input type="text" id="algoTargetInput" class="bg-gray-800 border border-gray-700 rounded-lg px-2 py-1.5 text-xs text-white w-20" placeholder="Target" title="Search target (for search algorithms)">
+                        <button onclick="initAlgo()" class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded-lg text-xs text-white transition" title="Reset"><i class="fas fa-sync mr-1"></i></button>
+                        <button onclick="stepBackAlgo()" id="algoBackBtn" class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded-lg text-xs text-white transition" title="Step Back"><i class="fas fa-backward mr-1"></i></button>
                         <button onclick="stepAlgo()" id="algoStepBtn" class="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 rounded-lg text-xs text-white font-semibold transition"><i class="fas fa-forward mr-1"></i>Step</button>
                         <button onclick="autoAlgo()" id="algoAutoBtn" class="px-4 py-1.5 bg-green-600 hover:bg-green-500 rounded-lg text-xs text-white font-semibold transition"><i class="fas fa-play mr-1"></i>Auto</button>
                     </div>
                 </div>
                 <div class="bg-gray-900/60 rounded-xl p-6 min-h-[280px]" id="algoCanvas">
                     <div class="flex items-end justify-center gap-1.5 h-56" id="algoBars"></div>
+                    <div class="hidden" id="algoGraph">
+                        <div class="flex items-center justify-center gap-4" id="graphNodes"></div>
+                        <div class="text-center text-xs text-gray-500 mt-2" id="graphInfo"></div>
+                    </div>
                 </div>
                 <div class="mt-4 flex items-center justify-between">
                     <div class="flex gap-4 text-xs text-gray-500">
@@ -235,6 +244,10 @@ print("\nHello from OpenLocalAI Programming Hub!")</textarea>
                     <button onclick="generateData('sorted')" class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded-lg text-[11px] text-white transition">Sorted</button>
                     <button onclick="generateData('reversed')" class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded-lg text-[11px] text-white transition">Reversed</button>
                     <button onclick="generateData('nearly')" class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded-lg text-[11px] text-white transition">Nearly</button>
+                </div>
+                <div class="flex gap-2 mb-2">
+                    <input type="text" id="algoCustomArray" class="flex-1 bg-gray-700 border border-gray-600 rounded-lg px-2 py-1 text-xs text-white" placeholder="Custom: 5,3,8,1,9">
+                    <button onclick="applyCustomArray()" class="px-2 py-1 bg-blue-600 hover:bg-blue-500 rounded text-xs text-white">Apply</button>
                 </div>
                 <p class="text-[10px] text-gray-600">Array: <span id="algoArray" class="text-gray-400">-</span></p>
             </div>
@@ -891,8 +904,11 @@ const ALGO_INFO = {
     insertion: { name: 'Insertion Sort', desc: 'Builds sorted array one element at a time.', time: 'O(n²)', space: 'O(1)', stable: 'Yes', steps: ['Take next element', 'Compare with sorted', 'Shift elements right', 'Insert in correct position'] },
     merge: { name: 'Merge Sort', desc: 'Divides array in half, sorts each, then merges.', time: 'O(n log n)', space: 'O(n)', stable: 'Yes', steps: ['Divide array in half', 'Recursively sort halves', 'Merge sorted halves', 'Return sorted array'] },
     quick: { name: 'Quick Sort', desc: 'Picks pivot, partitions around it, recurses.', time: 'O(n log n) avg', space: 'O(log n)', stable: 'No', steps: ['Choose pivot', 'Partition around pivot', 'Recurse left partition', 'Recurse right partition'] },
+    heap: { name: 'Heap Sort', desc: 'Builds max-heap and extracts max element repeatedly.', time: 'O(n log n)', space: 'O(1)', stable: 'No', steps: ['Build max heap', 'Swap root with last', 'Heapify root', 'Repeat'] },
     binary: { name: 'Binary Search', desc: 'Searches sorted array by halving search space.', time: 'O(log n)', space: 'O(1)', stable: '-', steps: ['Find middle', 'If target == middle, found', 'If target < middle, search left', 'If target > middle, search right'] },
-    linear: { name: 'Linear Search', desc: 'Checks each element sequentially.', time: 'O(n)', space: 'O(1)', stable: 'Yes', steps: ['Start at first element', 'Compare with target', 'If match, return index', 'Move to next element'] }
+    linear: { name: 'Linear Search', desc: 'Checks each element sequentially.', time: 'O(n)', space: 'O(1)', stable: 'Yes', steps: ['Start at first element', 'Compare with target', 'If match, return index', 'Move to next element'] },
+    bfs: { name: 'BFS (Graph)', desc: 'Breadth-First Search explores level by level.', time: 'O(V+E)', space: 'O(V)', stable: '-', steps: ['Start at node', 'Visit all neighbors', 'Add to queue', 'Process next'] },
+    dfs: { name: 'DFS (Graph)', desc: 'Depth-First Search explores deeply before backtracking.', time: 'O(V+E)', space: 'O(V)', stable: '-', steps: ['Start at node', 'Visit neighbor deeply', 'Backtrack when stuck', 'Continue until done'] }
 };
 
 const ALGO_CODES = {
@@ -935,6 +951,16 @@ const ALGO_CODES = {
         '    quickSort(arr, lo, pivot-1)',
         '    quickSort(arr, pivot+1, hi)'
     ],
+    heap: [
+        'function heapSort(arr):',
+        '  // Build max heap',
+        '  for i = n/2-1 downto 0:',
+        '    heapify(arr, n, i)',
+        '  // Extract elements',
+        '  for i = n-1 downto 0:',
+        '    swap(arr[0], arr[i])',
+        '    heapify(arr, i, 0)'
+    ],
     binary: [
         'low = 0, high = len-1',
         'while low <= high:',
@@ -948,6 +974,25 @@ const ALGO_CODES = {
         '  if arr[i] == target:',
         '    return i  // found',
         'return -1  // not found'
+    ],
+    bfs: [
+        'function bfs(start):',
+        '  queue = [start]',
+        '  visited = {start}',
+        '  while queue:',
+        '    node = queue.pop(0)',
+        '    for neighbor in graph[node]:',
+        '      if neighbor not in visited:',
+        '        visited.add(neighbor)',
+        '        queue.append(neighbor)'
+    ],
+    dfs: [
+        'function dfs(start, visited={}):',
+        '  if start in visited: return',
+        '  visited.add(start)',
+        '  process(start)',
+        '  for neighbor in graph[start]:',
+        '    dfs(neighbor, visited)'
     ]
 };
 
@@ -994,8 +1039,9 @@ function buildAlgoOps(sel) {
         qs(0, a.length - 1);
     } else if (sel === 'binary') {
         a.sort((x, y) => x - y);
-        const target = a[Math.floor(a.length / 2)];
-        ops.push({ t: 'msg', msg: `Array sorted. Target = ${target} (middle element)`, line: 0 });
+        const targetInput = document.getElementById('algoTargetInput')?.value.trim();
+        const target = targetInput ? parseInt(targetInput) : a[Math.floor(a.length / 2)];
+        ops.push({ t: 'msg', msg: `Array sorted. Searching for: ${target}`, line: 0 });
         let lo = 0, hi = a.length - 1;
         while (lo <= hi) {
             const mid = (lo + hi) >> 1;
@@ -1004,20 +1050,36 @@ function buildAlgoOps(sel) {
             else if (a[mid] < target) { ops.push({ t: 'msg', msg: `${a[mid]} < ${target} → search right half`, line: 4 }); lo = mid + 1; }
             else { ops.push({ t: 'msg', msg: `${a[mid]} > ${target} → search left half`, line: 5 }); hi = mid - 1; }
         }
-        if (lo > hi) ops.push({ t: 'done', msg: 'Target not found', line: 3 });
+        if (lo > hi) ops.push({ t: 'done', msg: `Target ${target} not found`, line: 3 });
+    } else if (sel === 'heap') {
+        const heapify = (n, i) => {
+            let largest = i, l = 2*i+1, r = 2*i+2;
+            if (l < n && a[l] > a[largest]) largest = l;
+            if (r < n && a[r] > a[largest]) largest = r;
+            if (largest !== i) { [a[i], a[largest]] = [a[largest], a[i]]; ops.push({ t: 'swap', i, j: largest, msg: `Heapify: swap ${a[largest]} with ${a[i]}`, line: 4 }); heapify(n, largest); }
+        };
+        const n = a.length;
+        for (let i = Math.floor(n/2)-1; i >= 0; i--) { heapify(n, i); ops.push({ t: 'msg', msg: `Build heap: heapify index ${i}`, line: 2 }); }
+        for (let i = n-1; i > 0; i--) { [a[0], a[i]] = [a[i], a[0]]; ops.push({ t: 'swap', i: 0, j: i, msg: `Extract max: swap ${a[i]} with root`, line: 6 }); heapify(i, 0); }
+        ops.push({ t: 'done', msg: 'Heap sort complete!', line: 0 });
     }
     return ops;
 }
-
-function initAlgo() {
-    algoStepCount = 0; algoComparisons = 0; algoSwaps = 0; algoStepsHistory = []; algoRunning = false;
-    algoOps = null; algoOpsIdx = 0;
     if (algoTimer) clearInterval(algoTimer);
+    algoRunning = false;
+    document.getElementById('algoAutoBtn').innerHTML = '<i class="fas fa-play mr-1"></i>Auto';
     generateData('random');
     const sel = document.getElementById('algoSelect').value;
-    if (['merge', 'quick', 'binary'].includes(sel)) {
-        algoOps = buildAlgoOps(sel);
-        if (sel === 'binary') { algoArray.sort((a, b) => a - b); }
+    const isGraph = ['bfs', 'dfs'].includes(sel);
+    document.getElementById('algoBars').classList.toggle('hidden', isGraph);
+    document.getElementById('algoGraph').classList.toggle('hidden', !isGraph);
+    if (isGraph) {
+        initGraph();
+    } else {
+        if (['merge', 'quick', 'binary', 'heap'].includes(sel)) {
+            algoOps = buildAlgoOps(sel);
+            if (sel === 'binary') { algoArray.sort((a, b) => a - b); }
+        }
     }
     const info = ALGO_INFO[sel] || ALGO_INFO.bubble;
     document.getElementById('algoInfo').innerHTML = `<p><strong class="text-white">${info.name}</strong></p><p>${info.desc}</p><div class="mt-3 space-y-1 text-xs"><p>Time: <span class="text-amber-400">${info.time}</span></p><p>Space: <span class="text-green-400">${info.space}</span></p><p>Stable: <span class="text-green-400">${info.stable}</span></p></div>`;
@@ -1102,6 +1164,66 @@ function addStepLog(msg, color) {
     el.querySelectorAll('.step-entry').forEach((e, i) => { if (i > 0) e.classList.remove('current'); });
 }
 
+function stepBackAlgo() {
+    if (algoHistory.length < 2) { showToast('No steps to go back to', 'info'); return; }
+    algoHistory.pop();
+    const prev = algoHistory[algoHistory.length - 1];
+    algoArray = [...prev.array];
+    algoStepCount = prev.stepCount;
+    algoComparisons = prev.comparisons;
+    algoSwaps = prev.swaps;
+    if (algoOps) algoOpsIdx = prev.opsIdx;
+    document.getElementById('algoComparisons').innerHTML = `<i class="fas fa-exchange-alt mr-1"></i>Comparisons: ${algoComparisons}`;
+    document.getElementById('algoSwaps').innerHTML = `<i class="fas fa-arrows-alt-h mr-1"></i>Swaps: ${algoSwaps}`;
+    document.getElementById('algoStatus').textContent = `Step ${algoStepCount}`;
+    document.getElementById('algoArray').textContent = algoArray.join(', ');
+    updateLiveData('Stepped back', { 'Step': algoStepCount });
+    const sel = document.getElementById('algoSelect').value;
+    if (['bfs', 'dfs'].includes(sel)) renderGraph(prev.graphState || { visited: [], queue: [], stack: [], current: null });
+    else renderBars();
+}
+
+let graphState = { nodes: [], edges: [], visited: [], queue: [], stack: [], current: null, order: [] };
+
+function initGraph() {
+    const n = 6;
+    graphState = {
+        nodes: ['A', 'B', 'C', 'D', 'E', 'F'],
+        edges: { A: ['B', 'C'], B: ['A', 'D', 'E'], C: ['A', 'F'], D: ['B'], E: ['B', 'F'], F: ['C', 'E'] },
+        visited: [], queue: [], stack: [], current: 'A', order: []
+    };
+    renderGraph(graphState);
+}
+
+function renderGraph(state) {
+    const container = document.getElementById('graphNodes');
+    const info = document.getElementById('graphInfo');
+    const sel = document.getElementById('algoSelect').value;
+    const isBfs = sel === 'bfs';
+    container.innerHTML = `<div class="flex flex-wrap justify-center gap-6 mt-8">
+        ${state.nodes.map((node, i) => {
+            const isVisited = state.visited.includes(node);
+            const isCurrent = state.current === node;
+            const inQueue = state.queue.includes(node);
+            const inStack = state.stack.includes(node);
+            const isFirst = state.order.length === 0 && node === 'A';
+            let cls = 'w-12 h-12 rounded-full flex items-center justify-center font-bold text-sm transition-all ';
+            if (isVisited) cls += 'bg-green-600 text-white border-2 border-green-400';
+            else if (isCurrent) cls += 'bg-blue-600 text-white border-2 border-blue-400 animate-pulse';
+            else if (inQueue || inStack) cls += 'bg-amber-600 text-white border-2 border-amber-400';
+            else if (isFirst) cls += 'bg-purple-600 text-white border-2 border-purple-400';
+            else cls += 'bg-gray-700 text-gray-300 border-2 border-gray-600';
+            return `<div class="${cls}">${node}</div>`;
+        }).join('')}
+    </div>
+    <div class="flex justify-center gap-4 mt-4 text-xs">
+        <span class="px-2 py-1 bg-blue-600 rounded">Current: ${state.current || '-'}</span>
+        <span class="px-2 py-1 bg-green-600 rounded">Visited: ${state.visited.join(', ') || '-'}</span>
+        <span class="px-2 py-1 bg-amber-600 rounded">${isBfs ? 'Queue' : 'Stack'}: ${isBfs ? state.queue.join(', ') : state.stack.join(', ') || '-'}</span>
+    </div>`;
+    info.textContent = `Traversal order: ${state.order.join(' → ') || 'Start from A'}`;
+}
+
 function stepAlgo() {
     const sel = document.getElementById('algoSelect').value;
 
@@ -1135,6 +1257,8 @@ function stepAlgo() {
             document.getElementById('algoStatus').textContent = 'Done!';
             renderBars({ sorted: algoArray.map((_, i) => i) });
         }
+        algoHistory.push({ array: [...algoArray], stepCount: algoStepCount, comparisons: algoComparisons, swaps: algoSwaps, opsIdx: algoOpsIdx });
+        if (algoHistory.length > 50) algoHistory.shift();
         return;
     }
 
@@ -1162,6 +1286,8 @@ function stepAlgo() {
         document.getElementById('algoSwaps').innerHTML = `<i class="fas fa-arrows-alt-h mr-1"></i>Swaps: ${algoSwaps}`;
         document.getElementById('algoStatus').textContent = `Step ${algoStepCount}...`;
         document.getElementById('algoArray').textContent = algoArray.join(', ');
+        algoHistory.push({ array: [...algoArray], stepCount: algoStepCount, comparisons: algoComparisons, swaps: algoSwaps, opsIdx: algoOpsIdx });
+        if (algoHistory.length > 50) algoHistory.shift();
     } else if (sel === 'selection') {
         const n = algoArray.length;
         const pass = Math.floor((algoStepCount - 1) / n);
@@ -1218,12 +1344,57 @@ function stepAlgo() {
         document.getElementById('algoStatus').textContent = `Step ${algoStepCount}...`;
         document.getElementById('algoArray').textContent = algoArray.join(', ');
     } else if (sel === 'binary') {
-        const target = algoArray[Math.floor(algoArray.length / 2)];
-        addStepLog(`Searching for middle element: ${target}`, '#8b5cf6');
+        const targetInput = document.getElementById('algoTargetInput')?.value.trim();
+        const target = targetInput ? parseInt(targetInput) : algoArray[Math.floor(algoArray.length / 2)];
+        addStepLog(`Searching for: ${target}`, '#8b5cf6');
         updateLiveData(`Binary search`, { 'target': target, 'low': 0, 'high': algoArray.length - 1 });
         renderBars({ pivot: Math.floor(algoArray.length / 2) });
         renderAlgoCode(3);
         document.getElementById('algoStatus').textContent = 'Searching...';
+    } else if (sel === 'bfs') {
+        if (graphState.visited.length === 0 && graphState.queue.length === 0) {
+            graphState.queue = ['A'];
+        }
+        if (graphState.queue.length > 0) {
+            const node = graphState.queue.shift();
+            if (!graphState.visited.includes(node)) {
+                graphState.visited.push(node);
+                graphState.current = node;
+                graphState.order.push(node);
+                graphState.queue.push(...graphState.edges[node].filter(n => !graphState.visited.includes(n) && !graphState.queue.includes(n)));
+                addStepLog(`Visit ${node}, add neighbors to queue`, '#3b82f6');
+                updateLiveData(`BFS: visiting ${node}`, { 'Visited': graphState.visited.join(', '), 'Queue': graphState.queue.join(', ') });
+                renderGraph(graphState);
+                renderAlgoCode(4);
+            }
+        } else {
+            addStepLog(`BFS complete! Order: ${graphState.order.join(' → ')}`, '#10b981');
+            updateLiveData('Done!', {});
+            document.getElementById('algoStatus').textContent = 'Done!';
+            renderAlgoCode(-1);
+        }
+    } else if (sel === 'dfs') {
+        if (graphState.visited.length === 0 && graphState.stack.length === 0) {
+            graphState.stack = ['A'];
+        }
+        if (graphState.stack.length > 0) {
+            const node = graphState.stack.pop();
+            if (!graphState.visited.includes(node)) {
+                graphState.visited.push(node);
+                graphState.current = node;
+                graphState.order.push(node);
+                graphState.stack.push(...graphState.edges[node].filter(n => !graphState.visited.includes(n) && !graphState.stack.includes(n)).reverse());
+                addStepLog(`Visit ${node}, add neighbors to stack`, '#8b5cf6');
+                updateLiveData(`DFS: visiting ${node}`, { 'Visited': graphState.visited.join(', '), 'Stack': graphState.stack.join(', ') });
+                renderGraph(graphState);
+                renderAlgoCode(3);
+            }
+        } else {
+            addStepLog(`DFS complete! Order: ${graphState.order.join(' → ')}`, '#10b981');
+            updateLiveData('Done!', {});
+            document.getElementById('algoStatus').textContent = 'Done!';
+            renderAlgoCode(-1);
+        }
     } else {
         const idx = algoStepCount % algoArray.length;
         addStepLog(`Checking index ${idx}: ${algoArray[idx]}`, '#8b5cf6');
@@ -1232,6 +1403,8 @@ function stepAlgo() {
         renderAlgoCode(1);
         document.getElementById('algoStatus').textContent = `Checking index ${idx}...`;
     }
+    algoHistory.push({ array: [...algoArray], stepCount: algoStepCount, comparisons: algoComparisons, swaps: algoSwaps, opsIdx: algoOpsIdx, graphState: {...graphState} });
+    if (algoHistory.length > 50) algoHistory.shift();
 }
 
 function autoAlgo() {
