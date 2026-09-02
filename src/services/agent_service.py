@@ -441,10 +441,29 @@ class AgentService:
                     choice = data.get("choices", [{}])[0]
                     message = choice.get("message", {})
                     usage = data.get("usage", {})
+                    content = message.get("content", "")
+                    tool_calls = message.get("tool_calls")
+                    
+                    # Parse tool calls from content if small model returns them as text
+                    if not tool_calls and content and '{"type":"function"' in content:
+                        try:
+                            import re
+                            tool_pattern = r'\{"type":"function","function":\{[^}]+\}\}'
+                            matches = re.findall(tool_pattern, content)
+                            if matches:
+                                tool_calls = []
+                                for i, m in enumerate(matches):
+                                    tc = json.loads(m)
+                                    tc["id"] = f"call_{i}"
+                                    tool_calls.append(tc)
+                                content = ""  # Clear content since it's tool calls
+                        except Exception:
+                            pass
+                    
                     return {
                         "success": True,
-                        "content": message.get("content", ""),
-                        "tool_calls": message.get("tool_calls"),
+                        "content": content,
+                        "tool_calls": tool_calls,
                         "finish_reason": choice.get("finish_reason"),
                         "tokens": usage.get("total_tokens", 0)
                     }
@@ -487,7 +506,14 @@ def run_agent_turn(session: AgentSession, user_message: str, db=None, provider_i
         session_id=session.id
     ).order_by(AgentMessage.created_at).all()
 
-    system_prompt = SYSTEM_PROMPT_BUILD if session.mode == "build" else SYSTEM_PROMPT_PLAN
+    # Use shorter prompt for small local models
+    is_small_model = provider.provider_type == "ollama"
+    if is_small_model:
+        system_prompt = "You are a coding agent. Use tools to help users. Be concise."
+        tools = TOOL_DEFINITIONS[:4]  # Only first 4 tools for small models
+    else:
+        system_prompt = SYSTEM_PROMPT_BUILD if session.mode == "build" else SYSTEM_PROMPT_PLAN
+        tools = TOOL_DEFINITIONS
 
     messages = [{"role": "system", "content": system_prompt}]
     for msg in history:
@@ -503,10 +529,10 @@ def run_agent_turn(session: AgentSession, user_message: str, db=None, provider_i
 
     agent = AgentService(provider)
     all_tool_results = []
-    max_iterations = 20
+    max_iterations = 20 if not is_small_model else 5  # Fewer iterations for small models
 
     for iteration in range(max_iterations):
-        response = agent.chat(messages, TOOL_DEFINITIONS, "auto")
+        response = agent.chat(messages, tools, "auto")
 
         if not response.get("success"):
             return {"success": False, "error": response.get("error", "Unknown error")}
