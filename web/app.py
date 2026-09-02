@@ -3584,7 +3584,17 @@ def integrations():
 
 @app.route("/agent")
 def agent():
+    if "access_token" not in session:
+        return redirect(url_for("login"))
     return render_template("agent.html", active_page="agent")
+
+
+@app.route("/api/session/token")
+def get_session_token():
+    token = session.get("access_token")
+    if token:
+        return jsonify({"success": True, "token": token})
+    return jsonify({"success": False, "error": "Not logged in"}), 401
 
 
 @app.route("/api/agent/<path:path>", methods=["GET", "POST", "PUT", "DELETE"])

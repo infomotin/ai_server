@@ -309,7 +309,16 @@ const LM={js:'javascript',py:'python',html:'htmlmixed',css:'css',json:{name:'jav
 const IC={js:'fab fa-js-square',py:'fab fa-python',html:'fab fa-html5',css:'fab fa-css3-alt',json:'fas fa-code',md:'fas fa-file-alt',sh:'fas fa-terminal',sql:'fas fa-database',def:'fas fa-file'};
 const CL={js:'#f7df1e',py:'#3572a5',html:'#e34c26',css:'#563d7c',json:'#a8b9cc',md:'#519aba',sh:'#89e051',sql:'#e38c00',def:'#999'};
 
-function H(){const t=document.cookie.match(/access_token=([^;]+)/);return{'Authorization':'Bearer '+(t?t[1]:''),'Content-Type':'application/json'}}
+let authToken=null;
+async function initAuth(){
+  try{
+    const r=await fetch('/api/session/token');
+    const d=await r.json();
+    if(d.success&&d.token){authToken=d.token}
+    else{window.location.href='/login';return}
+  }catch(e){window.location.href='/login';return}
+}
+function H(){return{'Authorization':'Bearer '+(authToken||''),'Content-Type':'application/json'}}
 function esc(s){return s?String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>'):''}
 
 function toggleSidebar(){
@@ -676,7 +685,8 @@ function showToast(msg){
 
 async function switchMode(m){if(!sess)return;await fetch(`${API}/sessions/${sess.id}/mode?mode=${m}`,{method:'PUT',headers:H()});sess.mode=m}
 
-refreshTree();loadProv();initSess();
+async function startup(){await initAuth();refreshTree();loadProv();initSess()}
+startup();
 document.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key==='s'){e.preventDefault();saveF()}});
 </script>
 {% endblock %}
