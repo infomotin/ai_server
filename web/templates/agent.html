@@ -175,10 +175,14 @@ html,body,#app{height:100%;overflow:hidden}
     <div class="chat-hdr">
       <div class="l"><i class="fas fa-robot" style="color:#007acc"></i>AI Agent</div>
       <div class="r">
+        <select id="sessSel" onchange="loadSess(this.value)" style="background:#3c3c33;border:1px solid #555;color:#ccc;font-size:11px;padding:3px 6px;border-radius:3px;max-width:120px">
+          <option value="">New Session</option>
+        </select>
         <select id="modeSel" onchange="switchMode(this.value)" style="background:#3c3c33;border:1px solid #555;color:#ccc;font-size:11px;padding:3px 6px;border-radius:3px">
           <option value="plan">Plan Mode</option>
           <option value="build">Build Mode</option>
         </select>
+        <button onclick="exportSess()" title="Export Session"><i class="fas fa-download"></i></button>
         <button onclick="toggleChat()" title="Toggle"><i class="fas fa-chevron-right"></i></button>
       </div>
     </div>
@@ -227,11 +231,16 @@ html,body,#app{height:100%;overflow:hidden}
     <div class="mc">
       <label>Provider</label>
       <select id="pType" onchange="updProvFields()">
-        <option value="openrouter">OpenRouter (Recommended)</option>
-        <option value="openai">OpenAI</option>
+        <option value="openrouter">OpenRouter (Recommended - Free Models)</option>
+        <option value="openai">OpenAI (GPT-4)</option>
         <option value="anthropic">Anthropic (Claude)</option>
-        <option value="groq">Groq</option>
-        <option value="ollama">Ollama (Local)</option>
+        <option value="groq">Groq (Fast Inference)</option>
+        <option value="ollama">Ollama (Local - Free)</option>
+        <option value="lmstudio">LM Studio (Local - Free)</option>
+        <option value="nvidia">NVIDIA NIM (Free Tier)</option>
+        <option value="bazaarlink">BazaarLink AI</option>
+        <option value="zai">Z AI</option>
+        <option value="omniroute">OmniRoute</option>
         <option value="custom">Custom API</option>
       </select>
       <label>Name</label>
@@ -239,7 +248,7 @@ html,body,#app{height:100%;overflow:hidden}
       <label>API URL</label>
       <input type="text" id="pUrl" placeholder="https://api.openrouter.ai/v1">
       <label>API Key</label>
-      <input type="password" id="pKey" placeholder="sk-or-v1-...">
+      <input type="password" id="pKey" placeholder="sk-or-v1-... (leave empty for local)">
       <label>Model</label>
       <select id="pModel">
         <option value="minimax/minimax-m2.7:free">minimax/minimax-m2.7:free (Recommended)</option>
@@ -247,6 +256,11 @@ html,body,#app{height:100%;overflow:hidden}
         <option value="google/gemma-4-26b-a4b-it:free">google/gemma-4-26b-a4b-it:free</option>
         <option value="anthropic/claude-3-haiku-20240307">anthropic/claude-3-haiku</option>
         <option value="gpt-4o-mini">gpt-4o-mini</option>
+        <option value="gpt-4o">gpt-4o</option>
+        <option value="claude-3-5-sonnet-20241022">claude-3-5-sonnet</option>
+        <option value="llama3.2:1b">llama3.2:1b (Ollama Local)</option>
+        <option value="llama3.2:3b">llama3.2:3b (Ollama Local)</option>
+        <option value="qwen2.5-coder:1.5b">qwen2.5-coder:1.5b (Ollama Local)</option>
       </select>
     </div>
     <div class="mb">
@@ -498,7 +512,19 @@ function showAddProv(){document.getElementById('provModal').style.display='flex'
 function closeProv(){document.getElementById('provModal').style.display='none';document.getElementById('pRes').style.display='none'}
 function updProvFields(){
   const t=document.getElementById('pType').value;
-  const urls={openrouter:'https://openrouter.ai/api/v1',openai:'https://api.openai.com/v1',anthropic:'https://api.anthropic.com/v1',groq:'https://api.groq.com/openai/v1',ollama:'http://localhost:11434',custom:''};
+  const urls={
+    openrouter:'https://openrouter.ai/api/v1',
+    openai:'https://api.openai.com/v1',
+    anthropic:'https://api.anthropic.com/v1',
+    groq:'https://api.groq.com/openai/v1',
+    ollama:'http://localhost:11434',
+    lmstudio:'http://localhost:1234/v1',
+    nvidia:'https://integrate.api.nvidia.com/v1',
+    bazaarlink:'https://api.bazaarlink.ai/v1',
+    zai:'https://api.zai.com/v1',
+    omniroute:'https://api.omniroute.com/v1',
+    custom:''
+  };
   document.getElementById('pUrl').value=urls[t]||'';
 }
 async function testProv(){
@@ -596,12 +622,58 @@ async function initSess(){
     const r=await fetch(`${API}/sessions`,{headers:H()});
     if(!r.ok)throw new Error('HTTP '+r.status);
     const ss=await r.json();
+    const sel=document.getElementById('sessSel');
+    sel.innerHTML='<option value="">New Session</option>';
     if(Array.isArray(ss)&&ss.length>0){
-      const s=await fetch(`${API}/sessions/${ss[0].id}`,{headers:H()});
-      if(s.ok){sess=await s.json();document.getElementById('modeSel').value=sess.mode||'plan'}
+      ss.forEach(s=>{
+        const opt=document.createElement('option');
+        opt.value=s.id;
+        opt.textContent=s.title||s.id.substring(0,8);
+        sel.appendChild(opt);
+      });
+      const first=await fetch(`${API}/sessions/${ss[0].id}`,{headers:H()});
+      if(first.ok){sess=await first.json();document.getElementById('modeSel').value=sess.mode||'plan';sel.value=sess.id}
     }
   }catch(e){console.error('initSess error:',e)}
 }
+
+async function loadSess(id){
+  if(!id){newSess();return}
+  try{
+    const r=await fetch(`${API}/sessions/${id}`,{headers:H()});
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    sess=await r.json();
+    document.getElementById('modeSel').value=sess.mode||'plan';
+    document.getElementById('chatMsgs').innerHTML='';
+    if(sess.messages&&sess.messages.length>0){
+      sess.messages.forEach(m=>{
+        addM(m.role==='user'?'user':'assistant',esc(m.content));
+      });
+    }
+  }catch(e){console.error('loadSess error:',e)}
+}
+
+async function exportSess(){
+  if(!sess)return;
+  try{
+    const r=await fetch(`${API}/sessions/${sess.id}`,{headers:H()});
+    const data=await r.json();
+    const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;a.download=`session-${(data.title||sess.id).replace(/[^a-z0-9]/gi,'_')}.json`;
+    a.click();URL.revokeObjectURL(url);
+    showToast('Session exported!');
+  }catch(e){showToast('Export failed: '+e.message)}
+}
+
+function showToast(msg){
+  const t=document.createElement('div');
+  t.style.cssText='position:fixed;top:20px;right:20px;background:#0e639c;color:#fff;padding:10px 20px;border-radius:6px;z-index:99999;font-size:13px;animation:fadeIn .3s';
+  t.textContent=msg;document.body.appendChild(t);
+  setTimeout(()=>{t.style.opacity='0';t.style.transition='opacity .3s';setTimeout(()=>t.remove(),300)},2000);
+}
+
 async function switchMode(m){if(!sess)return;await fetch(`${API}/sessions/${sess.id}/mode?mode=${m}`,{method:'PUT',headers:H()});sess.mode=m}
 
 refreshTree();loadProv();initSess();
