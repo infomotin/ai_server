@@ -3887,6 +3887,15 @@ def api_telegram_test():
         result = resp.json()
         if result.get("ok"):
             bot = result["result"]
+            # Save token server-side for persistence
+            try:
+                import os
+                token_path = os.path.join(DATA_DIR, "telegram_token.txt")
+                os.makedirs(DATA_DIR, exist_ok=True)
+                with open(token_path, "w") as f:
+                    f.write(token)
+            except Exception:
+                pass
             return jsonify({"success": True, "username": bot.get("username", ""), "id": bot.get("id", ""), "first_name": bot.get("first_name", "")})
         return jsonify({"success": False, "message": result.get("description", "Invalid token")})
     except Exception as e:
@@ -4491,10 +4500,16 @@ def api_google_callback():
     error = request.args.get("error")
 
     if error:
-        return jsonify({"success": False, "error": f"Google OAuth error: {error}"}), 400
+        return f"""<html><body><script>
+            window.opener && window.opener.postMessage({{success: false, error: '{error}'}}, '*');
+            window.close();
+        </script><p>Error: {error}</p></body></html>"""
 
     if not code or state not in google_state_tokens:
-        return jsonify({"success": False, "error": "Invalid callback parameters"}), 400
+        return """<html><body><script>
+            window.opener && window.opener.postMessage({success: false, error: 'Invalid parameters'}, '*');
+            window.close();
+        </script><p>Invalid callback parameters</p></body></html>"""
 
     service = google_state_tokens.pop(state)
 
@@ -4518,13 +4533,16 @@ def api_google_callback():
         }
         save_google_tokens()
 
-        return jsonify({
-            "success": True,
-            "service": service,
-            "message": f"{service.replace('google_', 'Google ').title()} connected successfully!"
-        })
+        service_name = service.replace('google_', 'Google ').title()
+        return f"""<html><body><script>
+            window.opener && window.opener.postMessage({{success: true, service: '{service}', message: '{service_name} connected successfully!'}}, '*');
+            window.close();
+        </script><p>{service_name} connected successfully! You can close this window.</p></body></html>"""
     except Exception as e:
-        return jsonify({"success": False, "error": f"Token exchange failed: {str(e)}"}), 500
+        return f"""<html><body><script>
+            window.opener && window.opener.postMessage({{success: false, error: 'Token exchange failed: {str(e)[:100]}'}}, '*');
+            window.close();
+        </script><p>Token exchange failed: {str(e)[:200]}</p></body></html>"""
 
 @app.route("/api/integrations/google/status")
 def api_google_status():
@@ -4576,12 +4594,12 @@ def api_google_gmail():
             detail_resp = requests.get(f"https://gmail.googleapis.com/gmail/v1/users/me/messages/{msg['id']}?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date", headers=headers, timeout=10)
             if detail_resp.ok:
                 d = detail_resp.json()
-                headers = {h["name"]: h["value"] for h in d.get("payload", {}).get("headers", [])}
+                msg_headers = {h["name"]: h["value"] for h in d.get("payload", {}).get("headers", [])}
                 messages.append({
                     "id": d.get("id"),
-                    "from": headers.get("From", "Unknown"),
-                    "subject": headers.get("Subject", "(no subject)"),
-                    "date": headers.get("Date", ""),
+                    "from": msg_headers.get("From", "Unknown"),
+                    "subject": msg_headers.get("Subject", "(no subject)"),
+                    "date": msg_headers.get("Date", ""),
                     "snippet": d.get("snippet", ""),
                     "read": "UNREAD" not in d.get("labelIds", []),
                     "platform": "gmail",
@@ -4729,7 +4747,7 @@ def api_whatsapp_qr():
     data = request.get_json(silent=True) or {}
     phone = data.get("phone", "")
     message = data.get("message", "Hello! I'm interested in your business.")
-    session_id = data.get("session_id", f"wa_{session.get('user', {}).get('id', 'default')}")
+    session_id = data.get("session_id", "wa_default")
 
     bridge = _wa_bridge_request("POST", f"/sessions/{session_id}/init", timeout=10)
     if bridge is None:
@@ -4740,7 +4758,7 @@ def api_whatsapp_qr():
         }), 503
 
     import time
-    for _ in range(20):
+    for _ in range(10):
         time.sleep(1)
         qr_resp = _wa_bridge_request("GET", f"/sessions/{session_id}/qr", timeout=5)
         if qr_resp and qr_resp.status_code == 200:
@@ -4780,9 +4798,28 @@ def api_whatsapp_qr():
     }), 408
 
 
+@app.route("/api/integrations/whatsapp/qr-refresh", methods=["GET"])
+def api_whatsapp_qr_refresh():
+    session_id = request.args.get("session_id", "wa_default")
+    qr_resp = _wa_bridge_request("GET", f"/sessions/{session_id}/qr", timeout=5)
+    if qr_resp and qr_resp.status_code == 200:
+        try:
+            d = qr_resp.json()
+            if d.get("success"):
+                return jsonify({
+                    "success": True,
+                    "image": d.get("qrImage"),
+                    "content": d.get("qr"),
+                    "session_id": session_id
+                })
+        except Exception:
+            pass
+    return jsonify({"success": False, "error": "QR not ready"}), 404
+
+
 @app.route("/api/integrations/whatsapp/status", methods=["GET"])
 def api_whatsapp_status():
-    session_id = request.args.get("session_id", f"wa_{session.get('user', {}).get('id', 'default')}")
+    session_id = request.args.get("session_id", "wa_default")
     bridge = _wa_bridge_request("GET", f"/sessions/{session_id}/status", timeout=5)
     if bridge is None:
         return jsonify({"success": False, "bridge_running": False, "error": "Bridge not running"}), 503
@@ -4795,7 +4832,7 @@ def api_whatsapp_status():
 @app.route("/api/integrations/whatsapp/logout", methods=["POST"])
 def api_whatsapp_logout():
     data = request.get_json(silent=True) or {}
-    session_id = data.get("session_id", f"wa_{session.get('user', {}).get('id', 'default')}")
+    session_id = data.get("session_id", "wa_default")
     bridge = _wa_bridge_request("POST", f"/sessions/{session_id}/logout", timeout=15)
     if bridge is None:
         return jsonify({"success": False, "error": "Bridge not running"}), 503
@@ -4808,11 +4845,17 @@ def api_whatsapp_logout():
 @app.route("/api/integrations/whatsapp/send-wa", methods=["POST"])
 def api_whatsapp_send_wa():
     data = request.get_json(silent=True) or {}
-    session_id = data.get("session_id", f"wa_{session.get('user', {}).get('id', 'default')}")
+    session_id = data.get("session_id", "wa_default")
     to = data.get("to", "")
     text = data.get("text", "")
     if not to or not text:
         return jsonify({"success": False, "message": "Recipient and text required"}), 400
+    
+    # Normalize number format for WhatsApp
+    to = to.strip().replace("+", "").replace(" ", "").replace("-", "")
+    if not to.endswith("@c.us") and not to.endswith("@g.us"):
+        to = to + "@c.us"
+    
     bridge = _wa_bridge_request("POST", f"/sessions/{session_id}/send", json={"to": to, "text": text}, timeout=15)
     if bridge is None:
         return jsonify({"success": False, "error": "Bridge not running"}), 503
@@ -4917,7 +4960,7 @@ def api_whatsapp_webhook():
                     save_whatsapp_message(from_num, text, msg_type, "inbound", value.get("metadata", {}).get("phone_number_id", ""))
         return jsonify({"status": "ok"}), 200
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 200
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 
 def save_whatsapp_message(from_num, text, msg_type, direction, phone_id):
@@ -5118,7 +5161,8 @@ def api_assign_user_role(user_id):
 def api_ai_chat_proxy():
     data = request.get_json(silent=True) or {}
     try:
-        resp = requests.post(f"{API_BASE_URL}/v1/chat/completions", json=data, headers=get_api_headers(), timeout=180)
+        # Use llama.cpp directly (OpenAI-compatible API)
+        resp = requests.post("http://localhost:8080/v1/chat/completions", json=data, timeout=180)
         result = resp.json()
         return jsonify(result), resp.status_code
     except Exception as e:

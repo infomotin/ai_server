@@ -990,7 +990,7 @@ async function initWhatsAppWeb() {
 
 async function refreshWhatsAppQR() {
     try {
-        const r = await fetch(API + '/whatsapp/qr', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({session_id: waSessionId, refresh: true})});
+        const r = await fetch(API + '/whatsapp/qr-refresh?session_id=' + waSessionId);
         const d = await r.json();
         if (d.success && d.image) {
             document.getElementById('waQrImage').src = d.image;
@@ -1031,8 +1031,11 @@ async function logoutWhatsAppWeb() {
     if (!confirm('Logout from WhatsApp Web?')) return;
     try {
         await fetch(API + '/whatsapp/logout', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({session_id: waSessionId})});
+        if (waQrRefreshInterval) { clearInterval(waQrRefreshInterval); waQrRefreshInterval = null; }
+        if (waStatusRefreshInterval) { clearInterval(waStatusRefreshInterval); waStatusRefreshInterval = null; }
         document.getElementById('waQrResult').classList.add('hidden');
         document.getElementById('waConnectedBox').classList.add('hidden');
+        document.getElementById('waInitBtn').disabled = false;
         updateWAStatus('disconnected', 'Disconnected');
         showToast('Logged out', 'success');
     } catch(e) { showToast('Error', 'error'); }
@@ -1630,7 +1633,7 @@ async function sendChatMessage(aiMode) {
         chatEl.scrollTop = chatEl.scrollHeight;
         try {
             var r = await fetch('/api/ai/chat', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({
-                model: document.getElementById('aiModel') ? document.getElementById('aiModel').value : 'qwen2.5-coder:1.5b',
+                model: document.getElementById('aiModel') ? document.getElementById('aiModel').value : 'llama3.2:1b',
                 messages: [{role:'system', content:'You are a helpful assistant. Generate a short, natural reply.'}, {role:'user', content:text}],
                 max_tokens: 200, temperature: 0.7
             })});
@@ -1651,7 +1654,7 @@ async function sendChatMessage(aiMode) {
     var success = false;
     if (conv.platform === 'whatsapp' && chatId) {
         try {
-            var r = await fetch(API + '/whatsapp/send-wa', {method:'POST', headers:{'Content-Type': 'application/json'}, body: JSON.stringify({session_id: 'wa_default', to: chatId.replace('@c.us','').replace('@g.us',''), text: text})});
+            var r = await fetch(API + '/whatsapp/send-wa', {method:'POST', headers:{'Content-Type': 'application/json'}, body: JSON.stringify({session_id: waSessionId || 'wa_default', to: chatId.replace('@c.us','').replace('@g.us',''), text: text})});
             var d = await r.json();
             if (d.success) { success = true; }
             else { showToast('Send failed: ' + (d.message || d.error), 'error'); _sendingMessage = false; return; }
@@ -1727,7 +1730,7 @@ async function aiVoiceAssist() {
         document.getElementById('aiVoiceStatus').innerHTML = '<i class="fas fa-check mr-1"></i>Heard: "' + transcript + '" - AI thinking...';
         try {
             var r = await fetch('/api/ai/chat', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({
-                model: 'qwen2.5-coder:1.5b',
+                model: 'llama3.2:1b',
                 messages: [{role:'system', content:'You are a voice assistant. ' + context + '. Give a short, helpful spoken response.'}, {role:'user', content:transcript}],
                 max_tokens: 200, temperature: 0.7
             })});
@@ -1938,7 +1941,7 @@ async function generateReply(message) {
     if (!panel || !suggestion) return;
     panel.classList.remove('hidden');
     suggestion.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Generating reply...';
-    var model = document.getElementById('aiModel') ? document.getElementById('aiModel').value : 'qwen2.5-coder:1.5b';
+    var model = document.getElementById('aiModel') ? document.getElementById('aiModel').value : 'llama3.2:1b';
     var plat = message.platform || 'whatsapp';
     var replyPrompt = 'Generate a helpful reply to this ' + plat + ' message from "' + (message.contact || 'Unknown') + '": "' + (message.text || message.body || '') + '". Keep it short and natural. Just the reply text.';
     try {
@@ -1973,7 +1976,7 @@ async function sendAIMessage(takeAction) {
     chatEl.innerHTML += '<div class="flex justify-start mb-3" id="typingBubble"><div class="bg-purple-600/20 rounded-2xl px-4 py-2.5"><div class="typing-indicator"><span></span><span></span><span></span></div></div></div>';
     chatEl.scrollTop = chatEl.scrollHeight;
 
-    var model = document.getElementById('aiModel') ? document.getElementById('aiModel').value : 'qwen2.5-coder:1.5b';
+    var model = document.getElementById('aiModel') ? document.getElementById('aiModel').value : 'llama3.2:1b';
     var conv = activeConversation ? allConversations[activeConversation] : null;
     var systemPrompt = 'You are an Integration AI Assistant. Connected platforms: WhatsApp, Email, Facebook, Telegram. ' + (takeAction ? 'The user wants ACTION. Provide steps.' : 'Answer questions about reading/writing/replying to messages.') + ' Be concise and helpful.';
 
@@ -1998,17 +2001,7 @@ async function sendAIMessage(takeAction) {
 }
 
 function showActionSteps(response) {
-    const container = document.getElementById('actionSteps');
-    const list = document.getElementById('actionStepsList');
-    if (!container || !list) return;
-    container.classList.remove('hidden');
-
-    const steps = response.split(/\n\d+\.|\nStep \d+/i).filter(s => s.trim());
-    list.innerHTML = steps.slice(0, 5).map((s, i) => `
-        <div class="action-step ${i === 0 ? 'executing' : ''}">
-            <span class="step-num">${i + 1}</span>${esc(s.trim().substring(0, 150))}
-        </div>
-    `).join('');
+    showToast('Action: ' + response.substring(0, 100), 'info');
 }
 
 /* ===== VIDEO/AUDIO CALLS ===== */
