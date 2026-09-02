@@ -847,14 +847,14 @@ def api_explain_code():
 
     try:
         resp = requests.post(
-            "http://localhost:11434/api/chat",
+            "http://localhost:8080/v1/chat/completions",
             json={
                 "model": model,
                 "messages": [
                     {"role": "system", "content": "You are an expert programming teacher. Explain code step by step in simple terms. Describe what each part does, the overall logic, input/output, time complexity, and potential improvements. Use clear formatting with bullet points. Also provide a trace table showing variable values at each step."},
                     {"role": "user", "content": f"Explain this code in detail with variable trace:\n\n{code}"}
                 ],
-                "stream": False
+                
             },
             timeout=60
         )
@@ -863,7 +863,7 @@ def api_explain_code():
         if resp.status_code == 200:
             result = resp.json()
             reply = result.get("message", {}).get("content", "No response")
-            tokens = result.get("eval_count", 0)
+            tokens = result.get("usage", {}).get("completion_tokens", 0)
             return jsonify({"success": True, "explanation": reply, "tokens": tokens, "latency_ms": elapsed, "model": model})
         else:
             return jsonify({"success": False, "error": "Ollama error", "latency_ms": elapsed})
@@ -887,14 +887,14 @@ def api_book_qa():
 
     try:
         resp = requests.post(
-            "http://localhost:11434/api/chat",
+            "http://localhost:8080/v1/chat/completions",
             json={
                 "model": model,
                 "messages": [
                     {"role": "system", "content": f"You are a book analysis expert. Analyze the book '{book_title}' and generate: 1) A brief summary (3-5 sentences) 2) Key themes and ideas 3) 10 quiz questions with answers 4) Character analysis 5) Important quotes 6) Critical thinking questions. Format everything clearly with markdown."},
                     {"role": "user", "content": f"Analyze this book content and generate Q&A:\n\n{book_text[:6000]}"}
                 ],
-                "stream": False
+                
             },
             timeout=90
         )
@@ -903,7 +903,7 @@ def api_book_qa():
         if resp.status_code == 200:
             result = resp.json()
             reply = result.get("message", {}).get("content", "No response")
-            tokens = result.get("eval_count", 0)
+            tokens = result.get("usage", {}).get("completion_tokens", 0)
             return jsonify({"success": True, "analysis": reply, "tokens": tokens, "latency_ms": elapsed, "model": model})
         else:
             return jsonify({"success": False, "error": "Ollama error", "latency_ms": elapsed})
@@ -924,14 +924,14 @@ def api_programming_skill_test():
 
     try:
         resp = requests.post(
-            "http://localhost:11434/api/chat",
+            "http://localhost:8080/v1/chat/completions",
             json={
                 "model": model,
                 "messages": [
                     {"role": "system", "content": f"You are a programming exam creator. Generate a {difficulty} level programming quiz on {topic}. Create 5 questions mixing multiple choice, code completion, and debugging challenges. For each question provide: question, options (if MC), correct answer, and explanation. Format as JSON array."},
                     {"role": "user", "content": f"Generate a {difficulty} {topic} programming quiz with 5 questions. Include code snippets where relevant."}
                 ],
-                "stream": False
+                
             },
             timeout=60
         )
@@ -940,7 +940,7 @@ def api_programming_skill_test():
         if resp.status_code == 200:
             result = resp.json()
             reply = result.get("message", {}).get("content", "No response")
-            tokens = result.get("eval_count", 0)
+            tokens = result.get("usage", {}).get("completion_tokens", 0)
             return jsonify({"success": True, "quiz": reply, "tokens": tokens, "latency_ms": elapsed, "model": model, "topic": topic, "difficulty": difficulty})
         else:
             return jsonify({"success": False, "error": "Ollama error", "latency_ms": elapsed})
@@ -963,14 +963,14 @@ def api_sql_explain():
 
     try:
         resp = requests.post(
-            "http://localhost:11434/api/chat",
+            "http://localhost:8080/v1/chat/completions",
             json={
                 "model": model,
                 "messages": [
                     {"role": "system", "content": "You are a SQL expert. Analyze this SQL query and explain: 1) What the query does step by step, 2) Tables and joins used, 3) WHERE conditions and filters, 4) GROUP BY and HAVING logic, 5) Performance tips, 6) Potential issues, 7) How to optimize it. Use clear formatting with examples."},
                     {"role": "user", "content": f"Explain this SQL query in detail:\n\n{code}"}
                 ],
-                "stream": False
+                
             },
             timeout=60
         )
@@ -979,7 +979,7 @@ def api_sql_explain():
         if resp.status_code == 200:
             result = resp.json()
             reply = result.get("message", {}).get("content", "No response")
-            tokens = result.get("eval_count", 0)
+            tokens = result.get("usage", {}).get("completion_tokens", 0)
             return jsonify({"success": True, "explanation": reply, "tokens": tokens, "latency_ms": elapsed, "model": model})
         else:
             return jsonify({"success": False, "error": "Ollama error", "latency_ms": elapsed})
@@ -1043,14 +1043,14 @@ def api_book_upload():
 
     try:
         resp = requests.post(
-            "http://localhost:11434/api/chat",
+            "http://localhost:8080/v1/chat/completions",
             json={
                 "model": model,
                 "messages": [
                     {"role": "system", "content": "You are a literary analysis expert and educator. Provide thorough, well-structured analysis with clear formatting."},
                     {"role": "user", "content": prompt}
                 ],
-                "stream": False
+                
             },
             timeout=90
         )
@@ -1059,7 +1059,7 @@ def api_book_upload():
         if resp.status_code == 200:
             result = resp.json()
             reply = result.get("message", {}).get("content", "No response")
-            tokens = result.get("eval_count", 0)
+            tokens = result.get("usage", {}).get("completion_tokens", 0)
             return jsonify({"success": True, "analysis": reply, "tokens": tokens, "latency_ms": elapsed, "model": model})
         else:
             return jsonify({"success": False, "error": "Ollama error", "latency_ms": elapsed})
@@ -1089,14 +1089,14 @@ def api_visualino_code():
         }.get(board, "generic microcontroller")
 
         resp = requests.post(
-            "http://localhost:11434/api/chat",
+            "http://localhost:8080/v1/chat/completions",
             json={
                 "model": model,
                 "messages": [
                     {"role": "system", "content": f"You are an expert embedded systems programmer. Generate Arduino/C++ code for {board} ({board_info}). Include proper setup(), loop(), comments, pin definitions, and library imports. Code should be ready to compile and upload."},
                     {"role": "user", "content": f"Generate code for this block program:\n{block_desc}\n\nBoard: {board}\n\nProvide complete, compilable Arduino code with comments."}
                 ],
-                "stream": False
+                
             },
             timeout=60
         )
@@ -1105,7 +1105,7 @@ def api_visualino_code():
         if resp.status_code == 200:
             result = resp.json()
             reply = result.get("message", {}).get("content", "No response")
-            tokens = result.get("eval_count", 0)
+            tokens = result.get("usage", {}).get("completion_tokens", 0)
             return jsonify({"success": True, "code": reply, "tokens": tokens, "latency_ms": elapsed, "model": model, "board": board})
         else:
             return jsonify({"success": False, "error": "Ollama error", "latency_ms": elapsed})
@@ -1128,7 +1128,7 @@ def api_optimize_query():
 
     try:
         resp = requests.post(
-            "http://localhost:11434/api/chat",
+            "http://localhost:8080/v1/chat/completions",
             json={
                 "model": model,
                 "messages": [
@@ -1144,7 +1144,7 @@ def api_optimize_query():
 Be specific, use examples, and explain the WHY behind every suggestion."""},
                     {"role": "user", "content": f"Optimize this SQL query:\n\n{code}"}
                 ],
-                "stream": False
+                
             },
             timeout=60
         )
@@ -1153,7 +1153,7 @@ Be specific, use examples, and explain the WHY behind every suggestion."""},
         if resp.status_code == 200:
             result = resp.json()
             reply = result.get("message", {}).get("content", "No response")
-            tokens = result.get("eval_count", 0)
+            tokens = result.get("usage", {}).get("completion_tokens", 0)
             return jsonify({"success": True, "optimization": reply, "tokens": tokens, "latency_ms": elapsed, "model": model})
         else:
             return jsonify({"success": False, "error": "Ollama error", "latency_ms": elapsed})
@@ -1301,35 +1301,36 @@ def api_chat():
         except Exception:
             pass
 
-    ollama_messages = []
+    chat_messages = []
     if system_prompt:
-        ollama_messages.append({"role": "system", "content": system_prompt})
+        chat_messages.append({"role": "system", "content": system_prompt})
     for m in messages:
-        ollama_messages.append({"role": m.get("role", "user"), "content": m.get("content", "")})
+        chat_messages.append({"role": m.get("role", "user"), "content": m.get("content", "")})
 
     try:
         import uuid
         import time
 
+        # Use llama.cpp OpenAI-compatible API
         payload = {
             "model": model,
-            "messages": ollama_messages,
+            "messages": chat_messages,
             "temperature": temperature,
-            "options": {"num_predict": max_tokens},
-            "stream": False
+            "max_tokens": max_tokens
         }
 
         response = requests.post(
-            "http://localhost:11434/api/chat",
+            "http://localhost:8080/v1/chat/completions",
             json=payload,
             timeout=120
         )
 
         if response.status_code == 200:
             result = response.json()
-            content = result.get("message", {}).get("content", "")
-            prompt_tokens = result.get("prompt_eval_count", 0)
-            completion_tokens = result.get("eval_count", 0)
+            content = result.get("choices", [{}])[0].get("message", {}).get("content", "")
+            usage = result.get("usage", {})
+            prompt_tokens = usage.get("prompt_tokens", 0)
+            completion_tokens = usage.get("completion_tokens", 0)
 
             return jsonify({
                 "id": f"chatcmpl-{uuid.uuid4().hex[:8]}",
@@ -1348,9 +1349,9 @@ def api_chat():
                 }
             })
         else:
-            return jsonify({"error": f"Ollama returned {response.status_code}"}), 500
+            return jsonify({"error": f"llama.cpp returned {response.status_code}"}), 500
     except requests.exceptions.ConnectionError:
-        return jsonify({"error": "Cannot connect to Ollama. Is it running?"}), 503
+        return jsonify({"error": "Cannot connect to llama.cpp. Is it running on port 8080?"}), 503
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -1362,7 +1363,7 @@ def management():
         # Fetch models directly from Ollama
         ollama_models = []
         try:
-            ollama_resp = requests.get("http://localhost:11434/api/tags", timeout=5)
+            ollama_resp = requests.get("http://localhost:8080/v1/models", timeout=5)
             if ollama_resp.status_code == 200:
                 ollama_data = ollama_resp.json()
                 for m in ollama_data.get("models", []):
@@ -1766,7 +1767,7 @@ def api_management_model_info(model_id):
     try:
         import time
         started = time.time()
-        ollama_resp = requests.get("http://localhost:11434/api/tags", timeout=5)
+        ollama_resp = requests.get("http://localhost:8080/v1/models", timeout=5)
         if ollama_resp.status_code == 200:
             models = ollama_resp.json().get("models", [])
             for m in models:
@@ -1852,7 +1853,7 @@ def api_management_health_check():
         import time
         started = time.time()
         try:
-            ollama_resp = requests.get("http://localhost:11434/", timeout=5)
+            ollama_resp = requests.get("http://localhost:8080/v1/models", timeout=5)
             reachable = ollama_resp.status_code == 200
         except Exception:
             reachable = False
@@ -1878,10 +1879,10 @@ def api_management_benchmark():
         import time
         started = time.time()
         try:
-            ollama_resp = requests.post("http://localhost:11434/api/generate", json={
+            ollama_resp = requests.post("http://localhost:8080/v1/completions", json={
                 "model": model_id,
                 "prompt": prompt,
-                "stream": False
+                
             }, timeout=120)
             result = ollama_resp.json()
         except Exception as e:
@@ -1889,8 +1890,8 @@ def api_management_benchmark():
         elapsed = time.time() - started
 
         text = result.get("response", "")
-        completion_tokens = result.get("eval_count", 0)
-        prompt_tokens = result.get("prompt_eval_count", 0)
+        completion_tokens = result.get("usage", {}).get("completion_tokens", 0)
+        prompt_tokens = result.get("usage", {}).get("prompt_tokens", 0)
         tps = (completion_tokens / elapsed) if elapsed > 0 and completion_tokens else 0.0
 
         return {
@@ -1917,20 +1918,20 @@ def api_management_playground():
         import time
         started = time.time()
         try:
-            ollama_resp = requests.post("http://localhost:11434/api/chat", json={
+            ollama_resp = requests.post("http://localhost:8080/v1/chat/completions", json={
                 "model": model_id,
                 "messages": messages,
-                "stream": False
+                
             }, timeout=120)
             result = ollama_resp.json()
         except Exception as e:
             return {"error": str(e)[:300]}
         elapsed = time.time() - started
 
-        text = result.get("message", {}).get("content", "")
+        text = result.get("choices", [{}])[0].get("message", {}).get("content", "")
         usage = {
-            "completion_tokens": result.get("eval_count", 0),
-            "prompt_tokens": result.get("prompt_eval_count", 0),
+            "completion_tokens": result.get("usage", {}).get("completion_tokens", 0),
+            "prompt_tokens": result.get("usage", {}).get("prompt_tokens", 0),
         }
 
         return {
@@ -2283,12 +2284,12 @@ def api_model_builder_test(model_id):
 
     try:
         r = requests.post(f"{OLLAMA_BASE_URL}/api/chat",
-                          json={"model": ollama_name, "messages": messages, "stream": False},
+                          json={"model": ollama_name, "messages": messages, },
                           timeout=60)
         if r.status_code == 200:
             result = r.json()
             return jsonify({
-                "response": result.get("message", {}).get("content", ""),
+                "response": result.get("choices", [{}])[0].get("message", {}).get("content", ""),
                 "model": ollama_name,
             })
         return jsonify({"error": f"Ollama error: {r.text[:200]}"}), 502
