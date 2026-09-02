@@ -3927,6 +3927,31 @@ def api_telegram_send_direct():
         return jsonify({"success": False, "message": str(e)[:200]})
 
 
+@app.route("/api/integrations/telegram/resolve-username", methods=["POST"])
+def api_telegram_resolve_username():
+    data = request.get_json(silent=True) or {}
+    token = data.get("bot_token", "")
+    username = data.get("username", "").strip().replace("@", "")
+    if not token or not username:
+        return jsonify({"success": False, "message": "Token and username required"})
+    try:
+        resp = httpx.get(f"https://api.telegram.org/bot{token}/getChat", params={"chat_id": f"@{username}"}, timeout=10)
+        result = resp.json()
+        if result.get("ok"):
+            chat = result["result"]
+            return jsonify({
+                "success": True,
+                "chat_id": chat.get("id"),
+                "username": chat.get("username"),
+                "first_name": chat.get("first_name", ""),
+                "last_name": chat.get("last_name", ""),
+                "type": chat.get("type")
+            })
+        return jsonify({"success": False, "message": result.get("description", "User not found. Make sure they have started a chat with the bot.")})
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)[:200]})
+
+
 @app.route("/api/integrations/telegram/updates-direct", methods=["POST"])
 def api_telegram_updates_direct():
     data = request.get_json(silent=True) or {}
