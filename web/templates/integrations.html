@@ -819,11 +819,19 @@ async function testConnect() {
             const r = await fetch(API + '/whatsapp/qr', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({phone: document.getElementById('waPhone')?.value || ''})});
             const d = await r.json();
             if (d.success) {
-                document.getElementById('connectQrImg').src = d.image;
-                document.getElementById('connectQrInstructions').textContent = d.instructions;
-                status.className = 'p-3 rounded-lg bg-green-600/20 border border-green-600 text-green-400 text-sm';
-                status.innerHTML = '<i class="fas fa-check mr-1"></i>QR code generated. Scan with your phone.';
+                if (d.already_connected) {
+                    document.getElementById('connectQrArea').classList.add('hidden');
+                    status.className = 'p-3 rounded-lg bg-green-600/20 border border-green-600 text-green-400 text-sm';
+                    status.innerHTML = '<i class="fas fa-check mr-1"></i>WhatsApp is already connected!';
+                } else if (d.image) {
+                    document.getElementById('connectQrArea').classList.remove('hidden');
+                    document.getElementById('connectQrImg').src = d.image;
+                    document.getElementById('connectQrInstructions').textContent = d.instructions || '';
+                    status.className = 'p-3 rounded-lg bg-green-600/20 border border-green-600 text-green-400 text-sm';
+                    status.innerHTML = '<i class="fas fa-check mr-1"></i>QR code generated. Scan with your phone.';
+                }
             } else {
+                document.getElementById('connectQrArea').classList.add('hidden');
                 status.className = 'p-3 rounded-lg bg-red-600/20 border border-red-600 text-red-400 text-sm';
                 status.innerHTML = '<i class="fas fa-times mr-1"></i>' + (d.error || 'Failed');
             }
