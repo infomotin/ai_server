@@ -1,5 +1,6 @@
 import asyncio
 import json
+import re
 import time
 import uuid
 from datetime import datetime
@@ -12,6 +13,7 @@ from src.models.database import (
     AssistantLog, AssistantMessage, AssistantConversation
 )
 from src.inference.ollama_client import ollama_client, lmstudio_client, get_inference_client
+from src.services.agent_service import TOOL_DEFINITIONS, execute_tool
 
 
 ASSISTANT_TEMPLATES = {
@@ -200,6 +202,73 @@ def _estimate_tokens(text: str) -> int:
     if not text:
         return 0
     return max(1, len(text) // 4)
+
+
+def _tool_names() -> str:
+    return ", ".join(t["function"]["name"] for t in TOOL_DEFINITIONS)
+
+
+TOOL_SYSTEM_PROMPT = """You are Jarvas, an AI assistant with FULL AGENT powers running on the user's own server. You have these tools available, which you can invoke by emitting a special function-call JSON object as your ONLY output for a step:
+
+TOOLS:
+- run_command(command, cwd?, timeout?): Execute any shell command on the server (full root power). Use for running programs, scripts, git, installs, OS operations, etc.
+- read_file(path, offset?, limit?): Read a file's contents.
+- write_file(path, content): Create or overwrite a file (use for writing code, scripts, configs).
+- edit_file(path, old_text, new_text): Replace exact text in a file.
+- list_directory(path, max_depth?): List a directory's contents.
+- search_files(path, pattern, file_pattern?, max_results?): Regex-search across files inside the project.
+- get_file_info(path): File metadata.
+- create_directory(path): Create a directory.
+- delete_file(path): Delete a file/directory (destructive).
+- web_search(query, max_results?): Search the internet via DuckDuckGo.
+- web_fetch(url, max_chars?): Fetch and read a web page's text content.
+
+HOW TO CALL A TOOL - output ONLY one JSON object like this, NO other text:
+{"tool":"run_command","arguments":{"command":"ls -la","cwd":"/www"}}
+
+After I (the harness) execute the tool, you will receive the result and then decide the next step (another tool call or the final answer).
+
+RULES:
+- For multi-step tasks (read code, modify, run, verify), DO use multiple tool calls in sequence.
+- To write+run code: use write_file to create the script, then run_command to execute it, then read output.
+- To search the web: use web_search, then web_fetch the best URL if you need full content.
+- To modify the application: explore first with list_directory/search_files/read_file, then edit_file/write_file, then run_command to test.
+- IMPORTANT: When you are DONE and ready to give the user your final natural-language response (including summarizing any tool results), output plain text normally (no JSON).
+- When you want to call a tool, output ONLY the JSON tool call.
+
+You have full permission to execute commands with root power, access the web, search/read/modify application code, and write & execute code. You are an AI coding agent."""
+
+
+def _parse_tool_call(text: str):
+    """Extract a single tool call from model output text. Returns (tool_name, args) or None."""
+    if not text:
+        return None
+    # Direct native format may come through content as JSON
+    try:
+        stripped = text.strip()
+        obj = json.loads(stripped)
+        if isinstance(obj, dict) and "tool" in obj:
+            return (obj["tool"], obj.get("arguments") or {})
+        if isinstance(obj, dict) and "name" in obj and "arguments" in obj:
+            return (obj["name"], obj.get("arguments") or {})
+    except Exception:
+        pass
+    # Regex search for {"tool":...} or {"name":...} JSON in text
+    for pattern in (
+        r'\{"tool"\s*:\s*"[^"]+"\s*,\s*"arguments"\s*:\s*\{.*?\}\}',
+        r'\{"name"\s*:\s*"[^"]+"\s*,\s*"arguments"\s*:\s*\{.*?\}\}',
+    ):
+        matches = re.findall(pattern, text, re.DOTALL)
+        if matches:
+            try:
+                obj = json.loads(matches[0])
+                if "tool" in obj:
+                    return (obj["tool"], obj.get("arguments") or {})
+                if "name" in obj:
+                    return (obj["name"], obj.get("arguments") or {})
+            except Exception:
+                continue
+    return None
 
 
 class AIAssistantService:
@@ -550,6 +619,26 @@ class AIAssistantService:
 
     # ---------- Core chat ----------
 
+    def _get_capable_provider_agent(self, db: Session):
+        """Return an AgentService for a tool-capable non-local provider (reliable function calling),
+        or None to fall back to the local llama.cpp model."""
+        try:
+            from src.models.agent_models import AgentProvider
+            from src.services.agent_service import AgentService
+            # Prefer an active provider that is NOT the local tiny model and has an API key
+            for prov in db.query(AgentProvider).filter(
+                AgentProvider.is_active == True
+            ).order_by(AgentProvider.created_at.asc()).all():
+                ptype = (prov.provider_type or "").lower()
+                if ptype in ("ollama", "llamacpp"):
+                    continue
+                if not prov.api_key and ptype not in ("custom",):
+                    continue
+                return AgentService(prov)
+        except Exception:
+            pass
+        return None
+
     async def process_chat(self, db: Session, assistant_id: str, user_id: str,
                            message: str, conversation_id: str = None,
                            integration_type: str = None) -> Dict[str, Any]:
@@ -586,41 +675,130 @@ class AIAssistantService:
         if personality_suffix:
             system_content += "\n\n" + personality_suffix
 
-        messages_payload = [{"role": "system", "content": system_content}]
-        for h in history:
-            messages_payload.append({"role": h.role, "content": h.content})
-
         response_text = ""
         tokens_used = 0
         error_message = None
         status = "success"
 
+        # Build agent system prompt (tool instructions) layered on top of the assistant prompt
+        tool_prompt = TOOL_SYSTEM_PROMPT
+        messages_payload = [{"role": "system", "content": system_content + "\n\n" + tool_prompt}]
+        for h in history:
+            messages_payload.append({
+                "role": "assistant" if h.role == "assistant" else "user",
+                "content": h.content
+            })
+        messages_payload.append({"role": "user", "content": message})
+
+        # Prefer a tool-capable remote/cloud provider (reliable function calling) if one exists;
+        # otherwise fall back to the local llama.cpp model.
+        provider_agent = self._get_capable_provider_agent(db)
+        client = get_inference_client()
+        model = assistant.model_id or "llama3.2:1b"
+        is_local = isinstance(client, type(ollama_client))
+
+        async def _one_iteration(payload, temp, m_tok):
+            """One model call. Returns (content, raw_tool_calls)."""
+            if provider_agent is not None:
+                res = provider_agent.chat(
+                    payload, tools=TOOL_DEFINITIONS,
+                    tool_choice="auto", max_tokens=m_tok
+                )
+                if not res.get("success"):
+                    # Provider failed -> fall back to local
+                    raise RuntimeError(res.get("error", "provider error"))
+                return res.get("content", "") or "", res.get("tool_calls")
+            # Local path
+            result = await client.chat(
+                messages=payload, model=model,
+                temperature=temp, top_p=0.9, max_tokens=m_tok, stream=False
+            )
+            if is_local:
+                return result.get("message", {}).get("content", ""), result.get("tool_calls")
+            return result["choices"][0]["message"]["content"] or "", \
+                result["choices"][0]["message"].get("tool_calls")
+
         try:
-            client = get_inference_client()
-            model = assistant.model_id or "llama3.2:1b"
+            temp = assistant.temperature if assistant.temperature is not None else 0.7
+            max_tokens = assistant.max_tokens if assistant.max_tokens else 1000
+            max_iterations = 8
+            tool_results = []
+            finished = False
 
-            if isinstance(client, type(ollama_client)):
-                result = await client.chat(
-                    messages=messages_payload,
-                    model=model,
-                    temperature=assistant.temperature or 0.7,
-                    top_p=0.9,
-                    max_tokens=assistant.max_tokens or 1000,
-                    stream=False
-                )
-                response_text = result.get("message", {}).get("content", "")
-            else:
-                result = await client.chat(
-                    messages=messages_payload,
-                    model=model,
-                    temperature=assistant.temperature or 0.7,
-                    top_p=0.9,
-                    max_tokens=assistant.max_tokens or 1000,
-                    stream=False
-                )
-                response_text = result["choices"][0]["message"]["content"]
+            for iteration in range(max_iterations):
+                try:
+                    content, raw_tool_calls = await _one_iteration(messages_payload, temp, max_tokens)
+                except Exception:
+                    # Fall back to the local model if the remote provider fails
+                    if provider_agent is not None:
+                        try:
+                            result = await client.chat(
+                                messages=messages_payload, model=model,
+                                temperature=temp, top_p=0.9, max_tokens=max_tokens, stream=False
+                            )
+                            if is_local:
+                                content = result.get("message", {}).get("content", "")
+                                raw_tool_calls = result.get("tool_calls")
+                            else:
+                                content = result["choices"][0]["message"]["content"] or ""
+                                raw_tool_calls = result["choices"][0]["message"].get("tool_calls")
+                        except Exception:
+                            raise
+                    else:
+                        raise
 
-            tokens_used = _estimate_tokens(system_content) + _estimate_tokens(message) + _estimate_tokens(response_text)
+                # Resolve a tool call from native tool_calls OR text JSON
+                tool_call = None
+                if raw_tool_calls:
+                    tc = raw_tool_calls[0]
+                    try:
+                        args = tc.get("function", {}).get("arguments")
+                        if isinstance(args, str):
+                            args = json.loads(args)
+                        tool_call = (tc["function"]["name"], args or {})
+                    except Exception:
+                        tool_call = _parse_tool_call(json.dumps(raw_tool_calls[:1])[-2000:])
+                else:
+                    tool_call = _parse_tool_call(content)
+
+                if not tool_call:
+                    response_text = content or "No response."
+                    finished = True
+                    break
+
+                tool_name, tool_args = tool_call
+                try:
+                    tool_result = execute_tool(tool_name, tool_args, project_path="/www")
+                except Exception as tool_err:
+                    tool_result = {"success": False, "error": f"Tool execution failed: {str(tool_err)[:300]}"}
+
+                tokens_used += _estimate_tokens(content)
+                tool_results.append({
+                    "tool": tool_name,
+                    "args": tool_args,
+                    "result": tool_result
+                })
+
+                # Append the assistant's tool-call intent then the tool result
+                messages_payload.append({"role": "assistant", "content": content})
+                result_str = json.dumps(tool_result, default=str)[:8000]
+                messages_payload.append({
+                    "role": "user",
+                    "content": f"Tool '{tool_name}' returned:\n{result_str}\n\nContinue. If done, give your final answer. If more steps, call another tool."
+                })
+
+            if not finished:
+                # Exhausted all iterations
+                if tool_results:
+                    response_text = (
+                        "I performed multiple tool operations:\n"
+                        + "\n".join(f"- {t['tool']} {json.dumps(t['args'])[:120]}" for t in tool_results)
+                        + "\n\nWhat would you like me to do next?"
+                    )
+                else:
+                    response_text = "No response."
+
+            tokens_used += _estimate_tokens(system_content) + _estimate_tokens(message)
         except Exception as e:
             response_text = (
                 "I couldn't reach the inference backend. "
@@ -628,6 +806,7 @@ class AIAssistantService:
             )
             error_message = str(e)[:500]
             status = "error"
+
 
         assistant_msg = AssistantMessage(
             conversation_id=conv.id,

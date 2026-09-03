@@ -1,6 +1,8 @@
 import json
 import os
+import re
 import httpx
+import requests
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 
@@ -248,8 +250,119 @@ TOOL_DEFINITIONS = [
                 "required": ["path"]
             }
         }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "web_search",
+            "description": "Search the internet using DuckDuckGo. Returns a list of results with title, url, and snippet. Use this to find current information, news, or pages on the web.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string", "description": "The search query"},
+                    "max_results": {"type": "integer", "description": "Max results", "default": 5}
+                },
+                "required": ["query"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "web_fetch",
+            "description": "Fetch the text content of a web page/URL (HTML stripped to readable text). Use this to read articles, docs, or pages found via web_search.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "url": {"type": "string", "description": "The URL to fetch"},
+                    "max_chars": {"type": "integer", "description": "Max characters of text to return", "default": 4000}
+                },
+                "required": ["url"]
+            }
+        }
     }
 ]
+
+
+def web_search_impl(query: str, max_results: int = 5) -> Dict[str, Any]:
+    """Search the web via Bing (no API key needed). Returns title, real URL, snippet."""
+    try:
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept-Language": "en-US,en;q=0.9"
+        }
+        resp = requests.get(
+            "https://www.bing.com/search",
+            params={"q": query, "setlang": "en", "cc": "US", "mkt": "en-US"},
+            headers=headers,
+            timeout=20
+        )
+        if resp.status_code != 200:
+            return {"success": False, "error": f"Search failed: HTTP {resp.status_code}"}
+        from bs4 import BeautifulSoup
+        soup = BeautifulSoup(resp.text, "html.parser")
+        import urllib.parse
+        results = []
+        for li in soup.select("#b_results > li"):
+            a = li.select_one("h2 a")
+            if not a:
+                continue
+            title = a.get_text(strip=True)
+            href = a.get("href", "")
+            # Decode Bing redirect links
+            if href.startswith("https://www.bing.com/ck/a") or href.startswith("http://www.bing.com/ck/a"):
+                parsed = urllib.parse.urlparse(href)
+                qp = urllib.parse.parse_qs(parsed.query)
+                if qp.get("u"):
+                    raw = qp["u"][0]
+                    import base64
+                    try:
+                        if raw.startswith("a1"):
+                            decoded = base64.urlsafe_b64decode(raw[2:] + "===").decode("utf-8", "replace")
+                        else:
+                            decoded = base64.urlsafe_b64decode(raw + "===").decode("utf-8", "replace")
+                        if decoded.startswith("http"):
+                            href = decoded
+                    except Exception:
+                        pass
+                elif qp.get("p"):
+                    href = urllib.parse.unquote(qp["p"][0])
+            sn = li.select_one(".b_caption p")
+            snippet = sn.get_text(strip=True)[:300] if sn else ""
+            results.append({"title": title, "url": href, "snippet": snippet})
+            if len(results) >= max_results:
+                break
+        if not results:
+            return {"success": False, "error": "No search results found"}
+        return {"success": True, "query": query, "results": results}
+    except Exception as e:
+        return {"success": False, "error": str(e)[:300]}
+
+
+def web_fetch_impl(url: str, max_chars: int = 4000) -> Dict[str, Any]:
+    """Fetch a URL and return readable text (HTML stripped)."""
+    try:
+        headers = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36"}
+        resp = requests.get(url, headers=headers, timeout=30, verify=False)
+        if resp.status_code != 200:
+            return {"success": False, "error": f"HTTP {resp.status_code}"}
+        content_type = resp.headers.get("Content-Type", "")
+        text = resp.text
+        if "json" in content_type:
+            try:
+                return {"success": True, "url": url, "content": json.dumps(resp.json())[:max_chars]}
+            except Exception:
+                pass
+        if "html" in content_type or "<html" in text.lower()[:1000] or "<div" in text.lower()[:1000]:
+            from bs4 import BeautifulSoup
+            soup = BeautifulSoup(text, "html.parser")
+            for tag in soup(["script", "style", "nav", "footer", "header", "aside", "noscript"]):
+                tag.decompose()
+            text = soup.get_text(separator="\n", strip=True)
+        text = re.sub(r"\n{3,}", "\n\n", text).strip()
+        return {"success": True, "url": url, "content": text[:max_chars]}
+    except Exception as e:
+        return {"success": False, "error": str(e)[:300]}
 
 
 def execute_tool(tool_name: str, arguments: dict, project_path: str = "/www") -> Any:
@@ -310,6 +423,12 @@ def execute_tool(tool_name: str, arguments: dict, project_path: str = "/www") ->
     elif tool_name == "delete_file":
         path = normalize_path(arguments.get("path", ""))
         return delete_file(path)
+
+    elif tool_name == "web_search":
+        return web_search_impl(arguments.get("query", ""), arguments.get("max_results", 5))
+
+    elif tool_name == "web_fetch":
+        return web_fetch_impl(arguments.get("url", ""), arguments.get("max_chars", 4000))
 
     return {"error": f"Unknown tool: {tool_name}"}
 
