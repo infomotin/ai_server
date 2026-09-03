@@ -16,7 +16,7 @@ database:
 inference:
   provider: "ollama"
   ollama:
-    base_url: "http://localhost:11434"
+    base_url: "http://localhost:8080"
     timeout: 300
   lmstudio:
     base_url: "http://localhost:1234"
