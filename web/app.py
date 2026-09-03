@@ -45,15 +45,15 @@ SMS_CONFIG_FILE = os.path.join(CONFIG_DIR, "sms.json")
 SECURITY_CONFIG_FILE = os.path.join(CONFIG_DIR, "security.json")
 
 DEFAULT_MAIL_CONFIG = {
-    "enabled": False,
-    "smtp_host": "smtp.gmail.com",
-    "smtp_port": 587,
+    "enabled": True,
+    "smtp_host": "sandbox.smtp.mailtrap.io",
+    "smtp_port": 2525,
     "use_ssl": False,
     "use_tls": True,
-    "username": "",
-    "password": "",
+    "username": "5222b220dcdef4",
+    "password": "0f62b8b368e1f9",
     "from_name": "AI Server",
-    "from_email": "",
+    "from_email": "noreply@aiserver.local",
     # System mail options
     "send_verification": True,       # send verification emails
     "send_otp": True,                # send OTP codes on login

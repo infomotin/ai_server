@@ -1,0 +1,17 @@
+{
+  "enabled": true,
+  "smtp_host": "sandbox.smtp.mailtrap.io",
+  "smtp_port": 2525,
+  "use_ssl": false,
+  "use_tls": true,
+  "username": "5222b220dcdef4",
+  "password": "0f62b8b368e1f9",
+  "from_name": "AI Server",
+  "from_email": "noreply@aiserver.local",
+  "send_verification": true,
+  "send_otp": true,
+  "send_notifications": true,
+  "send_group_mail": true,
+  "send_reports": true,
+  "mailing_list": []
+}
