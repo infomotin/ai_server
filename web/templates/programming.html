@@ -1065,6 +1065,8 @@ function buildAlgoOps(sel) {
     }
     return ops;
 }
+
+function initAlgo() {
     if (algoTimer) clearInterval(algoTimer);
     algoRunning = false;
     document.getElementById('algoAutoBtn').innerHTML = '<i class="fas fa-play mr-1"></i>Auto';
