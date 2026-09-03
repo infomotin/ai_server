@@ -624,7 +624,7 @@ class AIAssistantService:
         except Exception as e:
             response_text = (
                 "I couldn't reach the inference backend. "
-                "Please ensure Ollama is running and the selected model is downloaded."
+                "Please ensure the local AI server (llama.cpp on port 8080) is running and the model is loaded."
             )
             error_message = str(e)[:500]
             status = "error"

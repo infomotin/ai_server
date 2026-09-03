@@ -22,7 +22,7 @@ class DatabaseConfig(BaseModel):
 
 
 class OllamaConfig(BaseModel):
-    base_url: str = "http://localhost:11434"
+    base_url: str = "http://localhost:8080"
     timeout: int = 300
 
 

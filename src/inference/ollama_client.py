@@ -58,25 +58,34 @@ class OllamaClient:
                 "messages": messages,
                 "temperature": temperature,
                 "top_p": top_p,
-                "options": {
-                    "num_predict": max_tokens
-                },
+                "max_tokens": max_tokens,
                 "stream": stream
             }
 
-            if stop:
-                payload["options"]["stop"] = stop
-
-            response = await client.post(f"{self.base_url}/api/chat", json=payload)
+            response = await client.post(f"{self.base_url}/v1/chat/completions", json=payload)
             response.raise_for_status()
-            return response.json()
+            data = response.json()
+            # Convert OpenAI format to Ollama format for compatibility
+            if "choices" in data:
+                return {
+                    "message": {"content": data["choices"][0]["message"]["content"]},
+                    "choices": data["choices"],
+                    "model": data.get("model", model),
+                    "created_at": datetime.utcnow().isoformat(),
+                    "done": True
+                }
+            return data
 
     async def list_models(self) -> List[Dict[str, Any]]:
         async with httpx.AsyncClient(timeout=self.timeout) as client:
-            response = await client.get(f"{self.base_url}/api/tags")
-            response.raise_for_status()
-            data = response.json()
-            return data.get("models", [])
+            try:
+                response = await client.get(f"{self.base_url}/v1/models")
+                response.raise_for_status()
+                data = response.json()
+                models = data.get("data", [])
+                return [{"name": m.get("id", "unknown"), "modified_at": "", "size": 0} for m in models]
+            except Exception:
+                return []
 
     async def get_model_info(self, model: str) -> Optional[Dict[str, Any]]:
         async with httpx.AsyncClient(timeout=self.timeout) as client:
@@ -112,6 +121,10 @@ class OllamaClient:
     async def check_health(self) -> bool:
         try:
             async with httpx.AsyncClient(timeout=5) as client:
+                response = await client.get(f"{self.base_url}/health")
+                if response.status_code == 200:
+                    return True
+                # Fallback: try root endpoint (Ollama style)
                 response = await client.get(f"{self.base_url}/")
                 return response.status_code == 200
         except Exception:
