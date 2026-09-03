@@ -50,18 +50,60 @@
             </div>
 
             <form method="POST" class="space-y-5">
+                {% if security and security.get('honeypot_enabled') %}
+                <div style="position:absolute; left:-9999px; top:-9999px; opacity:0; height:0; overflow:hidden;" aria-hidden="true">
+                    <label for="{{ security.get('honeypot_field','website') }}">Do not fill this field</label>
+                    <input type="text" id="{{ security.get('honeypot_field','website') }}" name="{{ security.get('honeypot_field','website') }}" tabindex="-1" autocomplete="off">
+                </div>
+                {% endif %}
+
+                {% if continue_login %}
+                <div class="flex items-center gap-2 mb-3 px-4 py-2 bg-slate-800/60 rounded-lg text-sm text-gray-300">
+                    <i class="fas fa-envelope text-indigo-400"></i> Continuing for <span class="font-medium text-white">{{ continue_login }}</span>
+                </div>
+                {% endif %}
+
+                {% if show_otp %}
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-1.5">Verification Code</label>
+                    <input type="text" name="otp" required class="input-field text-center text-2xl tracking-widest" placeholder="••••••" autocomplete="one-time-code" maxlength="10">
+                    <p class="text-xs text-gray-500 mt-1"><i class="fas fa-info-circle mr-1"></i>Enter the code sent to your email/SMS.</p>
+                </div>
+                {% endif %}
+
+                {% if show_2fa %}
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-1.5">2FA Code</label>
+                    <input type="text" name="otp" required class="input-field text-center text-2xl tracking-widest" placeholder="••••••" autocomplete="one-time-code" maxlength="6">
+                    <p class="text-xs text-gray-500 mt-1"><i class="fas fa-shield-halved mr-1"></i>Enter the 6-digit code from your authenticator app.</p>
+                </div>
+                {% endif %}
+
                 <div>
                     <label class="block text-sm font-medium text-gray-300 mb-1.5">Email address</label>
-                    <input type="email" name="email" required class="input-field" placeholder="you@example.com" autocomplete="email">
+                    <input type="email" name="email" required class="input-field" placeholder="you@example.com" autocomplete="email" value="{{ continue_login or '' }}">
                 </div>
+                {% if not (show_otp or show_2fa) %}
                 <div>
                     <div class="flex items-center justify-between mb-1.5">
                         <label class="text-sm font-medium text-gray-300">Password</label>
                     </div>
                     <input type="password" name="password" required class="input-field" placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;" autocomplete="current-password">
                 </div>
+                {% endif %}
+
+                {% if show_captcha %}
+                <div class="flex items-center gap-3">
+                    <div class="flex-1">
+                        <label class="block text-sm font-medium text-gray-300 mb-1.5">Security Check</label>
+                        <input type="text" name="captcha_answer" required class="input-field" placeholder="" inputmode="numeric" pattern="[0-9]*">
+                    </div>
+                    <div class="w-28 mt-5 px-3 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-center font-bold text-lg text-white select-none">{{ session.get('captcha_text','') }}</div>
+                </div>
+                {% endif %}
+
                 <button type="submit" class="btn btn-primary py-3">
-                    <i class="fas fa-sign-in-alt"></i> Sign In
+                    <i class="fas fa-sign-in-alt"></i> {{ 'Verify' if (show_otp or show_2fa) else 'Sign In' }}
                 </button>
             </form>
 

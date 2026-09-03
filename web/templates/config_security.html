@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+{% block header_title %}Security{% endblock %}
+{% block content %}
+<style>
+    .cfg-card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 24px; }
+    .cfg-input { width: 100%; background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 10px 14px; color: #e2e8f0; font-size: 14px; }
+    .cfg-input:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,0.15); }
+    .cfg-label { display: block; font-size: 13px; color: #94a3b8; margin-bottom: 6px; }
+    .toggle { position: relative; width: 46px; height: 24px; background: #334155; border-radius: 999px; cursor: pointer; transition: .2s; flex-shrink: 0; }
+    .toggle.on { background: #3b82f6; }
+    .toggle::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; background: #fff; border-radius: 999px; transition: .2s; }
+    .toggle.on::after { left: 25px; }
+    .sec-title { font-size: 13px; font-weight: 600; color: #e2e8f0; text-transform: uppercase; letter-spacing: .5px; }
+    .btn-primary { background: #3b82f6; color: #fff; padding: 10px 18px; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; transition: .2s; border: none; }
+    .btn-primary:hover { background: #2563eb; }
+    .btn-green { background: #16a34a; color: #fff; padding: 10px 18px; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; transition: .2s; border: none; }
+    .chip { display: inline-flex; align-items: center; gap: 6px; background: #0f172a; border: 1px solid #334155; border-radius: 999px; padding: 4px 12px; font-size: 13px; color: #e2e8f0; }
+    .chip button { color: #f87171; background: none; border: none; cursor: pointer; font-size: 14px; }
+</style>
+
+<div class="max-w-5xl">
+    <div class="flex items-center justify-between mb-6">
+        <div>
+            <h3 class="text-xl font-semibold text-white">Security Settings</h3>
+            <p class="text-sm text-gray-500 mt-1">Enable or disable login OTP, 2FA, IP blocking, honeypot, country blocking and CAPTCHA.</p>
+        </div>
+        <button class="btn-primary" onclick="saveSecurity()"><i class="fas fa-save mr-2"></i>Save All Changes</button>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+        <!-- Login protection -->
+        <div class="cfg-card md:col-span-2">
+            <div class="sec-title mb-4"><i class="fas fa-lock mr-2 text-blue-500"></i>Login Protection</div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <label class="flex items-center justify-between p-4 bg-slate-900/50 border border-slate-800 rounded-lg cursor-pointer">
+                    <div><p class="text-sm font-medium text-white">Login OTP</p><p class="text-xs text-gray-500">Send a code by email/SMS on login</p></div>
+                    <div id="opt_login_otp" class="toggle {{ 'on' if cfg.get('login_otp') else '' }}" onclick="toggleEl(this,'login_otp')"></div>
+                </label>
+                <label class="flex items-center justify-between p-4 bg-slate-900/50 border border-slate-800 rounded-lg cursor-pointer">
+                    <div><p class="text-sm font-medium text-white">2-Factor Auth</p><p class="text-xs text-gray-500">TOTP via authenticator app</p></div>
+                    <div id="opt_two_factor_auth" class="toggle {{ 'on' if cfg.get('two_factor_auth') else '' }}" onclick="toggleEl(this,'two_factor_auth')"></div>
+                </label>
+                <label class="flex items-center justify-between p-4 bg-slate-900/50 border border-slate-800 rounded-lg cursor-pointer">
+                    <div><p class="text-sm font-medium text-white">CAPTCHA</p><p class="text-xs text-gray-500">Math challenge on login</p></div>
+                    <div id="opt_captcha_enabled" class="toggle {{ 'on' if cfg.get('captcha_enabled') else '' }}" onclick="toggleEl(this,'captcha_enabled')"></div>
+                </label>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-5">
+                <div>
+                    <label class="cfg-label">Max Login Attempts</label>
+                    <input id="max_login_attempts" type="number" class="cfg-input" value="{{ cfg.get('max_login_attempts',5) }}">
+                </div>
+                <div>
+                    <label class="cfg-label">Lockout Minutes</label>
+                    <input id="lockout_minutes" type="number" class="cfg-input" value="{{ cfg.get('lockout_minutes',15) }}">
+                </div>
+            </div>
+            <div class="flex items-center gap-3 mt-4">
+                <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                    2FA Secret
+                </label>
+                <div class="flex gap-2 flex-1">
+                    <input id="totp_secret" class="cfg-input" placeholder="Base32 secret for authenticator app" value="{{ cfg.get('totp_secret','') }}">
+                    <button class="btn-ghost whitespace-nowrap" style="background:transparent;color:#94a3b8;border:1px solid #334155;padding:10px 18px;border-radius:8px;cursor:pointer" onclick="genSecret()"><i class="fas fa-dice mr-1"></i>Generate</button>
+                </div>
+            </div>
+            <div class="text-xs text-gray-500 mt-2">
+                Add this secret to your authenticator app (Google Authenticator / Authy). Users will be asked for a TOTP code after password login.
+            </div>
+        </div>
+
+        <!-- IP Blocking -->
+        <div class="cfg-card">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <div class="sec-title"><i class="fas fa-network-wired mr-2 text-red-500"></i>IP Blocking</div>
+                    <p class="text-xs text-gray-500 mt-1">Block specific IPs or CIDR ranges.</p>
+                </div>
+                <div id="opt_ip_block_enabled" class="toggle {{ 'on' if cfg.get('ip_block_enabled') else '' }}" onclick="toggleEl(this,'ip_block_enabled')"></div>
+            </div>
+            <div class="flex gap-2 mb-3">
+                <input id="ip_input" class="cfg-input" placeholder="e.g. 192.168.1.0/24 or 8.8.8.8">
+                <button class="btn-ghost whitespace-nowrap" style="background:transparent;color:#94a3b8;border:1px solid #334155;padding:10px 18px;border-radius:8px;cursor:pointer" onclick="addList('ip')"><i class="fas fa-plus"></i></button>
+            </div>
+            <div id="ipChips" class="flex flex-wrap gap-2"></div>
+        </div>
+
+        <!-- Country Block -->
+        <div class="cfg-card">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <div class="sec-title"><i class="fas fa-globe mr-2 text-orange-500"></i>Country Block</div>
+                    <p class="text-xs text-gray-500 mt-1">Block access from selected countries (ISO codes).</p>
+                </div>
+                <div id="opt_country_block_enabled" class="toggle {{ 'on' if cfg.get('country_block_enabled') else '' }}" onclick="toggleEl(this,'country_block_enabled')"></div>
+            </div>
+            <div class="flex gap-2 mb-3">
+                <input id="country_input" class="cfg-input" placeholder="e.g. RU, CN, KP">
+                <button class="btn-ghost whitespace-nowrap" style="background:transparent;color:#94a3b8;border:1px solid #334155;padding:10px 18px;border-radius:8px;cursor:pointer" onclick="addList('country')"><i class="fas fa-plus"></i></button>
+            </div>
+            <div id="countryChips" class="flex flex-wrap gap-2"></div>
+        </div>
+
+        <!-- Honeypot -->
+        <div class="cfg-card md:col-span-2">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <div class="sec-title"><i class="fas fa-bug mr-2 text-green-500"></i>Honeypot Trap</div>
+                    <p class="text-xs text-gray-500 mt-1">Add an invisible hidden field that bots fill in. Real users never see it.</p>
+                </div>
+                <div id="opt_honeypot_enabled" class="toggle {{ 'on' if cfg.get('honeypot_enabled') else '' }}" onclick="toggleEl(this,'honeypot_enabled')"></div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="cfg-label">Honeypot Field Name</label>
+                    <input id="honeypot_field" class="cfg-input" value="{{ cfg.get('honeypot_field','website') }}">
+                </div>
+                <div>
+                    <label class="cfg-label">Blocked Message</label>
+                    <input id="honeypot_message" class="cfg-input" value="{{ cfg.get('honeypot_message','Activity blocked. Please try again.') }}">
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="toast" class="fixed bottom-6 right-6 z-50 px-5 py-3 rounded-lg text-sm font-medium text-white opacity-0 transition pointer-events-none" style="box-shadow:0 10px 30px rgba(0,0,0,.5)"></div>
+
+<script>
+let SEC = {{ cfg | tojson }};
+
+function toggleEl(el, key){ SEC[key]=!SEC[key]; el.classList.toggle('on',SEC[key]); }
+function toast(m,ok){ const t=document.getElementById('toast'); t.textContent=m; t.style.background=ok?'#16a34a':'#dc2626'; t.style.opacity='1'; setTimeout(()=>t.style.opacity='0',3500); }
+function genSecret(){ SEC.totp_secret = Math.random().toString(36).slice(2).toUpperCase().replace(/[^A-Z2-7]/g,'') || 'JBSWY3DPEHPK3PXP'; document.getElementById('totp_secret').value = SEC.totp_secret; toast('New 2FA secret generated', true); }
+
+function addList(which){
+    const inpId = which==='ip' ? 'ip_input' : 'country_input';
+    const key = which==='ip' ? 'blocked_ips' : 'blocked_countries';
+    const val = document.getElementById(inpId).value.trim().toUpperCase();
+    if(!val) return;
+    (SEC[key] = SEC[key]||[]).push(val);
+    document.getElementById(inpId).value='';
+    render(which);
+}
+function removeList(which, i){ const key=which==='ip'?'blocked_ips':'blocked_countries'; (SEC[key]||[]).splice(i,1); render(which); }
+function render(which){
+    const key=which==='ip'?'blocked_ips':'blocked_countries';
+    const box=document.getElementById(which+'Chips'); box.innerHTML='';
+    (SEC[key]||[]).forEach((e,i)=>{ const c=document.createElement('span'); c.className='chip'; c.innerHTML='<span>'+e+'</span><button onclick="removeList(\''+which+'\','+i+')">&times;</button>'; box.appendChild(c); });
+}
+
+function saveSecurity(){
+    SEC.max_login_attempts = parseInt(document.getElementById('max_login_attempts').value||5);
+    SEC.lockout_minutes = parseInt(document.getElementById('lockout_minutes').value||15);
+    SEC.totp_secret = document.getElementById('totp_secret').value.trim();
+    SEC.honeypot_field = document.getElementById('honeypot_field').value.trim();
+    SEC.honeypot_message = document.getElementById('honeypot_message').value.trim();
+    fetch('/api/config/security',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(SEC)}).then(r=>r.json()).then(d=>{ if(d.success) toast('Security settings saved',true); else toast(d.error||'Save failed',false); });
+}
+
+render('ip'); render('country');
+</script>
+{% endblock %}

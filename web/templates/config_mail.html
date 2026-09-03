@@ -1,0 +1,221 @@
+{% extends "base.html" %}
+{% block header_title %}Mail Configuration{% endblock %}
+{% block content %}
+<style>
+    .cfg-card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 24px; }
+    .cfg-input { width: 100%; background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 10px 14px; color: #e2e8f0; font-size: 14px; }
+    .cfg-input:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,0.15); }
+    .cfg-label { display: block; font-size: 13px; color: #94a3b8; margin-bottom: 6px; }
+    .toggle { position: relative; width: 46px; height: 24px; background: #334155; border-radius: 999px; cursor: pointer; transition: .2s; flex-shrink: 0; }
+    .toggle.on { background: #3b82f6; }
+    .toggle::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; background: #fff; border-radius: 999px; transition: .2s; }
+    .toggle.on::after { left: 25px; }
+    .sec-title { font-size: 13px; font-weight: 600; color: #e2e8f0; text-transform: uppercase; letter-spacing: .5px; }
+    .badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; font-size: 12px; }
+    .badge.on { background: #16a34a33; color: #4ade80; border: 1px solid #16a34a; }
+    .badge.off { background: #ef444433; color: #f87171; border: 1px solid #ef4444; }
+    .btn-primary { background: #3b82f6; color: #fff; padding: 10px 18px; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; transition: .2s; border: none; }
+    .btn-primary:hover { background: #2563eb; }
+    .btn-ghost { background: transparent; color: #94a3b8; border: 1px solid #334155; padding: 10px 18px; border-radius: 8px; font-size: 14px; cursor: pointer; transition: .2s; }
+    .btn-ghost:hover { color: #e2e8f0; border-color: #475569; }
+    .chip { display: inline-flex; align-items: center; gap: 6px; background: #0f172a; border: 1px solid #334155; border-radius: 999px; padding: 4px 12px; font-size: 13px; color: #e2e8f0; }
+    .chip button { color: #f87171; background: none; border: none; cursor: pointer; font-size: 14px; }
+</style>
+
+<div class="max-w-5xl">
+    <div class="flex items-center justify-between mb-6">
+        <div>
+            <h3 class="text-xl font-semibold text-white">Mail Server Configuration</h3>
+            <p class="text-sm text-gray-500 mt-1">Set up your own mail server for verification, OTP, notifications, group mail and reports.</p>
+        </div>
+        <span id="mailBadge" class="badge {{ 'on' if cfg.enabled else 'off' }}">
+            <i class="fas fa-circle {{ 'text-green-400' if cfg.enabled else 'text-red-400' }}"></i>
+            <span id="mailBadgeText">{{ 'Enabled' if cfg.enabled else 'Disabled' }}</span>
+        </span>
+    </div>
+
+    <div class="grid grid-cols-1 gap-6">
+
+        <!-- Server settings -->
+        <div class="cfg-card">
+            <div class="flex items-center justify-between mb-5">
+                <div>
+                    <div class="sec-title"><i class="fas fa-server mr-2 text-blue-500"></i>SMTP Server</div>
+                    <p class="text-xs text-gray-500 mt-1">Outgoing mail server used to send all system emails.</p>
+                </div>
+                <div class="flex items-center gap-3">
+                    <label class="cfg-label mb-0">Enable Mail</label>
+                    <div id="mailServerToggle" class="toggle {{ 'on' if cfg.enabled else '' }}" onclick="toggleEl(this, 'enabled')"></div>
+                </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="cfg-label">SMTP Host</label>
+                    <input id="smtp_host" class="cfg-input" placeholder="smtp.gmail.com" value="{{ cfg.smtp_host }}">
+                </div>
+                <div>
+                    <label class="cfg-label">SMTP Port</label>
+                    <input id="smtp_port" type="number" class="cfg-input" value="{{ cfg.smtp_port }}">
+                </div>
+                <div>
+                    <label class="cfg-label">Username</label>
+                    <input id="mail_username" class="cfg-input" placeholder="you@gmail.com" value="{{ cfg.username }}">
+                </div>
+                <div>
+                    <label class="cfg-label">Password / App Password</label>
+                    <div class="relative">
+                        <input id="mail_password" type="password" class="cfg-input pr-10" placeholder="••••••••" value="{{ cfg.password }}">
+                        <button onclick="togglePw('mail_password')" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300"><i class="fas fa-eye"></i></button>
+                    </div>
+                </div>
+                <div>
+                    <label class="cfg-label">From Name</label>
+                    <input id="from_name" class="cfg-input" placeholder="AI Server" value="{{ cfg.from_name }}">
+                </div>
+                <div>
+                    <label class="cfg-label">From Email</label>
+                    <input id="from_email" class="cfg-input" placeholder="no-reply@yourserver.com" value="{{ cfg.from_email }}">
+                </div>
+            </div>
+            <div class="flex items-center gap-6 mt-4">
+                <label class="flex items-center gap-2 text-sm text-gray-400 cursor-pointer">
+                    <input type="checkbox" id="use_tls" class="w-4 h-4" {{ 'checked' if cfg.use_tls else '' }}> Use TLS (STARTTLS)
+                </label>
+                <label class="flex items-center gap-2 text-sm text-gray-400 cursor-pointer">
+                    <input type="checkbox" id="use_ssl" class="w-4 h-4" {{ 'checked' if cfg.use_ssl else '' }}> Use SSL
+                </label>
+            </div>
+        </div>
+
+        <!-- System mail options -->
+        <div class="cfg-card">
+            <div class="sec-title mb-5"><i class="fas fa-cogs mr-2 text-purple-500"></i>System Mail Options</div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {% for opt in ['send_verification','send_otp','send_notifications','send_group_mail','send_reports'] %}
+                <label class="flex items-center justify-between p-4 bg-0f172a bg-slate-900/50 border border-slate-800 rounded-lg cursor-pointer">
+                    <div>
+                        <p class="text-sm font-medium text-white capitalize">{{ opt.replace('send_','').replace('_',' ') }}</p>
+                        <p class="text-xs text-gray-500">{{ {'send_verification':'Verification emails on registration','send_otp':'One-time passwords for login','send_notifications':'System notifications','send_group_mail':'Group mail to mailing list','send_reports':'Periodic reports to users'}.get(opt) }}</p>
+                    </div>
+                    <div id="opt_{{ opt }}" class="toggle {{ 'on' if cfg.get(opt) else '' }}" onclick="toggleEl(this, '{{ opt }}')"></div>
+                </label>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Mailing list -->
+        <div class="cfg-card">
+            <div class="sec-title mb-4"><i class="fas fa-list-ul mr-2 text-green-500"></i>Mailing List</div>
+            <p class="text-xs text-gray-500 mb-3">Recipients to receive group mail and reports. Separate with commas.</p>
+            <div class="flex gap-3">
+                <input id="mailing_list_input" class="cfg-input" placeholder="user1@example.com, user2@example.com" value="{{ cfg.mailing_list | join(', ') }}">
+                <button class="btn-ghost whitespace-nowrap" onclick="addToList()"><i class="fas fa-plus mr-1"></i>Add</button>
+            </div>
+            <div id="mailingListChips" class="flex flex-wrap gap-2 mt-3"></div>
+        </div>
+
+        <!-- Actions -->
+        <div class="cfg-card">
+            <div class="sec-title mb-4"><i class="fas fa-paper-plane mr-2 text-blue-500"></i>Test & Send</div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="cfg-label">Test Email</label>
+                    <div class="flex gap-2">
+                        <input id="test_email" class="cfg-input" placeholder="send test to...">
+                        <button class="btn-ghost whitespace-nowrap" onclick="testMail()"><i class="fas fa-vial mr-1"></i>Test</button>
+                    </div>
+                </div>
+            </div>
+            <div class="mt-5 pt-5 border-t border-slate-800">
+                <p class="text-sm font-medium text-white mb-3">Send Group Mail</p>
+                <div class="space-y-3">
+                    <input id="gm_subject" class="cfg-input" placeholder="Email subject">
+                    <textarea id="gm_body" class="cfg-input" rows="4" placeholder="Email body..."></textarea>
+                </div>
+                <div class="flex gap-3 mt-4">
+                    <button class="btn-primary" onclick="sendGroupMail()"><i class="fas fa-paper-plane mr-1"></i>Send to Mailing List</button>
+                    <button class="btn-ghost" onclick="saveMail()"><i class="fas fa-save mr-1"></i>Save Configuration</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="toast" class="fixed bottom-6 right-6 z-50 px-5 py-3 rounded-lg text-sm font-medium text-white opacity-0 transition pointer-events-none" style="box-shadow:0 10px 30px rgba(0,0,0,.5)"></div>
+
+<script>
+let MAIL = {{ cfg | tojson }};
+
+function toggleEl(el, key, isSys) {
+    if (key === 'enabled') {
+        MAIL.enabled = !MAIL.enabled;
+        el.classList.toggle('on', MAIL.enabled);
+        updateBadge();
+        return;
+    }
+    if (key.startsWith('send_')) { MAIL[key] = !MAIL[key]; el.classList.toggle('on', MAIL[key]); return; }
+    if (key === 'use_tls') { MAIL.use_tls = el.checked; return; }
+    if (key === 'use_ssl') { MAIL.use_ssl = el.checked; return; }
+}
+
+function updateBadge() {
+    const b = document.getElementById('mailBadge');
+    b.className = 'badge ' + (MAIL.enabled ? 'on' : 'off');
+    b.innerHTML = '<i class="fas fa-circle ' + (MAIL.enabled ? 'text-green-400' : 'text-red-400') + '"></i><span>' + (MAIL.enabled ? 'Enabled' : 'Disabled') + '</span>';
+}
+
+function togglePw(id) { const el = document.getElementById(id); el.type = el.type === 'password' ? 'text' : 'password'; }
+
+function collect() {
+    MAIL.smtp_host = document.getElementById('smtp_host').value;
+    MAIL.smtp_port = parseInt(document.getElementById('smtp_port').value || 587);
+    MAIL.username = document.getElementById('mail_username').value;
+    MAIL.password = document.getElementById('mail_password').value;
+    MAIL.from_name = document.getElementById('from_name').value;
+    MAIL.from_email = document.getElementById('from_email').value;
+    MAIL.use_tls = document.getElementById('use_tls').checked;
+    MAIL.use_ssl = document.getElementById('use_ssl').checked;
+    return MAIL;
+}
+
+function toast(msg, ok) { const t = document.getElementById('toast'); t.textContent = msg; t.style.background = ok ? '#16a34a' : '#dc2626'; t.style.opacity = '1'; setTimeout(() => t.style.opacity = '0', 3500); }
+
+function saveMail() { collect(); fetch('/api/config/mail', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(MAIL)}).then(r=>r.json()).then(d=>{ if(d.success){ toast('Configuration saved', true); updateBadge(); } else toast(d.error||'Save failed', false); }); }
+
+function testMail() {
+    const to = document.getElementById('test_email').value.trim();
+    if(!to) return toast('Enter a test email address', false);
+    collect();
+    fetch('/api/config/mail', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(MAIL)}).then(()=>{
+        return fetch('/api/config/mail/test', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({test_email: to})});
+    }).then(r=>r.json()).then(d=> toast(d.success ? 'Test email sent: ' + d.message : 'Error: ' + d.message, d.success));
+}
+
+function addToList() {
+    const inp = document.getElementById('mailing_list_input');
+    const vals = inp.value.split(',').map(s=>s.trim()).filter(Boolean);
+    MAIL.mailing_list = [...new Set([...(MAIL.mailing_list||[]), ...vals])];
+    inp.value = MAIL.mailing_list.join(', ');
+    renderChips(); saveMail();
+}
+
+function renderChips() {
+    const box = document.getElementById('mailingListChips');
+    box.innerHTML = '';
+    (MAIL.mailing_list||[]).forEach((e,i)=>{ const c=document.createElement('span'); c.className='chip'; c.innerHTML = '<span>'+e+'</span><button onclick="removeMail('+i+')">&times;</button>'; box.appendChild(c); });
+}
+
+function removeMail(i) { MAIL.mailing_list.splice(i,1); document.getElementById('mailing_list_input').value = MAIL.mailing_list.join(', '); renderChips(); saveMail(); }
+
+function sendGroupMail() {
+    const subject = document.getElementById('gm_subject').value.trim();
+    const body = document.getElementById('gm_body').value.trim();
+    if(!subject || !body) return toast('Fill in subject and body', false);
+    collect();
+    fetch('/api/config/mail/send', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({subject, body})})
+        .then(r=>r.json()).then(d=>{ if(d.success) toast('Sent to '+(d.sent||[]).length+' recipient(s)'+(d.failed&&d.failed.length?' ('+d.failed.length+' failed)':''), true); else toast(d.error||'Send failed', false); });
+}
+
+renderChips();
+</script>
+{% endblock %}

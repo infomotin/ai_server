@@ -1,0 +1,279 @@
+{% extends "base.html" %}
+{% block title %}Role Permissions - Admin{% endblock %}
+{% block header_title %}Role Permissions{% endblock %}
+
+{% block content %}
+<style>
+    :root {
+        --bg: #0f172a; --panel: #1e293b; --border: #334155; --txt: #e2e8f0; --muted: #94a3b8;
+        --accent: #3b82f6; --green: #16a34a; --red: #dc2626; --amber: #d97706;
+    }
+    .rp-panel { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; }
+    .rp-tab { padding: 10px 16px; border-radius: 8px; color: var(--muted); cursor: pointer; transition: .2s; text-align: left; width: 100%; background: none; border: 1px solid transparent; }
+    .rp-tab:hover { background: #334155; color: var(--txt); }
+    .rp-tab.active { background: var(--accent); color: #fff; }
+    .rp-tab .ico { width: 30px; height: 30px; border-radius: 8px; background: #334155; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .rp-tab.active .ico { background: #2563eb; }
+    .rp-tab .ico i { font-size: 13px; }
+    .rp-sec-title { font-size: 12px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); padding: 6px 16px 8px; }
+    .rp-menu-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; border-bottom: 1px solid #263449; }
+    .rp-menu-row:last-child { border-bottom: none; }
+    .rp-menu-name { font-size: 14px; color: var(--txt); font-weight: 500; }
+    .rp-child { margin-left: 20px; }
+    .rp-child-name { font-size: 13px; color: var(--muted); font-weight: 400; }
+    .crud { display: flex; gap: 6px; flex-wrap: wrap; }
+    .crud-box { width: 34px; height: 30px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; cursor: pointer; border: 1px solid var(--border); background: #0f172a; color: var(--muted); transition: .15s; user-select: none; }
+    .crud-box:hover { border-color: var(--accent); }
+    .crud-box.on { background: var(--green); border-color: var(--green); color: #fff; }
+    .crud-box.all { width: 40px; }
+    .crud-box.all.on { background: var(--accent); border-color: var(--accent); }
+    .rp-input { background: #0f172a; border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px; color: var(--txt); font-size: 14px; width: 100%; }
+    .rp-input:focus { outline: none; border-color: var(--accent); }
+    .btn { padding: 9px 16px; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; border: none; transition: .2s; }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { background: #2563eb; }
+    .btn-green { background: var(--green); color: #fff; }
+    .btn-green:hover { background: #15803d; }
+    .btn-ghost { background: transparent; border: 1px solid var(--border); color: var(--muted); }
+    .btn-ghost:hover { color: var(--txt); border-color: #475569; }
+    .rp-stat { background: #0f172a; border: 1px solid var(--border); border-radius: 10px; padding: 12px; text-align: center; }
+    .badge-cnt { display: inline-flex; padding: 2px 8px; border-radius: 999px; font-size: 11px; background: #334155; color: var(--muted); }
+</style>
+
+<div class="max-w-6xl">
+    <div class="flex items-center justify-between mb-6 flex-wrap gap-4">
+        <div>
+            <h3 class="text-xl font-semibold text-white">Role & Permission Management</h3>
+            <p class="text-sm text-gray-500 mt-1">Manage roles and assign independent CRUD permissions (View / Create / Edit / Delete) to every menu.</p>
+        </div>
+        <div class="flex gap-3">
+            <button class="btn btn-ghost" onclick="initRbac()"><i class="fas fa-sync mr-1"></i>Initialize RBAC</button>
+            <button class="btn btn-primary" onclick="openRoleModal()"><i class="fas fa-plus mr-1"></i>New Role</button>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div class="rp-stat"><div class="text-2xl font-bold text-white" id="roleCount">{{ roles|length }}</div><div class="text-xs text-gray-500 mt-1">Roles</div></div>
+        <div class="rp-stat"><div class="text-2xl font-bold text-white" id="menuCount">{{ modules|length }}</div><div class="text-xs text-gray-500 mt-1">Modules</div></div>
+        <div class="rp-stat"><div class="text-2xl font-bold text-white" id="permCount">125</div><div class="text-xs text-gray-500 mt-1">Total Permissions</div></div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        <!-- Role list -->
+        <div class="rp-panel p-3">
+            <div class="rp-sec-title">Select a Role</div>
+            <div id="roleList"></div>
+            <div id="initPrompt" class="hidden text-center py-6 px-4">
+                <i class="fas fa-database text-3xl text-gray-600 mb-3"></i>
+                <p class="text-sm text-gray-500 mb-3">No roles or menus found. Initialize the RBAC system to create the default structure.</p>
+                <button class="btn btn-primary" onclick="initRbac()">Initialize RBAC</button>
+            </div>
+        </div>
+
+        <!-- Permission matrix -->
+        <div class="lg:col-span-3 rp-panel">
+            <div class="border-b border-slate-800 px-5 py-4 flex items-center justify-between">
+                <div>
+                    <div class="text-white font-semibold" id="matrixTitle">Permissions</div>
+                    <div class="text-xs text-gray-500" id="matrixSub">Select a role to view and edit its permissions</div>
+                </div>
+                <div class="flex gap-2 items-center">
+                    <button class="btn btn-ghost text-sm" onclick="selectAllForRole()"><i class="fas fa-check-double mr-1"></i>All</button>
+                    <button class="btn btn-ghost text-sm" onclick="clearAllForRole()"><i class="fas fa-eraser mr-1"></i>None</button>
+                    <button class="btn btn-green text-sm" id="saveBtn" onclick="saveRolePermissions()" disabled><i class="fas fa-save mr-1"></i>Save Permissions</button>
+                </div>
+            </div>
+            <div id="matrix" class="divide-y divide-slate-800">
+                <div class="p-8 text-center text-sm text-gray-500"><i class="fas fa-arrow-left mr-2"></i>Select a role from the left to manage its per-menu CRUD permissions.</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- New Role Modal -->
+<div id="roleModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/60 backdrop-blur-sm">
+    <div class="rp-panel w-full max-w-md p-6">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-semibold text-white" id="roleModalTitle">Create Role</h3>
+            <button onclick="closeRoleModal()" class="text-gray-500 hover:text-white"><i class="fas fa-times"></i></button>
+        </div>
+        <form id="roleForm" onsubmit="saveRole(event)">
+            <input type="hidden" id="role_id">
+            <div class="space-y-4">
+                <div><label class="block text-sm text-gray-400 mb-1">Role Name</label><input id="role_name" class="rp-input" required placeholder="e.g. Editor"></div>
+                <div><label class="block text-sm text-gray-400 mb-1">Slug (unique)</label><input id="role_slug" class="rp-input" required placeholder="editor"></div>
+                <div><label class="block text-sm text-gray-400 mb-1">Description</label><textarea id="role_desc" class="rp-input" rows="2" placeholder="What can this role do?"></textarea></div>
+            </div>
+            <div class="flex gap-3 mt-6 justify-end">
+                <button type="button" class="btn btn-ghost" onclick="closeRoleModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary"><i class="fas fa-save mr-1"></i>Save Role</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div id="toast" class="fixed bottom-6 right-6 z-50 px-5 py-3 rounded-lg text-sm font-medium text-white opacity-0 transition pointer-events-none" style="box-shadow:0 10px 30px rgba(0,0,0,.5)"></div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+const ACTIONS = ['view','create','edit','delete','*'];
+const ACTION_LABELS = {view:'V',create:'C',edit:'E',delete:'D','*':'ALL'};
+const ACTION_TITLES = {view:'View',create:'Create',edit:'Edit',delete:'Delete','*':'Full Access'};
+
+let ROLES = {{ roles | tojson }};
+let MODULES = {{ modules | tojson }};
+let currentRole = null;
+let dirtyMatrix = {};  // key: menu_slug:action -> true/false
+
+function toast(m, ok){ const t=document.getElementById('toast'); t.textContent=m; t.style.background=ok?'#16a34a':'#dc2626'; t.style.opacity='1'; setTimeout(()=>t.style.opacity='0',3000); }
+function $(id){ return document.getElementById(id); }
+
+function renderRoleList(){
+    const box = $('roleList');
+    box.innerHTML = '';
+    ROLES.forEach(r => {
+        const d = document.createElement('div');
+        d.className = 'rp-tab ' + (currentRole && currentRole.id===r.id ? 'active':'');
+        d.innerHTML = '<div class="flex items-center gap-3"><span class="ico"><i class="fas fa-user-shield"></i></span><span class="flex-1"><span class="block text-sm font-medium">'+r.name+'</span><span class="block text-xs '+(currentRole && currentRole.id===r.id?'text-blue-100':'text-gray-600')+'">'+(r.permissions?r.permissions.length:0)+' perms</span></span>'+(r.is_system?'<span class="badge-cnt" title="System role">SYS</span>':'')+'</div>';
+        d.onclick = () => selectRole(r.id);
+        box.appendChild(d);
+    });
+    $('initPrompt').classList.toggle('hidden', ROLES.length>0 && MODULES.length>0);
+}
+
+function flattenMenus(modules){
+    const out = [];
+    modules.forEach(m => { (m.menus||[]).forEach(menu => { out.push({module:m, menu}); (menu.children||[]).forEach(c=>out.push({module:m, menu, child:c})); }); });
+    return out;
+}
+
+function selectRole(roleId){
+    currentRole = ROLES.find(r=>r.id===roleId) || null;
+    if(!currentRole) return;
+    renderRoleList();
+    buildMatrix();
+    $('saveBtn').disabled = true;
+}
+
+function buildMatrix(){
+    const title = $('matrixTitle'), sub = $('matrixSub'), box = $('matrix');
+    title.textContent = currentRole.name + ' — Permissions';
+    sub.textContent = currentRole.is_system ? 'System role (view-only)' : 'Toggle CRUD permissions per menu, then save.';
+    dirtyMatrix = {};
+    // Build lookup of current perms
+    const permSet = new Set(currentRole.permissions || []);
+    box.innerHTML = '';
+    MODULES.forEach(mod => {
+        const sec = document.createElement('div');
+        sec.className = 'py-3';
+        const head = document.createElement('div');
+        head.className = 'flex items-center justify-between px-5 py-2';
+        head.innerHTML = '<div class="flex items-center gap-2"><span class="text-sm font-semibold text-white">'+(mod.icon?'<i class="'+mod.icon+' mr-1 text-blue-400"></i>':'')+mod.name+'</span></div><span class="badge-cnt">'+(mod.menus||[]).length+' menus</span>';
+        sec.appendChild(head);
+        (mod.menus||[]).forEach(menu => {
+            sec.appendChild(menuRow(menu, permSet));
+            (menu.children||[]).forEach(child => sec.appendChild(menuRow(child, permSet, menu)));
+        });
+        box.appendChild(sec);
+    });
+    if(!MODULES.length) box.innerHTML = '<div class="p-8 text-center text-sm text-gray-500">No menus defined. Initialize RBAC first.</div>';
+}
+
+function menuRow(menu, permSet, parent){
+    const row = document.createElement('div');
+    const base = parent ? parent.slug + '.' + menu.slug : menu.slug;
+    row.className = 'rp-menu-row' + (parent?' rp-child':'');
+    const label = (parent?'<span class="rp-child-name">↳ '+parent.title+' / '+menu.title+'</span>':'<span class="rp-menu-name">'+menu.title+'</span>');
+    let crudTools = '<div class="crud" data-base="'+base+'">';
+    ACTIONS.forEach(a => {
+        const key = base + '.' + a;
+        const on = permSet.has(key);
+        dirtyMatrix[key] = on;
+        crudTools += '<div class="crud-box '+(a==='*'?'all':'')+' '+(on?'on':'')+'" data-key="'+key+'" title="'+ACTION_TITLES[a]+'" onclick="toggle('+JSON.stringify(key)+', this)">'+ACTION_LABELS[a]+'</div>';
+    });
+    crudTools += '</div>';
+    row.innerHTML = '<div class="flex-1 min-w-0 pr-3">'+label+'</div>'+crudTools;
+    return row;
+}
+
+function toggle(key, el){
+    if(currentRole.is_system){ toast('System roles cannot be modified', false); return; }
+    dirtyMatrix[key] = !dirtyMatrix[key];
+    el.classList.toggle('on', dirtyMatrix[key]);
+    $('saveBtn').disabled = false;
+}
+
+function selectAllForRole(){
+    if(currentRole.is_system){ toast('System roles cannot be modified', false); return; }
+    Object.keys(dirtyMatrix).forEach(k=>dirtyMatrix[k]=true);
+    syncMatrix(); $('saveBtn').disabled = false;
+}
+function clearAllForRole(){
+    if(currentRole.is_system){ toast('System roles cannot be modified', false); return; }
+    Object.keys(dirtyMatrix).forEach(k=>dirtyMatrix[k]=false);
+    syncMatrix(); $('saveBtn').disabled = false;
+}
+function syncMatrix(){
+    document.querySelectorAll('.crud-box').forEach(el=>{ const k=el.dataset.key; el.classList.toggle('on', dirtyMatrix[k]); });
+}
+
+async function saveRolePermissions(){
+    if(!currentRole || currentRole.is_system) return;
+    const selected = Object.keys(dirtyMatrix).filter(k=>dirtyMatrix[k]);
+    // If 'ALL' selected for a menu, drop the individual CRUD items for that menu
+    const final = [];
+    const allKeys = Object.keys(dirtyMatrix).filter(k=>dirtyMatrix[k] && k.endsWith('.*'));
+    selected.forEach(k=>{ const base=k.slice(0,-2); if(k.endsWith('.*')){ final.push(k); } else if(!allKeys.includes(base+'.*')){ final.push(k); } });
+    try{
+        const res = await fetch('/api/admin/roles/'+currentRole.id+'/permissions', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(final)});
+        const d = await res.json();
+        if(res.ok || d.success){ toast('Permissions saved for '+currentRole.name, true); currentRole.permissions = final; renderRoleList(); $('saveBtn').disabled=true; }
+        else toast(d.detail || 'Failed to save', false);
+    }catch(e){ toast('Error: '+e.message, false); }
+}
+
+function openRoleModal(){ $('role_id').value=''; $('roleModalTitle').textContent='Create Role'; $('role_name').value=''; $('role_slug').value=''; $('role_desc').value=''; $('roleModal').classList.remove('hidden'); $('roleModal').classList.add('flex'); }
+function editRole(id){ const r=ROLES.find(x=>x.id===id); if(!r) return; if(r.is_system){ toast('System roles cannot be edited',false); return; } $('role_id').value=r.id; $('roleModalTitle').textContent='Edit Role'; $('role_name').value=r.name; $('role_slug').value=r.slug; $('role_desc').value=r.description||''; $('roleModal').classList.remove('hidden'); $('roleModal').classList.add('flex'); }
+function closeRoleModal(){ $('roleModal').classList.add('hidden'); $('roleModal').classList.remove('flex'); }
+
+async function saveRole(e){
+    e.preventDefault();
+    const data = {
+        name: $('role_name').value.trim(),
+        slug: $('role_slug').value.trim(),
+        description: $('role_desc').value.trim()
+    };
+    if(!data.name || !data.slug) return toast('Name and slug required', false);
+    const id = $('role_id').value;
+    const url = id ? '/api/admin/roles/'+id : '/api/admin/roles';
+    const method = id ? 'PUT' : 'POST';
+    try{
+        const res = await fetch(url, {method, headers:{'Content-Type':'application/json'}, body: JSON.stringify(id?{...data}:{...data, permissions:[]})});
+        const d = await res.json();
+        if(res.ok || d.success){ toast(id?'Role updated':'Role created', true); closeRoleModal(); reloadData(); }
+        else toast(d.detail || 'Failed to save role', false);
+    }catch(err){ toast('Error: '+err.message, false); }
+}
+
+async function reloadData(){
+    const r = await fetch('/api/admin/roles');
+    const d = await r.json();
+    ROLES = d;
+    currentRole = null;
+    renderRoleList();
+    $('matrix').innerHTML = '<div class="p-8 text-center text-sm text-gray-500"><i class="fas fa-arrow-left mr-2"></i>Select a role from the left to manage its permissions.</div>';
+}
+
+async function initRbac(){
+    if(!confirm('Initialize the RBAC system with default modules, menus and roles?')) return;
+    const res = await fetch('/admin/init-rbac', {method:'POST'});
+    const d = await res.json();
+    toast('RBAC initialized', true);
+    setTimeout(()=>window.location.reload(), 600);
+}
+
+renderRoleList();
+</script>
+{% endblock %}

@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% block header_title %}SMS Gateway{% endblock %}
+{% block content %}
+<style>
+    .cfg-card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 24px; }
+    .cfg-input { width: 100%; background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 10px 14px; color: #e2e8f0; font-size: 14px; }
+    .cfg-input:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,0.15); }
+    .cfg-label { display: block; font-size: 13px; color: #94a3b8; margin-bottom: 6px; }
+    .toggle { position: relative; width: 46px; height: 24px; background: #334155; border-radius: 999px; cursor: pointer; transition: .2s; flex-shrink: 0; }
+    .toggle.on { background: #3b82f6; }
+    .toggle::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; background: #fff; border-radius: 999px; transition: .2s; }
+    .toggle.on::after { left: 25px; }
+    .sec-title { font-size: 13px; font-weight: 600; color: #e2e8f0; text-transform: uppercase; letter-spacing: .5px; }
+    .btn-primary { background: #3b82f6; color: #fff; padding: 10px 18px; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; transition: .2s; border: none; }
+    .btn-primary:hover { background: #2563eb; }
+    .btn-ghost { background: transparent; color: #94a3b8; border: 1px solid #334155; padding: 10px 18px; border-radius: 8px; font-size: 14px; cursor: pointer; transition: .2s; }
+    .btn-ghost:hover { color: #e2e8f0; border-color: #475569; }
+    .hide { display: none; }
+    .badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; font-size: 12px; }
+    .badge.on { background: #16a34a33; color: #4ade80; border: 1px solid #16a34a; }
+    .badge.off { background: #ef444433; color: #f87171; border: 1px solid #ef4444; }
+</style>
+
+<div class="max-w-5xl">
+    <div class="flex items-center justify-between mb-6">
+        <div>
+            <h3 class="text-xl font-semibold text-white">SMS Gateway Configuration</h3>
+            <p class="text-sm text-gray-500 mt-1">Configure an SMS provider for OTP codes and notifications.</p>
+        </div>
+        <span id="smsBadge" class="badge {{ 'on' if cfg.enabled else 'off' }}" style="{{ 'display:none' if not cfg else '' }}">
+            <i class="fas fa-circle {{ 'text-green-400' if cfg.enabled else 'text-red-400' }}"></i>
+            <span id="smsBadgeText">{{ 'Enabled' if cfg.enabled else 'Disabled' }}</span>
+        </span>
+    </div>
+
+    <div class="grid grid-cols-1 gap-6">
+
+        <!-- General -->
+        <div class="cfg-card">
+            <div class="flex items-center justify-between mb-5">
+                <div>
+                    <div class="sec-title"><i class="fas fa-sms mr-2 text-blue-500"></i>Gateway</div>
+                    <p class="text-xs text-gray-500 mt-1">Select and enable your SMS provider.</p>
+                </div>
+                <div class="flex items-center gap-3">
+                    <label class="cfg-label mb-0">Enable SMS</label>
+                    <div id="smsServerToggle" class="toggle {{ 'on' if cfg.enabled else '' }}" onclick="toggleEl(this,'enabled')"></div>
+                </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="cfg-label">Provider</label>
+                    <select id="provider" class="cfg-input" onchange="showProvider()">
+                        <option value="textbelt" {{ 'selected' if cfg.provider=='textbelt' }}>TextBelt (free trial)</option>
+                        <option value="twilio" {{ 'selected' if cfg.provider=='twilio' }}>Twilio</option>
+                        <option value="custom" {{ 'selected' if cfg.provider=='custom' }}>Custom HTTP API</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="cfg-label">API Key</label>
+                    <input id="api_key" class="cfg-input" placeholder="Your API key" value="{{ cfg.api_key }}">
+                </div>
+                <div>
+                    <label class="cfg-label">Sender ID</label>
+                    <input id="sender_id" class="cfg-input" value="{{ cfg.sender_id }}">
+                </div>
+            </div>
+        </div>
+
+        <!-- Twilio -->
+        <div id="twilioBox" class="cfg-card hide">
+            <div class="sec-title mb-4"><i class="fab fa-twilio mr-2 text-red-500"></i>Twilio Credentials</div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div><label class="cfg-label">Account SID</label><input id="twilio_account_sid" class="cfg-input" value="{{ cfg.twilio_account_sid }}"></div>
+                <div><label class="cfg-label">Auth Token</label><input id="twilio_auth_token" type="password" class="cfg-input" value="{{ cfg.twilio_auth_token }}"></div>
+                <div><label class="cfg-label">From Number</label><input id="twilio_from" class="cfg-input" placeholder="+1234567890" value="{{ cfg.twilio_from }}"></div>
+            </div>
+        </div>
+
+        <!-- Custom URL -->
+        <div id="customBox" class="cfg-card hide">
+            <div class="sec-title mb-4"><i class="fas fa-link mr-2 text-green-500"></i>Custom HTTP Gateway</div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div><label class="cfg-label">Endpoint URL</label><input id="custom_url" class="cfg-input" placeholder="https://gateway.example.com/send" value="{{ cfg.custom_url }}"></div>
+                <div><label class="cfg-label">To Field</label><input id="custom_phone_field" class="cfg-input" value="{{ cfg.custom_phone_field }}"></div>
+                <div><label class="cfg-label">Message Field</label><input id="custom_message_field" class="cfg-input" value="{{ cfg.custom_message_field }}"></div>
+                <div><label class="cfg-label">API Key Field</label><input id="custom_api_key_field" class="cfg-input" value="{{ cfg.custom_api_key_field }}"></div>
+            </div>
+        </div>
+
+        <!-- Options -->
+        <div class="cfg-card">
+            <div class="sec-title mb-4"><i class="fas fa-cogs mr-2 text-purple-500"></i>SMS Options</div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <label class="flex items-center justify-between p-4 bg-slate-900/50 border border-slate-800 rounded-lg cursor-pointer">
+                    <div><p class="text-sm font-medium text-white">Send OTP</p><p class="text-xs text-gray-500">One-time passwords for login</p></div>
+                    <div id="opt_send_otp" class="toggle {{ 'on' if cfg.get('send_otp') else '' }}" onclick="toggleEl(this,'send_otp')"></div>
+                </label>
+                <label class="flex items-center justify-between p-4 bg-slate-900/50 border border-slate-800 rounded-lg cursor-pointer">
+                    <div><p class="text-sm font-medium text-white">Notifications</p><p class="text-xs text-gray-500">Send SMS notifications</p></div>
+                    <div id="opt_send_notifications" class="toggle {{ 'on' if cfg.get('send_notifications') else '' }}" onclick="toggleEl(this,'send_notifications')"></div>
+                </label>
+            </div>
+        </div>
+
+        <!-- Test -->
+        <div class="cfg-card">
+            <div class="sec-title mb-4"><i class="fas fa-vial mr-2 text-blue-500"></i>Test Gateway</div>
+            <div class="flex gap-2">
+                <input id="test_phone" class="cfg-input" placeholder="Phone number e.g. +1234567890">
+                <button class="btn-ghost whitespace-nowrap" onclick="testSms()"><i class="fas fa-paper-plane mr-1"></i>Send Test SMS</button>
+                <button class="btn-primary whitespace-nowrap" onclick="saveSms()"><i class="fas fa-save mr-1"></i>Save</button>
+            </div>
+            <p class="text-xs text-gray-500 mt-3"><i class="fas fa-info-circle mr-1"></i>TextBelt sends 1 free SMS per day for testing (use key "textbelt" for free trial).</p>
+        </div>
+    </div>
+</div>
+
+<div id="toast" class="fixed bottom-6 right-6 z-50 px-5 py-3 rounded-lg text-sm font-medium text-white opacity-0 transition pointer-events-none" style="box-shadow:0 10px 30px rgba(0,0,0,.5)"></div>
+
+<script>
+let SMS = {{ cfg | tojson }};
+
+function toggleEl(el, key){ if(key==='enabled'){ SMS.enabled=!SMS.enabled; el.classList.toggle('on',SMS.enabled); updateBadge(); } else if(key==='send_otp'||key==='send_notifications'){ SMS[key]=!SMS[key]; el.classList.toggle('on',SMS[key]); } }
+function updateBadge(){ const b=document.getElementById('smsBadge'); b.style.display='inline-flex'; b.className='badge '+(SMS.enabled?'on':'off'); b.innerHTML='<i class="fas fa-circle '+(SMS.enabled?'text-green-400':'text-red-400')+'"></i><span>'+(SMS.enabled?'Enabled':'Disabled')+'</span>'; }
+function toast(m,ok){ const t=document.getElementById('toast'); t.textContent=m; t.style.background=ok?'#16a34a':'#dc2626'; t.style.opacity='1'; setTimeout(()=>t.style.opacity='0',3500); }
+function showProvider(){ const p=document.getElementById('provider').value; document.getElementById('twilioBox').classList.toggle('hide',p!=='twilio'); document.getElementById('customBox').classList.toggle('hide',p!=='custom'); }
+function collect(){ SMS.provider=document.getElementById('provider').value; SMS.api_key=document.getElementById('api_key').value; SMS.sender_id=document.getElementById('sender_id').value; SMS.twilio_account_sid=document.getElementById('twilio_account_sid').value; SMS.twilio_auth_token=document.getElementById('twilio_auth_token').value; SMS.twilio_from=document.getElementById('twilio_from').value; SMS.custom_url=document.getElementById('custom_url').value; SMS.custom_phone_field=document.getElementById('custom_phone_field').value; SMS.custom_message_field=document.getElementById('custom_message_field').value; SMS.custom_api_key_field=document.getElementById('custom_api_key_field').value; }
+function saveSms(){ collect(); fetch('/api/config/sms',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(SMS)}).then(r=>r.json()).then(d=>{ if(d.success){toast('Configuration saved',true); updateBadge();} else toast(d.error||'Save failed',false); }); }
+function testSms(){ const to=document.getElementById('test_phone').value.trim(); if(!to) return toast('Enter a phone number',false); collect(); fetch('/api/config/sms',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(SMS)}).then(()=>fetch('/api/config/sms/test',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({test_phone:to})})).then(r=>r.json()).then(d=>toast(d.success?'Test SMS sent: '+d.message:'Error: '+d.message,d.success)); }
+showProvider();
+</script>
+{% endblock %}

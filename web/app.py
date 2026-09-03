@@ -2,11 +2,22 @@ import os
 import sys
 import json
 import time
+import re
+import smtplib
+import socket
+import base64
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 import requests
 import httpx
 from pathlib import Path
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, Response, make_response, send_file
 from datetime import datetime
+
+try:
+    import pyotp
+except ImportError:
+    pyotp = None
 
 sys.path.insert(0, '/www/AI_server')
 
@@ -23,7 +34,274 @@ API_BASE_URL = os.environ.get("API_BASE_URL", "http://localhost:8000")
 INTERNAL_API_KEY = os.environ.get("INTERNAL_API_KEY", "sk-local-e77f090788b216214cef92750879745214bb5a44a244fe4513d0615901837cab")
 
 
+# =========================================================
+# Global Configuration Storage (Mail / SMS / Security)
+# =========================================================
+CONFIG_DIR = os.path.join(DATA_DIR, "config")
+os.makedirs(CONFIG_DIR, exist_ok=True)
+
+MAIL_CONFIG_FILE = os.path.join(CONFIG_DIR, "mail.json")
+SMS_CONFIG_FILE = os.path.join(CONFIG_DIR, "sms.json")
+SECURITY_CONFIG_FILE = os.path.join(CONFIG_DIR, "security.json")
+
+DEFAULT_MAIL_CONFIG = {
+    "enabled": False,
+    "smtp_host": "smtp.gmail.com",
+    "smtp_port": 587,
+    "use_ssl": False,
+    "use_tls": True,
+    "username": "",
+    "password": "",
+    "from_name": "AI Server",
+    "from_email": "",
+    # System mail options
+    "send_verification": True,       # send verification emails
+    "send_otp": True,                # send OTP codes on login
+    "send_notifications": True,      # send notifications
+    "send_group_mail": True,         # group mail to mailing list
+    "send_reports": True,            # send reports
+    "mailing_list": [],              # list of recipient emails
+}
+
+DEFAULT_SMS_CONFIG = {
+    "enabled": False,
+    "provider": "textbelt",          # textbelt | twilio | custom
+    "api_key": "",
+    "sender_id": "AIServer",
+    "twilio_account_sid": "",
+    "twilio_auth_token": "",
+    "twilio_from": "",
+    "custom_url": "",
+    "custom_phone_field": "to",
+    "custom_message_field": "message",
+    "custom_api_key_field": "api_key",
+    "send_otp": True,
+    "send_notifications": True,
+}
+
+DEFAULT_SECURITY_CONFIG = {
+    "enabled": True,
+    "login_otp": False,              # send OTP on login via email/SMS
+    "two_factor_auth": False,        # TOTP 2FA with authenticator app
+    "ip_block_enabled": False,       # block specific IPs
+    "blocked_ips": [],
+    "honeypot_enabled": False,       # honeypot trap fields
+    "honeypot_field": "website",
+    "honeypot_message": "Activity blocked. Please try again.",
+    "country_block_enabled": False,  # block by country
+    "blocked_countries": [],
+    "captcha_enabled": False,        # simple math captcha on login
+    "max_login_attempts": 5,
+    "lockout_minutes": 15,
+    "failed_attempts": {},           # email -> {count, until}
+}
+
+
+def _load_config(path, default):
+    try:
+        if os.path.exists(path):
+            with open(path, "r") as f:
+                data = json.load(f)
+            if isinstance(data, dict):
+                merged = dict(default)
+                merged.update(data)
+                return merged
+    except Exception:
+        pass
+    return dict(default)
+
+
+def _save_config(path, data):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+
+
+def load_mail_config():
+    return _load_config(MAIL_CONFIG_FILE, DEFAULT_MAIL_CONFIG)
+
+
+def load_sms_config():
+    return _load_config(SMS_CONFIG_FILE, DEFAULT_SMS_CONFIG)
+
+
+def load_security_config():
+    return _load_config(SECURITY_CONFIG_FILE, DEFAULT_SECURITY_CONFIG)
+
+
+def save_mail_config(data):
+    _save_config(MAIL_CONFIG_FILE, data)
+
+
+def save_sms_config(data):
+    _save_config(SMS_CONFIG_FILE, data)
+
+
+def save_security_config(data):
+    _save_config(SECURITY_CONFIG_FILE, data)
+
+
+def _get_client_ip():
+    forwarded = request.headers.get("X-Forwarded-For")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.remote_addr or ""
+
+
+def _ip_in_network(ip, cidr):
+    """Check if ip is in a CIDR block (e.g. 192.168.1.0/24) or exact ip."""
+    try:
+        if "/" in cidr:
+            network, prefix = cidr.split("/")
+            prefix = int(prefix)
+            ip_bits = int.from_bytes(socket.inet_aton(ip), "big")
+            net_bits = int.from_bytes(socket.inet_aton(network), "big")
+            mask = (0xFFFFFFFF << (32 - prefix)) & 0xFFFFFFFF
+            return (ip_bits & mask) == (net_bits & mask)
+        return ip == cidr
+    except Exception:
+        return False
+
+
+def _ip_is_blocked(ip):
+    sec = load_security_config()
+    if not sec.get("ip_block_enabled"):
+        return False
+    for entry in sec.get("blocked_ips", []):
+        if _ip_in_network(ip, str(entry).strip()):
+            return True
+    return False
+
+
+def _country_is_blocked():
+    """Best-effort country block via free GeoIP HTTP API (no key required)."""
+    sec = load_security_config()
+    if not sec.get("country_block_enabled"):
+        return False
+    blocked = sec.get("blocked_countries", [])
+    if not blocked:
+        return False
+    ip = _get_client_ip()
+    try:
+        r = requests.get(f"https://ipapi.co/{ip}/country/", timeout=5)
+        if r.status_code == 200:
+            code = (r.text or "").strip().upper()
+            return code in [c.upper() for c in blocked]
+    except Exception:
+        return False
+    return False
+
+
+def _honeypot_triggered():
+    sec = load_security_config()
+    if not sec.get("honeypot_enabled"):
+        return False
+    field = sec.get("honeypot_field", "website")
+    # Empty honeypot field means human (bots fill it); filled means bot
+    value = (request.form.get(field, "") or "").strip()
+    return len(value) > 0
+
+
+def _verify_captcha():
+    sec = load_security_config()
+    if not sec.get("captcha_enabled"):
+        return True
+    answer = request.form.get("captcha_answer", "").strip()
+    code = session.get("captcha_code")
+    try:
+        return answer.isdigit() and code is not None and int(answer) == code
+    except Exception:
+        return False
+
+
+def _send_mail(to, subject, body, html=None):
+    """Send mail using the configured mail server. Returns (ok, msg)."""
+    cfg = load_mail_config()
+    if not cfg.get("enabled"):
+        return False, "Mail server is not enabled"
+    if not cfg.get("username") or not cfg.get("smtp_host"):
+        return False, "Mail server not configured"
+    to_list = to
+    if isinstance(to, str):
+        to_list = [to]
+    try:
+        msg = MIMEMultipart("alternative")
+        from_addr = cfg.get("from_email") or cfg.get("username")
+        from_name = cfg.get("from_name", "AI Server")
+        msg["From"] = f"{from_name} <{from_addr}>" if from_name else from_addr
+        msg["To"] = ", ".join(to_list)
+        msg["Subject"] = subject
+        msg.attach(MIMEText(body, "plain", "utf-8"))
+        if html:
+            msg.attach(MIMEText(html, "html", "utf-8"))
+        port = int(cfg.get("smtp_port", 587))
+        use_tls = cfg.get("use_tls", True)
+        use_ssl = cfg.get("use_ssl", not use_tls)
+        if use_ssl:
+            server = smtplib.SMTP_SSL(cfg.get("smtp_host"), port, timeout=15)
+        else:
+            server = smtplib.SMTP(cfg.get("smtp_host"), port, timeout=15)
+            if use_tls:
+                server.starttls()
+        if cfg.get("username"):
+            server.login(cfg.get("username"), cfg.get("password", ""))
+        server.sendmail(from_addr, to_list, msg.as_string())
+        server.quit()
+        return True, "Email sent"
+    except Exception as e:
+        return False, str(e)[:300]
+
+
+def _send_sms(to, message):
+    """Send SMS using the configured gateway. Returns (ok, msg)."""
+    cfg = load_sms_config()
+    if not cfg.get("enabled"):
+        return False, "SMS gateway is not enabled"
+    provider = cfg.get("provider", "textbelt")
+    api_key = cfg.get("api_key", "").strip()
+    try:
+        if provider == "textbelt":
+            resp = requests.post(
+                "https://textbelt.com/text",
+                data={"phone": to, "message": message, "key": api_key or "textbelt"},
+                timeout=15,
+            )
+            data = resp.json()
+            return bool(data.get("success", False)), data.get("error") or data.get("message") or "sent"
+        elif provider == "twilio":
+            sid = cfg.get("twilio_account_sid", "").strip()
+            token = cfg.get("twilio_auth_token", "").strip()
+            from_ = cfg.get("twilio_from", "").strip()
+            if not (sid and token and from_):
+                return False, "Twilio credentials incomplete"
+            auth = base64.b64encode(f"{sid}:{token}".encode()).decode()
+            resp = requests.post(
+                f"https://api.twilio.com/2010-04-01/Accounts/{sid}/Messages.json",
+                data={"To": to, "From": from_, "Body": message},
+                headers={"Authorization": f"Basic {auth}"},
+                timeout=15,
+            )
+            data = resp.json()
+            return resp.status_code == 201, data.get("message") or "sent"
+        elif provider == "custom":
+            url = cfg.get("custom_url", "").strip()
+            if not url:
+                return False, "Custom URL not configured"
+            payload = {
+                cfg.get("custom_phone_field", "to"): to,
+                cfg.get("custom_message_field", "message"): message,
+            }
+            if api_key:
+                payload[cfg.get("custom_api_key_field", "api_key")] = api_key
+            resp = requests.post(url, json=payload, timeout=15)
+            return resp.status_code < 400, resp.text[:200]
+        return False, "Unknown provider"
+    except Exception as e:
+        return False, str(e)[:300]
+
+
 def get_api_headers():
+    """Build API auth headers for calling the backend, with agent auto-login fallback."""
     headers = {"Content-Type": "application/json"}
     auth_header = request.headers.get("Authorization", "")
     if auth_header:
@@ -31,8 +309,6 @@ def get_api_headers():
     elif "access_token" in session:
         headers["Authorization"] = f"Bearer {session['access_token']}"
     else:
-        # Auto-login as agent user if no token, but DO NOT modify the session
-        # to avoid overwriting the current user's session
         try:
             response = requests.post(
                 f"{API_BASE_URL}/auth/login",
@@ -120,11 +396,98 @@ def register():
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
+    sec = load_security_config()
+    client_ip = _get_client_ip()
+
+    # Enforce safety policies (independent of form submission)
+    if _ip_is_blocked(client_ip):
+        flash("Access denied: Your IP is blocked.", "error")
+        return render_template("login.html", security_blocked=True), 403
+    if _country_is_blocked():
+        flash("Access denied: Your country is blocked.", "error")
+        return render_template("login.html", security_blocked=True), 403
+
     if request.method == "POST":
+        # Honeypot trap
+        if _honeypot_triggered():
+            flash(sec.get("honeypot_message", "Activity blocked. Please try again."), "error")
+            return redirect(url_for("index"))
+
+        # CAPTCHA
+        if not _verify_captcha():
+            if sec.get("captcha_enabled"):
+                _generate_captcha()
+            flash("Incorrect CAPTCHA answer. Please try again.", "error")
+            return render_template("login.html", security=sec, show_captcha=sec.get("captcha_enabled"), continue_login=request.form.get("email"))
+
+        # Rate limiting (failed attempts)
+        email = request.form.get("email", "")
+        attempts = sec.get("failed_attempts", {}) or {}
+        ekey = email.lower()
+        cur = attempts.get(ekey) or {"count": 0, "until": 0}
+        max_attempts = int(sec.get("max_login_attempts", 5))
+        lock_min = int(sec.get("lockout_minutes", 15))
+        if cur.get("count", 0) >= max_attempts and time.time() < cur.get("until", 0):
+            mins_left = int((cur.get("until") - time.time()) / 60) + 1
+            flash(f"Too many failed attempts. Account locked for {mins_left} more minute(s).", "error")
+            return render_template("login.html", security=sec, show_captcha=sec.get("captcha_enabled"), continue_login=email), 429
+
         data = {
-            "email": request.form["email"],
+            "email": email,
             "password": request.form["password"]
         }
+
+        # Login OTP verification: code was already requested and stored in session
+        if session.get("_otp_email") == email and session.get("_otp_code"):
+            otp_input = request.form.get("otp", "").strip()
+            if time.time() > session.get("_otp_expires", 0):
+                session.pop("_otp_email", None)
+                session.pop("_otp_code", None)
+                session.pop("_otp_expires", None)
+                flash("OTP expired. Please log in again.", "error")
+                return redirect(url_for("login"))
+            if otp_input != session.get("_otp_code"):
+                _record_failed_attempt(sec, email)
+                flash("Invalid OTP code.", "error")
+                return render_template("login.html", security=sec, show_otp=True, continue_login=email, show_captcha=sec.get("captcha_enabled"))
+            # OTP valid -> complete login using stored result from earlier auth
+            result = session.get("_otp_pending")
+            if result and result.get("access_token"):
+                session["access_token"] = result["access_token"]
+                session["user"] = result["user"]
+                session.pop("_otp_email", None)
+                session.pop("_otp_code", None)
+                session.pop("_otp_pending", None)
+                session.pop("_otp_expires", None)
+                _clear_failed_attempts(sec, email)
+                flash("Login successful!", "success")
+                return redirect(url_for("dashboard"))
+            session.pop("_otp_email", None)
+            session.pop("_otp_code", None)
+            session.pop("_otp_pending", None)
+            flash("OTP session expired, please log in again.", "error")
+            return redirect(url_for("login"))
+
+        # 2FA: if session already has a resolved user needing TOTP code
+        if sec.get("two_factor_auth") and session.get("_2fa_email") == email:
+            code = request.form.get("otp", "").strip()
+            secret = session.get("_2fa_secret", "")
+            if not secret or not pyotp or not pyotp.TOTP(secret).verify(code):
+                _record_failed_attempt(sec, email)
+                flash("Invalid 2FA code.", "error")
+                return render_template("login.html", security=sec, show_2fa=True, continue_login=email, show_captcha=sec.get("captcha_enabled"))
+            session.pop("_2fa_email", None)
+            session.pop("_2fa_secret", None)
+            # credentials were already validated mentally; proceed using stored token
+            result = session.get("_2fa_pending")
+            if result and result.get("access_token"):
+                session["access_token"] = result["access_token"]
+                session["user"] = result["user"]
+                _clear_failed_attempts(sec, email)
+                flash("Login successful!", "success")
+                return redirect(url_for("dashboard"))
+            flash("2FA session expired, please log in again.", "error")
+            return redirect(url_for("login"))
 
         try:
             response = requests.post(
@@ -135,17 +498,41 @@ def login():
 
             if response.status_code == 200:
                 result = response.json()
+
+                # Two-Factor: require TOTP before granting session
+                if sec.get("two_factor_auth") and pyotp:
+                    session["_2fa_email"] = email
+                    session["_2fa_pending"] = result
+                    secret = sec.get("totp_secret") or ""
+                    session["_2fa_secret"] = secret
+                    flash("Enter your 2FA code to complete sign-in.", "info")
+                    return render_template("login.html", security=sec, show_2fa=True, continue_login=email, show_captcha=sec.get("captcha_enabled"))
+
+                # Login OTP (if enabled): send a code and require it
+                if sec.get("login_otp"):
+                    otp_code = str(pyotp.TOTP(pyotp.random_base32()).now() if pyotp else str(time.time())[-6:])
+                    session["_otp_email"] = email
+                    session["_otp_code"] = otp_code
+                    session["_otp_pending"] = result
+                    session["_otp_expires"] = time.time() + 300
+                    _deliver_otp(email, otp_code)
+                    flash("An OTP has been sent to you. Enter it to continue.", "info")
+                    return render_template("login.html", security=sec, show_otp=True, continue_login=email, show_captcha=sec.get("captcha_enabled"))
+
                 session["access_token"] = result["access_token"]
                 session["user"] = result["user"]
+                _clear_failed_attempts(sec, email)
                 flash("Login successful!", "success")
                 return redirect(url_for("dashboard"))
             else:
+                _record_failed_attempt(sec, email)
                 error = response.json().get("detail", "Login failed")
                 flash(error, "error")
         except requests.exceptions.RequestException as e:
             flash(f"Connection error: {str(e)}", "error")
 
-    return render_template("login.html")
+    _generate_captcha()
+    return render_template("login.html", security=sec, show_captcha=sec.get("captcha_enabled"))
 
 
 @app.route("/logout")
@@ -5100,7 +5487,65 @@ def admin_users():
         users = resp.json() if resp.status_code == 200 else []
     except:
         users = []
-    return render_template("admin/users.html", users=users)
+    try:
+        roles_resp = requests.get(f"{API_BASE_URL}/rbac/roles", headers=get_api_headers(), timeout=10)
+        roles = roles_resp.json() if roles_resp.status_code == 200 else []
+    except:
+        roles = []
+    return render_template("admin/users.html", users=users, roles=roles)
+
+
+@app.route("/admin/role-permissions")
+@require_admin
+def admin_role_permissions():
+    try:
+        resp = requests.get(f"{API_BASE_URL}/rbac/roles?include_permissions=true", headers=get_api_headers(), timeout=10)
+        roles = resp.json() if resp.status_code == 200 else []
+    except:
+        roles = []
+    try:
+        modules_resp = requests.get(f"{API_BASE_URL}/rbac/modules?include_menus=true", headers=get_api_headers(), timeout=10)
+        modules = modules_resp.json() if modules_resp.status_code == 200 else []
+    except:
+        modules = []
+    return render_template("admin/role_permissions.html", roles=roles, modules=modules)
+
+
+@app.route("/api/admin/users", methods=["POST"])
+@require_admin
+def admin_create_user():
+    try:
+        data = request.get_json(silent=True) or {}
+        username = data.get("username", "").strip()
+        email = data.get("email", "").strip()
+        password = data.get("password", "")
+        role_id = data.get("role_id") or data.get("role")
+        if not all([username, email, password]):
+            return jsonify({"detail": "Username, email and password are required"}), 400
+        resp = requests.post(
+            f"{API_BASE_URL}/auth/register",
+            json={"username": username, "email": email, "password": password},
+            headers=get_api_headers(),
+            timeout=10,
+        )
+        if resp.status_code not in (200, 201):
+            try:
+                detail = resp.json().get("detail", "Failed to create user")
+            except Exception:
+                detail = "Failed to create user"
+            return jsonify({"detail": detail}), resp.status_code
+        new_user = resp.json().get("user", {})
+        if role_id and new_user.get("id"):
+            requests.post(
+                f"{API_BASE_URL}/rbac/users/{new_user['id']}/role",
+                json={"user_id": new_user["id"], "role_id": role_id},
+                headers=get_api_headers(),
+                timeout=10,
+            )
+        return jsonify({"success": True, "user": new_user})
+    except Exception as e:
+        return jsonify({"detail": str(e)}), 500
+
 
 
 @app.route("/admin/roles")
@@ -5147,12 +5592,28 @@ def admin_init_rbac():
     try:
         resp = requests.post(f"{API_BASE_URL}/rbac/init", headers=get_api_headers(), timeout=10)
         if resp.status_code == 200:
+            if request.headers.get("X-Requested-With") == "XMLHttpRequest" or request.content_type == "application/json":
+                return jsonify(resp.json())
             flash("RBAC system initialized successfully!", "success")
         else:
+            if request.headers.get("X-Requested-With") == "XMLHttpRequest" or request.content_type == "application/json":
+                return jsonify(resp.json()), resp.status_code
             flash("Failed to initialize RBAC", "error")
     except Exception as e:
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest" or request.content_type == "application/json":
+            return jsonify({"detail": str(e)}), 500
         flash(f"Connection error: {str(e)}", "error")
     return redirect(url_for("admin_roles"))
+
+
+@app.route("/api/admin/roles", methods=["GET"])
+@require_admin
+def api_list_roles():
+    try:
+        resp = requests.get(f"{API_BASE_URL}/rbac/roles?include_permissions=true", headers=get_api_headers(), timeout=10)
+        return jsonify(resp.json()), resp.status_code
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/api/admin/roles", methods=["POST"])
@@ -5164,6 +5625,22 @@ def api_create_role():
         return resp.json(), resp.status_code
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/admin/roles/<role_id>/permissions", methods=["POST"])
+@require_admin
+def api_assign_role_permissions(role_id):
+    data = request.get_json(silent=True) or []
+    try:
+        resp = requests.post(
+            f"{API_BASE_URL}/rbac/roles/{role_id}/permissions",
+            json=data,
+            headers=get_api_headers(),
+            timeout=10,
+        )
+        return jsonify(resp.json()), resp.status_code
+    except Exception as e:
+        return jsonify({"detail": str(e)}), 500
 
 
 @app.route("/api/admin/roles/<role_id>", methods=["PUT"])
@@ -5573,6 +6050,217 @@ try:
     start_scheduler()
 except Exception as _sched_err:
     print(f"[MonitorScheduler] Could not start: {_sched_err}")
+
+
+# =========================================================
+# Configuration Pages: Mail / SMS / Security
+# =========================================================
+
+@app.route("/config/mail", methods=["GET"])
+def config_mail_page():
+    return render_template("config_mail.html", cfg=load_mail_config(), now=datetime.now())
+
+
+@app.route("/api/config/mail", methods=["GET"])
+def api_get_mail_config():
+    return jsonify(load_mail_config())
+
+
+@app.route("/api/config/mail", methods=["POST"])
+def api_save_mail_config():
+    try:
+        d = request.get_json(silent=True) or {}
+        cfg = load_mail_config()
+        for k in DEFAULT_MAIL_CONFIG:
+            if k in d:
+                cfg[k] = d[k]
+        cfg["enabled"] = bool(d.get("enabled", cfg.get("enabled")))
+        cfg["mailing_list"] = d.get("mailing_list", cfg.get("mailing_list", []))
+        if isinstance(cfg["mailing_list"], str):
+            cfg["mailing_list"] = [x.strip() for x in cfg["mailing_list"].split(",") if x.strip()]
+        save_mail_config(cfg)
+        return jsonify({"success": True, "config": cfg})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 400
+
+
+@app.route("/api/config/mail/test", methods=["POST"])
+def api_test_mail_config():
+    d = request.get_json(silent=True) or {}
+    to = d.get("test_email") or ""
+    if not to:
+        return jsonify({"success": False, "error": "Test email address required"}), 400
+    ok, msg = _send_mail(to, "AI Server Test Email", "This is a test email from your AI Server mail configuration. If you received this, your SMTP settings work correctly.")
+    return jsonify({"success": ok, "message": msg})
+
+
+@app.route("/api/config/mail/send", methods=["POST"])
+def api_send_group_mail():
+    d = request.get_json(silent=True) or {}
+    recipients = d.get("to") or d.get("recipients") or []
+    subject = d.get("subject", "")
+    body = d.get("body", "")
+    cfg = load_mail_config()
+    if not recipients:
+        recipients = cfg.get("mailing_list", [])
+    if not recipients:
+        return jsonify({"success": False, "error": "No recipients. Provide recipients or configure a mailing list."}), 400
+    sent, failed = [], []
+    for r in recipients:
+        ok, msg = _send_mail(r, subject, body)
+        if ok:
+            sent.append(r)
+        else:
+            failed.append({"to": r, "error": msg})
+    return jsonify({"success": True, "sent": sent, "failed": failed})
+
+
+@app.route("/config/sms", methods=["GET"])
+def config_sms_page():
+    return render_template("config_sms.html", cfg=load_sms_config(), now=datetime.now())
+
+
+@app.route("/api/config/sms", methods=["GET"])
+def api_get_sms_config():
+    return jsonify(load_sms_config())
+
+
+@app.route("/api/config/sms", methods=["POST"])
+def api_save_sms_config():
+    try:
+        d = request.get_json(silent=True) or {}
+        cfg = load_sms_config()
+        for k in DEFAULT_SMS_CONFIG:
+            if k in d:
+                cfg[k] = d[k]
+        cfg["enabled"] = bool(d.get("enabled", cfg.get("enabled")))
+        save_sms_config(cfg)
+        return jsonify({"success": True, "config": cfg})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 400
+
+
+@app.route("/api/config/sms/test", methods=["POST"])
+def api_test_sms_config():
+    d = request.get_json(silent=True) or {}
+    to = d.get("test_phone") or ""
+    if not to:
+        return jsonify({"success": False, "error": "Test phone number required"}), 400
+    ok, msg = _send_sms(to, "This is a test SMS from your AI Server SMS gateway.")
+    return jsonify({"success": ok, "message": msg})
+
+
+@app.route("/config/security", methods=["GET"])
+def config_security_page():
+    return render_template("config_security.html", cfg=load_security_config(), now=datetime.now())
+
+
+@app.route("/api/config/security", methods=["GET"])
+def api_get_security_config():
+    return jsonify(load_security_config())
+
+
+@app.route("/api/config/security", methods=["POST"])
+def api_save_security_config():
+    try:
+        d = request.get_json(silent=True) or {}
+        cfg = load_security_config()
+        for k in DEFAULT_SECURITY_CONFIG:
+            if k in d:
+                cfg[k] = d[k]
+        for k in ["ip_block_enabled", "honeypot_enabled", "country_block_enabled",
+                  "captcha_enabled", "login_otp", "two_factor_auth", "enabled"]:
+            if k in d:
+                cfg[k] = bool(d[k])
+        for lst in ["blocked_ips", "blocked_countries"]:
+            if lst in d:
+                v = d[lst]
+                if isinstance(v, str):
+                    v = [x.strip() for x in v.replace("\n", ",").split(",") if x.strip()]
+                cfg[lst] = v
+        current_total = cfg.get("failed_attempts", {})
+        new_fa = d.get("failed_attempts")
+        cfg["failed_attempts"] = new_fa if isinstance(new_fa, dict) else current_total
+        save_security_config(cfg)
+        return jsonify({"success": True, "config": cfg})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 400
+
+
+@app.route("/api/config/security/2fa/enroll", methods=["POST"])
+def api_enroll_2fa():
+    d = request.get_json(silent=True) or {}
+    secret = d.get("secret") or (pyotp.random_base32() if pyotp else "")
+    return jsonify({"success": True, "secret": secret})
+
+
+@app.route("/api/config/security/clear-failures", methods=["POST"])
+def api_clear_failures():
+    cfg = load_security_config()
+    cfg["failed_attempts"] = {}
+    save_security_config(cfg)
+    return jsonify({"success": True})
+
+
+@app.route("/api/config/security/verify-ip/<path:ip>", methods=["GET"])
+def api_check_ip(ip):
+    blocked = _ip_in_network(ip, ip) or _ip_in_network(ip, "0.0.0.0/0")
+    ecfg = load_security_config()
+    blocked = any(_ip_in_network(ip, str(x).strip()) for x in ecfg.get("blocked_ips", []))
+    return jsonify({"ip": ip, "blocked": blocked})
+
+
+def get_message_delivery():
+    """Get preferred delivery method for OTP/notifications based on config."""
+    return {"email": load_mail_config().get("enabled"), "sms": load_sms_config().get("enabled")}
+
+
+def _generate_captcha():
+    """Generate a simple math captcha and stash the answer in session."""
+    import random
+    a = random.randint(1, 9)
+    b = random.randint(1, 9)
+    session["captcha_code"] = a + b
+    session["captcha_text"] = f"{a} + {b} = ?"
+    return session["captcha_text"]
+
+
+def _record_failed_attempt(sec, email):
+    if not email:
+        return
+    attempts = sec.get("failed_attempts", {}) or {}
+    cur = attempts.get(email.lower()) or {"count": 0, "until": 0}
+    cur["count"] = cur.get("count", 0) + 1
+    if cur["count"] >= int(sec.get("max_login_attempts", 5)):
+        cur["until"] = time.time() + int(sec.get("lockout_minutes", 15)) * 60
+    attempts[email.lower()] = cur
+    sec["failed_attempts"] = attempts
+    save_security_config(sec)
+
+
+def _clear_failed_attempts(sec, email):
+    if not email:
+        return
+    attempts = sec.get("failed_attempts", {}) or {}
+    attempts.pop(email.lower(), None)
+    sec["failed_attempts"] = attempts
+    save_security_config(sec)
+
+
+def _deliver_otp(email, otp_code, phone=None):
+    """Deliver OTP via enabled channel (email first, then SMS)."""
+    result = {"email": False, "sms": False}
+    if email:
+        ok, _msg = _send_mail(
+            email,
+            "Your login verification code",
+            f"Your verification code is: {otp_code}\n\nThis code expires in 5 minutes. If you did not request this, please ignore.",
+        )
+        result["email"] = ok
+    if phone:
+        ok, _msg = _send_sms(phone, f"Your verification code is: {otp_code}")
+        result["sms"] = ok
+    return result
 
 
 if __name__ == "__main__":

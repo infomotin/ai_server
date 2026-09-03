@@ -448,7 +448,7 @@ class RBACService:
 
     def get_users_with_roles(self, db: Session) -> List[Dict]:
         """Get all users with their assigned roles."""
-        users = db.query(User).filter(User.is_active == True).all()
+        users = db.query(User).all()
         result = []
         for u in users:
             roles = self.get_user_roles(db, u.id)
@@ -457,6 +457,8 @@ class RBACService:
                 "username": u.username,
                 "email": u.email,
                 "is_active": u.is_active,
+                "is_admin": u.is_admin,
+                "created_at": str(u.created_at) if u.created_at else "",
                 "roles": roles
             })
         return result

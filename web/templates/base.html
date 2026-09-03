@@ -11,8 +11,12 @@
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background: #0f172a; color: #e2e8f0; }
-        .sidebar { width: 260px; min-height: 100vh; background: #1e293b; border-right: 1px solid #334155; position: fixed; top: 0; left: 0; z-index: 50; transition: transform 0.3s ease, width 0.3s ease; display: flex; flex-direction: column; }
-        .sidebar nav { flex: 1; overflow-y: auto; }
+        .sidebar { width: 260px; height: 100vh; background: #1e293b; border-right: 1px solid #334155; position: fixed; top: 0; left: 0; z-index: 50; transition: transform 0.3s ease, width 0.3s ease; display: flex; flex-direction: column; overflow: hidden; }
+        .sidebar nav { flex: 1; overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; scrollbar-color: #475569 transparent; }
+        .sidebar nav::-webkit-scrollbar { width: 8px; }
+        .sidebar nav::-webkit-scrollbar-track { background: transparent; }
+        .sidebar nav::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+        .sidebar nav::-webkit-scrollbar-thumb:hover { background: #64748b; }
         .sidebar.collapsed { transform: translateX(-260px); }
         .main-content { margin-left: 260px; min-height: 100vh; display: flex; flex-direction: column; transition: margin-left 0.3s ease; }
         .main-content.expanded { margin-left: 0; }
@@ -121,16 +125,30 @@
                 <i class="fas fa-key w-5"></i> API Keys
             </a>
 
+            <div class="nav-section">Configuration</div>
+            <a href="/config/mail" class="nav-item {% if request.path == '/config/mail' %}active{% endif %}">
+                <i class="fas fa-envelope w-5"></i> Mail Server
+            </a>
+            <a href="/config/sms" class="nav-item {% if request.path == '/config/sms' %}active{% endif %}">
+                <i class="fas fa-sms w-5"></i> SMS Gateway
+            </a>
+            <a href="/config/security" class="nav-item {% if request.path == '/config/security' %}active{% endif %}">
+                <i class="fas fa-shield-halved w-5"></i> Security
+            </a>
+
             {% if session.get('user') and session['user']['is_admin'] %}
             <div class="nav-section">Administration</div>
             <a href="/admin/users" class="nav-item {% if request.path == '/admin/users' %}active{% endif %}">
                 <i class="fas fa-users w-5"></i> User Management
             </a>
+            <a href="/admin/role-permissions" class="nav-item {% if request.path == '/admin/role-permissions' %}active{% endif %}">
+                <i class="fas fa-shield-halved w-5"></i> Role Permissions
+            </a>
             <a href="/admin/roles" class="nav-item {% if request.path == '/admin/roles' %}active{% endif %}">
                 <i class="fas fa-user-shield w-5"></i> Roles
             </a>
             <a href="/admin/permissions" class="nav-item {% if request.path == '/admin/permissions' %}active{% endif %}">
-                <i class="fas fa-key w-5"></i> Permissions
+                <i class="fas fa-key w-5"></i> View All Permissions
             </a>
             <a href="/admin/menus" class="nav-item {% if request.path == '/admin/menus' %}active{% endif %}">
                 <i class="fas fa-bars w-5"></i> Menus

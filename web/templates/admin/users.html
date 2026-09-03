@@ -1,86 +1,117 @@
 {% extends "base.html" %}
-
 {% block title %}User Management - Admin{% endblock %}
 {% block header_title %}User Management{% endblock %}
 
 {% block content %}
-<div class="mb-6">
-    <div class="flex items-center justify-between">
+<style>
+    .um-card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; }
+    .um-input { width: 100%; background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 10px 14px; color: #e2e8f0; font-size: 14px; }
+    .um-input:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,0.15); }
+    .um-label { display: block; font-size: 13px; color: #94a3b8; margin-bottom: 6px; }
+    .um-select { width: 100%; background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 9px 12px; color: #e2e8f0; font-size: 14px; cursor: pointer; }
+    .um-btn { padding: 10px 18px; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; transition: .2s; border: none; }
+    .um-primary { background: #3b82f6; color: #fff; }
+    .um-primary:hover { background: #2563eb; }
+    .um-green { background: #16a34a; color: #fff; }
+    .um-green:hover { background: #15803d; }
+    .um-ghost { background: transparent; color: #94a3b8; border: 1px solid #334155; }
+    .um-ghost:hover { color: #e2e8f0; border-color: #475569; }
+    .um-red { background: #dc2626; color: #fff; }
+    .um-red:hover { background: #b91c1c; }
+    .badge-green { background: #16a34a33; color: #4ade80; border: 1px solid #16a34a; padding: 3px 10px; border-radius: 999px; font-size: 12px; }
+    .badge-red { background: #dc262633; color: #f87171; border: 1px solid #dc2626; padding: 3px 10px; border-radius: 999px; font-size: 12px; }
+    .badge-blue { background: #3b82f633; color: #60a5fa; border: 1px solid #3b82f6; padding: 3px 10px; border-radius: 999px; font-size: 12px; }
+    .modal-bg { position: fixed; inset: 0; z-index: 50; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,.6); backdrop-filter: blur(6px); }
+    .modal-bg.show { display: flex; }
+    .modal-box { background: #1e293b; border: 1px solid #334155; border-radius: 16px; width: 100%; max-width: 520px; padding: 28px; }
+</style>
+
+<div class="max-w-6xl">
+    <div class="flex items-center justify-between mb-6 flex-wrap gap-4">
         <div>
-            <h2 class="text-2xl font-bold text-white">User Management</h2>
-            <p class="text-gray-400 text-sm mt-1">Manage users and their role assignments</p>
+            <h3 class="text-xl font-semibold text-white">User Management</h3>
+            <p class="text-sm text-gray-500 mt-1">List all users, create new accounts, assign roles and manage permissions.</p>
+        </div>
+        <div class="flex gap-3">
+            <button class="um-btn um-ghost" onclick="refreshUsers()"><i class="fas fa-sync mr-1"></i>Refresh</button>
+            <button class="um-btn um-primary" onclick="openCreateModal()"><i class="fas fa-user-plus mr-1"></i>Create User</button>
         </div>
     </div>
-</div>
 
-<div class="card">
-    <div class="card-header">
-        <h3 class="text-lg font-semibold text-white"><i class="fas fa-users mr-2"></i>All Users</h3>
-    </div>
-    <div class="card-body">
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                    <div class="flash flash-{{ category }}">{{ message }}</div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
-
+    <!-- Users Table -->
+    <div class="um-card overflow-hidden">
         <div class="overflow-x-auto">
             <table class="w-full">
                 <thead>
-                    <tr class="text-left text-gray-400 text-sm border-b border-gray-700">
-                        <th class="pb-3">Username</th>
-                        <th class="pb-3">Email</th>
-                        <th class="pb-3">Status</th>
-                        <th class="pb-3">Assigned Role</th>
-                        <th class="pb-3">Actions</th>
+                    <tr class="text-left text-gray-400 text-sm border-b border-gray-700 bg-gray-800/40">
+                        <th class="px-5 py-3">User</th>
+                        <th class="px-5 py-3">Email</th>
+                        <th class="px-5 py-3">Status</th>
+                        <th class="px-5 py-3">Admin</th>
+                        <th class="px-5 py-3">Assigned Role</th>
+                        <th class="px-5 py-3">Change Role</th>
+                        <th class="px-5 py-3">Actions</th>
                     </tr>
                 </thead>
-                <tbody>
+                <tbody id="userTableBody">
                     {% for user in users %}
-                    <tr class="border-b border-gray-800 hover:bg-gray-800/50">
-                        <td class="py-4">
+                    <tr class="border-b border-gray-800/60 hover:bg-gray-800/30 transition" data-uid="{{ user.id }}">
+                        <td class="px-5 py-4">
                             <div class="flex items-center gap-3">
-                                <div class="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold">
-                                    {{ user.username[0]|upper }}
+                                <div class="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold text-white {% if user.is_admin %}bg-indigo-600{% else %}bg-gray-600{% endif %}">
+                                    {{ user.username[0]|upper if user.username else '?' }}
                                 </div>
                                 <span class="text-white font-medium">{{ user.username }}</span>
                             </div>
                         </td>
-                        <td class="py-4 text-gray-400">{{ user.email }}</td>
-                        <td class="py-4">
+                        <td class="px-5 py-4 text-gray-400 text-sm">{{ user.email }}</td>
+                        <td class="px-5 py-4">
                             {% if user.is_active %}
-                                <span class="badge badge-green">Active</span>
+                                <span class="badge-green">Active</span>
                             {% else %}
-                                <span class="badge badge-red">Inactive</span>
+                                <span class="badge-red">Inactive</span>
                             {% endif %}
                         </td>
-                        <td class="py-4">
-                            {% if user.roles and user.roles|length > 0 %}
+                        <td class="px-5 py-4">
+                            {% if user.is_admin %}
+                                <span class="badge-blue">Admin</span>
+                            {% else %}
+                                <span class="text-gray-600 text-sm">No</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-5 py-4">
+                            {% if user.roles %}
                                 {% for ur in user.roles %}
-                                    <span class="badge badge-blue">{{ ur.role_name }}</span>
+                                    <span class="badge-blue">{{ ur.role_name }}</span>
                                 {% endfor %}
                             {% else %}
-                                <span class="text-gray-500 text-sm">No role assigned</span>
+                                <span class="text-gray-500 text-sm italic">No role</span>
                             {% endif %}
                         </td>
-                        <td class="py-4">
-                            <select class="role-select bg-gray-700 border border-gray-600 rounded px-3 py-1.5 text-sm text-white"
-                                    data-user-id="{{ user.id }}"
-                                    onchange="assignRole('{{ user.id }}', this.value)">
-                                <option value="">Select Role</option>
-                                <option value="">-- Remove Role --</option>
-                                {% for user in users %}
-                                    {% for role in user.roles %}
-                                    {% endfor %}
+                        <td class="px-5 py-4">
+                            <select class="um-select" style="width:160px" onchange="assignRole('{{ user.id }}', this.value)">
+                                <option value="">-- Select --</option>
+                                {% for role in roles %}
+                                <option value="{{ role.id }}" {% if user.roles %}{% for ur in user.roles %}{% if ur.role_id == role.id %}selected{% endif %}{% endfor %}{% endif %}>
+                                    {{ role.name }}
+                                </option>
                                 {% endfor %}
                             </select>
+                        </td>
+                        <td class="px-5 py-4">
+                            <div class="flex gap-2">
+                                <button class="um-btn um-ghost text-xs" onclick="toggleAdmin('{{ user.id }}', {{ 'false' if user.is_admin else 'true' }})" title="Toggle admin status">
+                                    <i class="fas fa-{{ 'user-minus' if user.is_admin else 'user-shield' }}"></i>
+                                </button>
+                            </div>
                         </td>
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="5" class="py-8 text-center text-gray-500">No users found</td>
+                        <td colspan="7" class="px-5 py-12 text-center text-gray-500">
+                            <i class="fas fa-users text-3xl mb-3 block opacity-30"></i>
+                            No users found.
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -88,41 +119,120 @@
         </div>
     </div>
 </div>
+
+<!-- Create User Modal -->
+<div id="createModal" class="modal-bg">
+    <div class="modal-box">
+        <div class="flex items-center justify-between mb-5">
+            <h3 class="text-lg font-semibold text-white"><i class="fas fa-user-plus mr-2 text-blue-400"></i>Create New User</h3>
+            <button onclick="closeCreateModal()" class="text-gray-500 hover:text-white"><i class="fas fa-times text-lg"></i></button>
+        </div>
+        <form id="createUserForm" onsubmit="createUser(event)">
+            <div class="space-y-4">
+                <div><label class="um-label">Username</label><input id="cu_username" class="um-input" required placeholder="john_doe"></div>
+                <div><label class="um-label">Email</label><input id="cu_email" type="email" class="um-input" required placeholder="john@example.com"></div>
+                <div><label class="um-label">Password</label><input id="cu_password" type="password" class="um-input" required minlength="8" placeholder="At least 8 characters"></div>
+                <div>
+                    <label class="um-label">Assign Role (optional)</label>
+                    <select id="cu_role" class="um-select">
+                        <option value="">-- No Role --</option>
+                        {% for role in roles %}
+                        <option value="{{ role.id }}">{{ role.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="flex gap-3 mt-6 justify-end">
+                <button type="button" class="um-btn um-ghost" onclick="closeCreateModal()">Cancel</button>
+                <button type="submit" class="um-btn um-green"><i class="fas fa-check mr-1"></i>Create User</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div id="toast" class="fixed bottom-6 right-6 z-50 px-5 py-3 rounded-lg text-sm font-medium text-white opacity-0 transition pointer-events-none" style="box-shadow:0 10px 30px rgba(0,0,0,.5)"></div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-async function assignRole(userId, roleId) {
-    if (!roleId) return;
+function toast(m, ok) {
+    const t = document.getElementById('toast');
+    t.textContent = m;
+    t.style.background = ok ? '#16a34a' : '#dc2626';
+    t.style.opacity = '1';
+    setTimeout(() => t.style.opacity = '0', 3500);
+}
 
+function openCreateModal() {
+    document.getElementById('createModal').classList.add('show');
+}
+function closeCreateModal() {
+    document.getElementById('createModal').classList.remove('show');
+}
+
+async function createUser(e) {
+    e.preventDefault();
+    const data = {
+        username: document.getElementById('cu_username').value.trim(),
+        email: document.getElementById('cu_email').value.trim(),
+        password: document.getElementById('cu_password').value,
+        role_id: document.getElementById('cu_role').value || undefined
+    };
     try {
-        const response = await fetch(`/api/admin/users/${userId}/role`, {
+        const res = await fetch('/api/admin/users', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest'
-            },
-            body: JSON.stringify({ role_id: roleId })
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
         });
-
-        const data = await response.json();
-        if (response.ok) {
-            showToast('Role assigned successfully', 'success');
-            setTimeout(() => window.location.reload(), 500);
+        const d = await res.json();
+        if (res.ok || d.success) {
+            toast('User created successfully', true);
+            closeCreateModal();
+            setTimeout(() => window.location.reload(), 600);
         } else {
-            showToast(data.detail || 'Failed to assign role', 'error');
+            toast(d.detail || 'Failed to create user', false);
         }
-    } catch (error) {
-        showToast('Error: ' + error.message, 'error');
+    } catch (err) {
+        toast('Error: ' + err.message, false);
     }
 }
 
-function showToast(message, type) {
-    const toast = document.createElement('div');
-    toast.className = `fixed bottom-4 right-4 px-6 py-3 rounded-lg text-white ${type === 'success' ? 'bg-green-600' : 'bg-red-600'}`;
-    toast.textContent = message;
-    document.body.appendChild(toast);
-    setTimeout(() => toast.remove(), 3000);
+async function assignRole(userId, roleId) {
+    if (!roleId) return;
+    try {
+        const res = await fetch('/api/admin/users/' + userId + '/role', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ role_id: roleId })
+        });
+        const d = await res.json();
+        if (res.ok || d.success) {
+            toast('Role assigned', true);
+            setTimeout(() => window.location.reload(), 600);
+        } else {
+            toast(d.detail || 'Failed to assign role', false);
+        }
+    } catch (err) {
+        toast('Error: ' + err.message, false);
+    }
 }
+
+async function toggleAdmin(userId, makeAdmin) {
+    const action = makeAdmin ? 'grant admin' : 'revoke admin';
+    if (!confirm('Are you sure you want to ' + action + ' for this user?')) return;
+    try {
+        const res = await fetch('/api/admin/users/' + userId + '/role', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ make_admin: makeAdmin === 'true' || makeAdmin === true })
+        });
+        toast('Admin status updated', true);
+        setTimeout(() => window.location.reload(), 600);
+    } catch (err) {
+        toast('Error: ' + err.message, false);
+    }
+}
+
+function refreshUsers() { window.location.reload(); }
 </script>
 {% endblock %}
